@@ -29,7 +29,7 @@ export const settingsStorage = {
 // ACT: primaryColor 原为 Element Plus 出厂蓝 #409eff —— 那是"一眼就是默认皮肤"的主要来源。
 // 改为住凯AI视频的品牌深青绿。派生色阶（light-1..9 / dark-2）由 App.vue 用 color-mix 运行时生成，
 // 所以改这一处即可全站生效，不需要手工维护色阶。
-export const defaultUiSettings = { theme: "light", language: "system", primaryColor: "#1F8A70", fontScale: 100, radius: 8, startupAnimation: true };
+export const defaultUiSettings = { theme: "light", language: "system", primaryColor: "#1F8A70", fontScale: 100, radius: 8 };
 export const uiSettings = computed(() => {
   const raw = settings.value.ui;
   const ui = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
@@ -39,7 +39,6 @@ export const uiSettings = computed(() => {
     primaryColor: typeof ui.primaryColor === "string" && /^#[\da-f]{6}$/i.test(ui.primaryColor) ? ui.primaryColor : defaultUiSettings.primaryColor,
     fontScale: typeof ui.fontScale === "number" && Number.isFinite(ui.fontScale) ? Math.min(125, Math.max(85, ui.fontScale)) : defaultUiSettings.fontScale,
     radius: typeof ui.radius === "number" && Number.isFinite(ui.radius) ? Math.min(16, Math.max(0, ui.radius)) : defaultUiSettings.radius,
-    startupAnimation: ui.startupAnimation !== false,
   };
 });
 

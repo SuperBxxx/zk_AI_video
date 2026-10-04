@@ -11,7 +11,6 @@
   "dependencies": {
     "@toonflow/file": "workspace:*",
     "@toonflow/server": "workspace:*",
-    "@toonflow/startup": "workspace:*",
     "@toonflow/i18n": "workspace:*"
   },
   "devDependencies": {

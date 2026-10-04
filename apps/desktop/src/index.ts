@@ -9,7 +9,6 @@ import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { dlopen, ptr } from "bun:ffi";
 import type { DesktopRuntime, PluginInstallRequest } from "@toonflow/server/desktop";
-import { showNativeSplash } from "@toonflow/startup";
 import Electrobun, { ApplicationMenu, BrowserWindow, PATHS, Screen, Utils, Updater } from "electrobun/main";
 import { parseInstallUrl } from "./protocol";
 import saveFile, { selectSaveFile } from "./saveFile";
@@ -71,16 +70,14 @@ async function restoreInstallRegistration(installDirectory: string) {
 }
 
 async function start() {
-  let splash: Awaited<ReturnType<typeof showNativeSplash>> | undefined;
   let isClosing = false;
 
   try {
     // Windows 的 data 与 app 同级；macOS 的 data 与 .app 同级，避免随程序更新被替换。
     const installDirectory = resolve(PATHS.RESOURCES_FOLDER, process.platform === "darwin" ? "../../.." : "../..");
     const dataDirectory = process.env.TOONFLOW_DATA_DIR ?? resolve(installDirectory, "data");
-    // ACT: 先显示原生动画，再加载服务，避免初始化期间没有反馈。
     const startupSettings = await file(resolve(dataDirectory, "settings.json")).json().catch((error) => {
-      if (error.code !== "ENOENT") console.error("读取启动设置失败，使用默认启动动画：", error);
+      if (error.code !== "ENOENT") console.error("读取启动设置失败，使用默认设置：", error);
       return null;
     });
     setLocaleFallback(() => normalizeLocale(startupSettings?.settings?.ui?.language)
@@ -107,21 +104,6 @@ async function start() {
           { role: "selectAll", label: t`全选` },
         ] },
       ]);
-    }
-    try {
-      if (startupSettings?.settings?.ui?.startupAnimation !== false) {
-        splash = await showNativeSplash(resolve(PATHS.VIEWS_FOLDER, "../startup"), () => {
-          isClosing = true;
-          splash = undefined;
-          Utils.quit();
-        });
-      }
-    } catch (error) {
-      console.error("原生启动画面创建失败：", error);
-    }
-    if (isClosing) {
-      splash?.close();
-      return;
     }
     process.env.toonflowDesktop = "1";
     const { createApp } = await import("@toonflow/server/app");
@@ -154,7 +136,9 @@ async function start() {
     const mainWindow = new BrowserWindow({
       title: "住凯AI视频",
       url: `http://127.0.0.1:${address.port}/?desktop=1`,
-      hidden: Boolean(splash),
+      // ACT: 原先窗口靠启动动画遮挡启动过程（hidden: Boolean(splash)，动画结束后才 show）。
+      // 启动动画已移除，改为窗口就绪后直接显示，避免开机看到未渲染的空窗。
+      hidden: true,
       frame: {
         width,
         height,
@@ -193,13 +177,7 @@ async function start() {
       async ready(failed = false) {
         if (isClosing) return;
         if (!isShowing) {
-          if (splash) {
-            await splash.finish();
-            if (isClosing || !splash) return;
-            mainWindow.show();
-            splash.close();
-            splash = undefined;
-          }
+          mainWindow.show();
           isShowing = true;
           // ACT: 安装器已完成注册；更新后的修复仅首次展示时执行，不阻塞主窗口。
           void restoreInstallRegistration(installDirectory);
@@ -259,15 +237,12 @@ async function start() {
       isClosing = true;
       deliverInstall = undefined;
       pendingInstalls.length = 0;
-      splash?.close();
-      splash = undefined;
     });
     if (process.platform === "win32") {
       // ACT: 运行信息随应用目录清理；启动器通过 PID 忽略已退出进程留下的端口。
       writeAtomicSync(resolve(PATHS.RESOURCES_FOLDER, "desktopRuntime.json"), JSON.stringify({ pid: process.pid, port: address.port }));
     }
   } catch (error) {
-    splash?.close();
     console.error("桌面启动失败：", error);
     if (process.platform === "win32") {
       try { confirmWindowsUpdateStartup(PATHS.RESOURCES_FOLDER, true); }

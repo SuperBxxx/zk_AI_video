@@ -18,22 +18,7 @@ if (!(isMac && ["x64", "arm64"].includes(process.arch)) && !(process.platform ==
   throw new Error("桌面构建需要 Windows x64 或 macOS x64/arm64 环境。");
 }
 if (mode === "dev") process.env.TOONFLOW_DATA_DIR = resolve(projectDir, "data");
-if (isMac) {
-  const startupTarget = isIntelMac ? "macX64" : "macArm64";
-  for (const name of ["libthorvg.dylib", "nativeSplash.dylib"]) {
-    if (!existsSync(resolve(projectDir, "packages/startup/assets", startupTarget, name))) {
-      throw new Error("缺少当前架构的 macOS 启动库，请先运行 bun packages/startup/scripts/buildMac.ts，再重新构建桌面应用。");
-    }
-  }
-}
 if (!isMac) {
-  const startupBuild = await Bun.build({
-    entrypoints: [resolve(projectDir, "packages/startup/src/windowsSplashWorker.ts")],
-    outdir: resolve(projectDir, "build/desktop/startup"),
-    target: "bun",
-    minify: true,
-  });
-  if (!startupBuild.success) throw new AggregateError(startupBuild.logs, "启动动画线程构建失败。");
   const protocolDir = resolve(projectDir, "build/desktop/protocol");
   const csc = resolve(process.env.WINDIR!, "Microsoft.NET/Framework64/v4.0.30319/csc.exe");
   mkdirSync(protocolDir, { recursive: true });

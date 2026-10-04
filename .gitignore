@@ -8,8 +8,6 @@ dist/
 playwright-report/
 test-results/
 /compat/macIntel/generated/
-/packages/startup/assets/macX64/
-/packages/startup/assets/macArm64/
 /apps/updateServer/public/
 /apps/updateServer/releases/
 /.hutch/
