@@ -1,12 +1,13 @@
 import conf from "conf";
 import { mkdirSync, realpathSync } from "@toonflow/file";
 import { resolve } from "node:path";
-import tfRouter from "@toonflow/providers/language/tfRouter";
 import type { RemoteTeam } from "@/utils/teams";
 import type { A2aSettings } from "@/agent/a2a/settings";
 import type { desktopUpdateAttempt } from "@/types/desktop";
 
-const autoInstallProviders = [tfRouter];
+// ACT: 原先这里会自动把上游的 TF-Router 中转服务写进用户配置（每次启动都写）。
+// 本产品不接任何中转，因此不再自动安装供应商，用户自己添加。
+const autoInstallProviders: readonly { id: string; label: string; version?: string; apiUrl?: string; protocol?: string; models: unknown[] }[] = [];
 const dataDirectory = process.env.TOONFLOW_DATA_DIR ?? resolve(import.meta.dirname, "../../../../../data");
 mkdirSync(dataDirectory, { recursive: true });
 const configDirectory = realpathSync(dataDirectory);

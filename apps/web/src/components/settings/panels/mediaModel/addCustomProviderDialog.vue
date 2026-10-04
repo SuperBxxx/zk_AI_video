@@ -98,9 +98,6 @@ import { modelIcon } from "@toonflow/model-icons";
 import logoUrl from "@toonflow/assets/logo.svg";
 import messageMarkdown from "@/components/messageMarkdown.vue";
 import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";
-import tfRouterSource from "@toonflow/providers/media/tfRouter?raw";
-import apiMartSource from "@toonflow/providers/media/apiMart?raw";
-import metaSource from "@toonflow/providers/media/meta?raw";
 import type { MediaProvider } from "./types";
 import { providerPrompt } from "./providerPrompt";
 import { saveSettings } from "@/stores/settings";
@@ -109,7 +106,16 @@ import { writeClipboardText } from "@/lib/clipboard";
 const { mode = "custom" } = defineProps<{ mode?: "builtin" | "custom" }>();
 const visible = defineModel<boolean>({ default: false });
 const emit = defineEmits<{ added: [provider: MediaProvider] }>();
-const providerSources: Record<string, string> = { tfRouter: tfRouterSource, apiMart: apiMartSource, meta: metaSource };
+// ACT: 原先这里逐个硬编码 provider 源码 import（tfRouter/apiMart/meta）。删掉一个 provider
+// 就会编译失败，加一个又得回来补一行。改为按目录 glob，源码集合与 packages 实际内容自动同步。
+const providerSourceModules = import.meta.glob("../../../../../../../packages/providers/src/media/*.ts", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+const providerSources: Record<string, string> = Object.fromEntries(
+  Object.entries(providerSourceModules).map(([path, source]) => [path.replace(/^.*\/([^/]+)\.ts$/, "$1"), source])
+);
 const selectedProvider = ref<string>(mediaProviders[0]?.id ?? "");
 const activeProvider = computed(() => mediaProviders.find(provider => provider.id === selectedProvider.value));
 const models = computed<MediaProvider["models"]>(() => activeProvider.value?.models ?? []);

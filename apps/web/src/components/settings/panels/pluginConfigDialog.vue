@@ -12,9 +12,9 @@
 <script setup lang="ts">
 import axios from "axios";
 import { computed, ref, shallowRef, toRaw, watch } from "vue";
-import formCreate, { type Api, type Options } from "../../formCreate";
+import formCreate, { type Api, type Options } from "../formCreate";
 import { ElMessage } from "element-plus";
-import type { Plugin } from "./types";
+import type { Plugin } from "../plugins";
 
 const { plugin, canManage } = defineProps<{ plugin: Plugin; canManage: boolean }>();
 const visible = defineModel<boolean>({ default: false });

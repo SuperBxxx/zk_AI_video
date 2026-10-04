@@ -4,7 +4,6 @@ import { lstat, mkdir, readFile, readdir, unlink } from "@toonflow/file";
 import { dirname, join } from "node:path";
 import { createContext, SourceTextModule } from "node:vm";
 import type { AudioConvertOptions, Provider, ProviderTools } from "@toonflow/providers";
-import tfRouter from "@toonflow/providers/media/tfRouter";
 import { parse, parseExpression } from "@babel/parser";
 import { z } from "zod";
 import conf from "@/utils/conf";
@@ -179,8 +178,8 @@ function parseProvider(source: string) {
 function metadata(fileName: string, source: string) {
   const { id, label, version, readme, modelsUrl, models } = parseProvider(source);
   if (fileName !== `${id}.ts`) invalid("供应商 ID 与文件名不一致");
-  // ACT: 旧 TF-Router 文件不会随应用覆盖，缺少列表地址时使用内置定义。
-  return { fileName, id, label, version, readme, modelsUrl: modelsUrl ?? (id === tfRouter.id ? tfRouter.modelsUrl : undefined), models,
+  // ACT: 供应商文件由用户维护，不随应用覆盖；列表地址缺失时如实为 undefined，由用户补全。
+  return { fileName, id, label, version, readme, modelsUrl, models,
     revision: createHash("sha256").update(source).digest("hex"), loadError: "" };
 }
 
@@ -295,8 +294,7 @@ export async function refreshMediaProviderModels(fileName: string, revision?: st
   const requestedType = z.enum(["text", "image", "video", "audio"]).safeParse(new URL(provider.modelsUrl).searchParams.get("type"));
   const models = result.data.map(model => {
     const id = model.id.trim();
-    const previous = provider.models.find(item => item.id === id)
-      ?? (provider.id === tfRouter.id ? tfRouter.models.find(item => item.id === id) : undefined);
+    const previous = provider.models.find(item => item.id === id);
     const type = model.type ?? (requestedType.success ? requestedType.data : previous?.type);
     if (!type) invalid(t`模型 ${id} 缺少 type，请在返回数据或 modelsUrl 的 type 参数中指定`);
     // ACT: 只有 ID 的列表沿用同名模型参数，新模型不猜测生成能力。

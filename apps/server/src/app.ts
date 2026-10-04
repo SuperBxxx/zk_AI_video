@@ -11,8 +11,6 @@ import { languageRequest, resolveRequestLocale, runWithLocale, setLocaleFallback
 import { detectLocale, normalizeLocale } from "@toonflow/i18n";
 import { z } from "zod";
 
-const autoInstallProviders = ["tfRouter.ts", "apiMart.ts", "meta.ts"];
-
 export async function createApp({
   webRoot,
   dataDirectory,
@@ -41,8 +39,10 @@ export async function createApp({
     await initializePlugins(resolve(dataDirectory, "tools"), toolsRoot, /^[a-z][a-zA-Z0-9]*\.tool\.js$/, pluginRevision);
   if (dataDirectory && nodesRoot) await initializePlugins(resolve(dataDirectory, "nodes"), nodesRoot, /^[a-z][a-zA-Z0-9]*\.umd\.js$/, pluginRevision);
   // ACT: 供应方和技能可由用户编辑，只补首次安装，不随应用版本覆盖。
+  // 这里不再预置任何媒体供应商 —— 原先会自动铺开 tfRouter/apiMart/meta 三个第三方中转，
+  // 它们会把请求发往外部托管平台。现在供应商完全由用户自己添加。
   if (dataDirectory && providersRoot)
-    await initializePlugins(resolve(dataDirectory, "providers"), resolve(providersRoot, "media"), autoInstallProviders);
+    await initializePlugins(resolve(dataDirectory, "providers"), resolve(providersRoot, "media"));
   if (dataDirectory && skillsRoot) await initializePlugins(resolve(dataDirectory, "skills"), skillsRoot);
   if (dataDirectory && agentsRoot) await initializePlugins(resolve(dataDirectory, "agents"), agentsRoot);
   const app = express();
@@ -59,8 +59,7 @@ export async function createApp({
   app.use(express.urlencoded({ extended: true, limit: "100mb" }));
   app.use("/api/desktop", desktopRequest);
 
-  const { default: initializeProviderModels } = await import("@/utils/ai/initialize");
-  await initializeProviderModels();
+  // ACT: 原先这里会在启动时联网刷新 TF-Router 的模型列表。中转服务已移除，该逻辑整体删除。
   const router = await import("@/router");
   router.default(app);
   const [{ createMcpRouter }, { getMcpTools }, { authorizeMcp }, { skillResources }] = await Promise.all([

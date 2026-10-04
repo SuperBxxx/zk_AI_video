@@ -56,9 +56,10 @@ export type NodeAiTool = {
 };
 
 export function groupNodeModels<T extends Pick<NodeAiModel, "providerId" | "providerLabel">>(models: readonly T[]) {
+  // ACT: 原先把 tfRouter 强制排在最前（上游自家中转的优待）。中转已移除，保持配置顺序。
   return [...Map.groupBy(models, item => item.providerId)].map(([id, items]) => ({
     id, label: items[0]!.providerLabel, models: items,
-  })).sort((left, right) => Number(right.id === "tfRouter") - Number(left.id === "tfRouter"));
+  }));
 }
 
 async function readResult<T>(response: Response): Promise<T> {

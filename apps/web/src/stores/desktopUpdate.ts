@@ -4,8 +4,9 @@ import type { updateSnapshot } from "@toonflow/server/desktop";
 import { settings } from "@/stores/settings";
 
 export const desktopUpdateCustomUrl = computed(() => typeof settings.value.desktopUpdateCustomUrl === "string" ? settings.value.desktopUpdateCustomUrl : "");
-export const desktopUpdateSource = computed(() => settings.value.desktopUpdateSource === "custom" && desktopUpdateCustomUrl.value ? "custom"
-  : settings.value.desktopUpdateSource === "github" ? "github" : "official");
+// ACT: 原先没有配置时回落到 "official"（上游 api.toonflow.net 更新接口）。该服务已移除，
+// 现在只有两种来源：GitHub 发布页，或用户自己填的更新地址。
+export const desktopUpdateSource = computed(() => settings.value.desktopUpdateSource === "custom" && desktopUpdateCustomUrl.value ? "custom" : "github");
 export const desktopUpdateKey = computed(() => desktopUpdateSource.value === "custom" ? `custom:${desktopUpdateCustomUrl.value}` : desktopUpdateSource.value);
 export const desktopUpdateSnapshot = shallowRef<updateSnapshot | null>(null);
 export const desktopUpdateAction = ref<"read" | "check" | "download" | "apply" | null>(null);

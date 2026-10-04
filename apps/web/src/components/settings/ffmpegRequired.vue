@@ -8,7 +8,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from "vue";
 import { ElMessageBox } from "element-plus";
-import ffmpeg from "./panels/pluginMarket/ffmpeg.vue";
+import ffmpeg from "./panels/ffmpeg/index.vue";
 
 const visible = ref(false);
 let pending = false;

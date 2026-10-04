@@ -19,7 +19,7 @@
             <keep-alive include="personalization">
               <component
                 :is="activePanel.component"
-                v-bind="['pluginMarket', 'languageModel', 'mediaModel', 'personalization'].includes(activePanel.id) ? { visible } : {}" />
+                v-bind="['languageModel', 'mediaModel', 'personalization'].includes(activePanel.id) ? { visible } : {}" />
             </keep-alive>
           </transition>
         </div>
@@ -35,7 +35,6 @@ import {
   IconPalette,
   IconSettings,
   IconPhotoVideo,
-  IconBuildingStore,
   IconInfoCircle,
   IconCode,
   IconShieldLock,
@@ -55,13 +54,6 @@ const settingsPanels = [
     component: defineAsyncComponent(() => import("./panels/languageModel/index.vue")),
   },
   { id: "mediaModel", label: "媒体模型", icon: IconPhotoVideo, component: defineAsyncComponent(() => import("./panels/mediaModel/index.vue")) },
-  {
-    id: "pluginMarket",
-    label: "插件市场",
-    icon: IconBuildingStore,
-    groupLabel: "市场",
-    component: defineAsyncComponent(() => import("./panels/pluginMarket/index.vue")),
-  },
   { id: "mcp", label: "MCP", icon: IconPlugConnected, groupLabel: "其他", component: defineAsyncComponent(() => import("./panels/mcp/index.vue")) },
   { id: "personalization", label: "个性化", icon: IconUserCog, component: defineAsyncComponent(() => import("./panels/personalization.vue")) },
   { id: "privacy", label: "隐私", icon: IconShieldLock, component: defineAsyncComponent(() => import("./panels/privacy.vue")) },

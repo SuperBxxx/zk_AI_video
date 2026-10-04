@@ -10,8 +10,7 @@
           :disabled="saving"
           :aria-pressed="selectedProvider === item.id"
           @click="selectedProvider = item.id">
-          <img v-if="item.id === 'tfRouter'" class="providerLogo" :src="logoUrl" alt="" />
-          <modelIcon v-else :model="item.id" :size="18" />
+          <modelIcon :model="item.id" :size="18" />
           <span>{{ item.label }}</span>
         </button>
       </aside>
@@ -56,7 +55,6 @@ import { IconRefresh } from "@tabler/icons-vue";
 import formCreate, { type Api, type Options } from "../../formCreate";
 import { languageProviders } from "@toonflow/providers";
 import { modelIcon } from "@toonflow/model-icons";
-import logoUrl from "@toonflow/assets/logo.svg";
 import messageMarkdown from "@/components/messageMarkdown.vue";
 import type { Column } from "element-plus";
 import { saveSettings, type CustomProviderModel } from "@/stores/settings";

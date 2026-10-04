@@ -4,9 +4,10 @@ import type { Request } from "express";
 import conf from "@/utils/conf";
 import type { DesktopRuntime, desktopUpdateAttempt, updateSnapshot } from "@/types/desktop";
 
+// ACT: 原先 official 指向上游的 api.toonflow.net 更新接口 —— 那是 Toonflow 的托管服务。
+// 改为只认自己的发布源：默认取 UPDATE_BASE_URL（发布时设置），用户也可以自己填更新地址。
 const updateBaseUrls = {
-  official: "https://api.toonflow.net/web/version/desktopUpdates",
-  github: "https://github.com/HBAI-Ltd/Toonflow-app/releases/latest/download",
+  github: process.env.UPDATE_BASE_URL ?? "https://github.com/HBAI-Ltd/Toonflow-app/releases/latest/download",
 };
 const updateRuntimeId = crypto.randomUUID();
 let cancelledUpdateAttempt: string | undefined;
@@ -83,8 +84,8 @@ export function isValidUpdateUrl(value: unknown): value is string {
 function getUpdateBaseUrl(): string {
   const settings = conf.get("settings", {});
   if (settings.desktopUpdateSource === "github") return updateBaseUrls.github;
-  if (settings.desktopUpdateSource === "custom" && isValidUpdateUrl(settings.desktopUpdateCustomUrl)) return settings.desktopUpdateCustomUrl;
-  return updateBaseUrls.official;
+  if (isValidUpdateUrl(settings.desktopUpdateCustomUrl)) return settings.desktopUpdateCustomUrl;
+  return updateBaseUrls.github;
 }
 
 async function withUpdateSource<T>(updater: DesktopRuntime["updater"], updateBaseUrl: string, run: () => Promise<T>) {

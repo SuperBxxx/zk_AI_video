@@ -3,25 +3,20 @@
     <div class="itemList">
       <el-card v-for="item in sortedProviders" :key="item.id" class="providerItem" shadow="never">
         <div class="providerHeader">
-          <div v-if="isTfRouterProvider(item)" class="providerMark" aria-hidden="true">
-            <img class="providerLogo" :src="logoUrl" alt="" />
-          </div>
           <div class="providerInfo">
             <div class="providerHeading">
               <el-text class="providerName" tag="strong">{{ item.label }}</el-text>
-              <el-tag v-if="isTfRouterProvider(item)" size="small">官方</el-tag>
             </div>
             <el-text class="providerId" size="small" type="info" :title="item.id">{{ item.id }}</el-text>
           </div>
         </div>
-        <tfAccount v-if="isTfRouterProvider(item)" :apiKey="typeof item.apiKey === 'string' ? item.apiKey : ''" :visible="visible" :modelProvider="item" :saveApiKey="(key, models) => saveProviderApiKey(item.id, key, models)" />
         <div class="providerFooter">
           <div class="providerMeta">
             <el-tag v-if="getProviderVersion(item)" size="small" type="info" effect="plain">v{{ getProviderVersion(item) }}</el-tag>
             <el-text size="small" type="info">{{ item.models.length }} 个模型</el-text>
           </div>
           <el-space class="itemActions" wrap>
-            <el-button v-if="isTfRouterProvider(item) && item.apiKey?.trim() && !item.models.length" text :icon="IconRefresh" :loading="fetchingId === item.id" :disabled="!!deletingId || !!fetchingId" @click="fetchProviderModels(item)">获取模型</el-button>
+            <el-button v-if="item.apiKey?.trim() && !item.models.length" text :icon="IconRefresh" :loading="fetchingId === item.id" :disabled="!!deletingId || !!fetchingId" @click="fetchProviderModels(item)">获取模型</el-button>
             <el-button text :icon="IconEdit" :disabled="!!deletingId" @click="openCustomProvider(item)">编辑</el-button>
             <el-popconfirm title="确定删除此供应商及其模型？" confirmButtonText="删除" cancelButtonText="取消" @confirm="deleteProvider(item.id)">
               <template #reference><el-button text type="danger" :icon="IconTrash" :loading="deletingId === item.id" :disabled="!!deletingId">删除</el-button></template>
@@ -46,9 +41,6 @@ import { ElMessage } from "element-plus";
 import { customProviders, saveSettings, type CustomProvider, type CustomProviderModel } from "@/stores/settings";
 import { IconPlus, IconSettings, IconEdit, IconTrash, IconRefresh } from "@tabler/icons-vue";
 import { languageProviders } from "@toonflow/providers";
-import logoUrl from "@toonflow/assets/logo.svg";
-import tfAccount from "../../tfAccount.vue";
-import { isTfRouterProvider } from "@/lib/tf";
 
 const { visible = true } = defineProps<{ visible?: boolean }>();
 const addProviderDialog = shallowRef<Component>();
@@ -58,7 +50,8 @@ const customProviderDialogVisible = ref(false);
 const editingProvider = ref<CustomProvider>();
 const deletingId = ref("");
 const fetchingId = ref("");
-const sortedProviders = computed(() => [...customProviders.value].sort((a, b) => Number(isTfRouterProvider(b)) - Number(isTfRouterProvider(a))));
+// ACT: 原先把上游自家的 tfRouter 强制排在最前。中转已移除，按配置顺序展示。
+const sortedProviders = computed(() => [...customProviders.value]);
 
 function getProviderVersion(provider: CustomProvider) {
   const version = languageProviders.find(item => item.id.toLowerCase() === provider.id.toLowerCase())?.version ?? provider.version;
@@ -93,7 +86,7 @@ async function saveProviderApiKey(id: string, key: string, fetchedModels?: Custo
   const provider = customProviders.value.find(item => item.id === id);
   if (!provider) throw new Error("供应商已不存在");
   const { apiUrl, protocol, apiKey } = provider;
-  let models = isTfRouterProvider(provider) ? fetchedModels : provider.models;
+  let models = fetchedModels ?? provider.models;
   if (!models) {
     try {
       const { data } = await axios.post("/api/providers/models", {
