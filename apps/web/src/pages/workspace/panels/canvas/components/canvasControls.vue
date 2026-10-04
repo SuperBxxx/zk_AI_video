@@ -110,6 +110,7 @@
             </el-popover>
           </span>
         </el-tooltip>
+      </div>
     </elCard>
   </panel>
 </template>

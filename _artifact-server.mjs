@@ -11,7 +11,6 @@ const port = 8899;
 
 createServer((req, res) => {
   const urlPath = decodeURIComponent((req.url ?? "/").split("?")[0]);
-  // 只允许读 root 之内
   const target = normalize(join(root, urlPath));
   if (!target.startsWith(normalize(root))) {
     res.writeHead(403).end("forbidden");
@@ -30,10 +29,7 @@ createServer((req, res) => {
     return;
   }
   console.log(`200 ${urlPath} (${(stat.size / 1024 / 1024).toFixed(2)} MB)`);
-  res.writeHead(200, {
-    "content-length": stat.size,
-    "content-type": "application/octet-stream",
-  });
+  res.writeHead(200, { "content-length": stat.size, "content-type": "application/octet-stream" });
   createReadStream(target).pipe(res);
 }).listen(port, "127.0.0.1", () => {
   console.log(`静态产物服务已启动: http://127.0.0.1:${port}  ->  ${resolve(root)}`);
