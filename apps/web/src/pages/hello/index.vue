@@ -37,7 +37,7 @@
       </footer>
     </section>
     <div class="artPanel" aria-hidden="true">
-      <bg class="artBg" />
+      <minimalBackground class="artBg" />
       <div class="artBrand">
         <span class="artLogo" v-html="logoSvg" />
         <span class="artName">住凯AI视频</span>
@@ -54,7 +54,7 @@ import { IconArrowLeft } from "@tabler/icons-vue";
 import { customProviders } from "@/stores/settings";
 import { useHelloStore } from "@/stores/hello";
 import logoSvg from "@toonflow/assets/logo.svg?raw";
-import bg from "./bg.vue";
+import minimalBackground from "@/components/minimalBackground.vue";
 import languageSelect from "@/components/languageSelect.vue";
 
 const languageModel = defineAsyncComponent(() => import("@/components/settings/panels/languageModel/index.vue"));
@@ -85,7 +85,7 @@ async function completeSetup() {
   padding: 8px;
   background: var(--el-bg-color);
   color: var(--el-text-color-primary);
-  font-family: "Inter", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 
   .pageLanguage {
     position: fixed;
@@ -228,11 +228,15 @@ async function completeSetup() {
     padding: 28px;
     border-radius: calc(var(--ui-radius) * 1.125);
     overflow: hidden;
-    background: radial-gradient(ellipse at 76% 82%, #f3dcb1 0%, transparent 46%), radial-gradient(ellipse at 25% 52%, #667ab5 0%, transparent 52%),
-      radial-gradient(ellipse at 90% 18%, #369889 0%, transparent 48%), linear-gradient(145deg, #123f38, #467f72 48%, #a8c9ad);
+    /* ACT: 上游这里是四层彩色径向渐变（含 #f3dcb1/#667ab5/#369889 等），视觉语言很"上游"。
+       极简化后只留品牌色实底，纹理交给 minimalBackground 的点阵与柔光。 */
+    background: var(--brand-panel, #12544A);
 
+    /* 纹理层在下，只提供质感；上面的柔光由 minimalBackground 负责 */
     .artBg {
       z-index: 0;
+      opacity: 0.5;
+      mix-blend-mode: soft-light;
     }
 
     .artBrand {

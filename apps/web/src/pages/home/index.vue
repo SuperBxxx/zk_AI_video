@@ -1,6 +1,6 @@
 <template>
   <el-container class="home">
-    <bg class="pageBackground" />
+    <minimalBackground class="pageBackground" />
     <el-header class="pageHeader">
       <el-badge isDot :hidden="!hasDesktopUpdate">
         <el-button round size="large" :icon="IconSettings" :aria-label="hasDesktopUpdate ? '设置，有新版本可用' : '设置'" @click="settingsVisible = true">设置</el-button>
@@ -13,12 +13,6 @@
           <h1>住凯AI视频</h1>
         </div>
         <div class="promptArea">
-          <span class="arrowHint inspirationHint">
-            灵感创作模式
-            <svg viewBox="0 0 60 60" fill="none" aria-hidden="true">
-              <path d="M4 9C21 0 44 5 40 23C36 39 14 34 22 20C30 7 49 21 47 52M38 43L47 52L54 42" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </span>
           <el-card class="promptCard" shadow="never" :bodyStyle="{ padding: '20px' }" :footerStyle="{ padding: '12px 16px' }">
             <attachmentList v-if="promptAttachments.length" class="promptAttachments" :attachments="promptAttachments" removable restorable :disabled="creating || opening" @remove="promptAttachments.splice($event, 1)" @restore="restoreAttachment" />
             <el-input ref="promptInput" v-model="prompt" type="textarea" :rows="4" resize="none" :disabled="creating || opening" :placeholder="promptPlaceholder" aria-label="创作描述" @paste.capture="pasteText" />
@@ -96,7 +90,7 @@ import { useWorkspaceStore, type Project } from "@/stores/workspace";
 import { hasDesktopUpdate } from "@/stores/desktopUpdate";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import settings from "@/components/settings/index.vue";
-import bg from "./bg.vue";
+import minimalBackground from "@/components/minimalBackground.vue";
 import workspacePicker from "./workspacePicker.vue";
 
 const settingsVisible = ref(false);
@@ -281,28 +275,6 @@ async function createProject(fromPrompt = true) {
     pointer-events: none;
   }
 
-  .arrowHint {
-    position: absolute;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--el-color-primary);
-    font-size: 13px;
-    white-space: nowrap;
-    pointer-events: none;
-    animation: hintNudge 2.4s ease-in-out infinite;
-
-    svg {
-      width: 56px;
-      height: 30px;
-      flex-shrink: 0;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      animation: none;
-    }
-  }
-
   .pageHeader {
     display: flex;
     align-items: center;
@@ -348,21 +320,6 @@ async function createProject(fromPrompt = true) {
 
       .promptArea {
         position: relative;
-
-        .inspirationHint {
-          bottom: calc(100% + 4px);
-          left: 16px;
-          height: 30px;
-          padding-right: 44px;
-
-          svg {
-            position: absolute;
-            top: -2px;
-            right: 0;
-            width: 36px;
-            height: 36px;
-          }
-        }
 
         .promptCard {
           border-radius: calc(var(--ui-radius) * 2.5);
@@ -502,10 +459,5 @@ async function createProject(fromPrompt = true) {
       }
     }
   }
-}
-
-@keyframes hintNudge {
-  0%, 100% { transform: translateX(0) rotate(-3deg); }
-  50% { transform: translateX(-6px) rotate(-5deg); }
 }
 </style>

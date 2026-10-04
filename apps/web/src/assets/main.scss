@@ -1,5 +1,8 @@
 html:root {
   --ui-radius: 8px;
+  /* ACT: 深色品牌面板底色（快速开始右侧面板）。由品牌色推导的固定深色，
+     与白字/白 Logo 对比度足够；深浅主题下都用它。 */
+  --brand-panel: #12544a;
   --ui-radius-small: calc(var(--ui-radius) * 0.5);
   --ui-radius-large: calc(var(--ui-radius) * 1.5);
   --el-border-radius-base: var(--ui-radius);
