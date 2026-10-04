@@ -44,8 +44,11 @@ export default {
     },
   },
   release: {
-    // ACT: 构建基线和补丁固定取 GitHub；客户端更新源由设置单独控制，默认官方源。
-    baseUrl: `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${process.env.GITHUB_REPOSITORY || "HBAI-Ltd/Toonflow-app"}/releases/latest/download`,
+    // ACT: 上游把这里默认指回 HBAI-Ltd/Toonflow-app。对住凯AI视频是错的——用户点更新会装成上游版本。
+    // 发布前必须用 UPDATE_BASE_URL 指向自己的发布地址；未设置时用占位域名，宁可让更新失败也不要装错。
+    // 例：UPDATE_BASE_URL=https://dl.example.com/zhukai
+    baseUrl: process.env.UPDATE_BASE_URL
+      ?? `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${process.env.GITHUB_REPOSITORY || "zhukai-video/zhukai-video"}/releases/latest/download`,
     // ACT: 常规构建不访问更新服务器；release:desktop 显式开启增量构建。
     generatePatch: process.env.generateUpdatePatch === "1",
   },
