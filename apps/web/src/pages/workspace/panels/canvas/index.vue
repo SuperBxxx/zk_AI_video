@@ -166,7 +166,6 @@ import { useWorkspaceStore } from "@/stores/workspace";
 import { generalSettings } from "@/stores/settings";
 import { getShortcutBindings, shortcutLabel, shortcutMatches, shortcutPressed } from "@/lib/canvasShortcuts";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
-import anonymousData from "@/lib/anonymousData";
 import { dropCanvasFiles, importCanvasFiles, isCanvasFileDrag } from "./canvasDrop";
 import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
@@ -218,9 +217,6 @@ const assetsVisible = ref(false);
 const assetLibraryRef = ref<InstanceType<typeof assetLibrary>>();
 const edgeDisconnect = ref<{ id: string; x: number; y: number }>();
 const flow = useVueFlow(props.runtimeKey);
-onScopeDispose(anonymousData.observeCanvas(() => props.active && canvasId.value
-  ? { nodes: flow.nodes.value, edgeCount: flow.edges.value.length }
-  : undefined));
 let dragCopy: ReturnType<InstanceType<typeof selectionToolbar>["startDragCopy"]>;
 flow.onNodeDragStart(({ event, nodes }) => {
   dragCopy = undefined;

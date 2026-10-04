@@ -49,7 +49,6 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import settings from "@/components/settings/index.vue";
 import { useWorkspaceStore } from "@/stores/workspace";
 import { registerWorkspaceControl, waitForControlValue } from "@/lib/mcpControl";
-import anonymousData from "@/lib/anonymousData";
 import canvasPanel from "./panels/canvas/canvasHost.vue";
 import workspaceMenu from "./components/workspaceMenu.vue";
 import floatingAgent from "./components/floatingAgent.vue";
@@ -57,7 +56,6 @@ import floatingAgent from "./components/floatingAgent.vue";
 const documentPanel = defineAsyncComponent(() => import("./panels/document/index.vue"));
 
 const activePanel = ref<"canvas" | "document">("canvas");
-onMounted(() => anonymousData.track("workspace.canvas"));
 const workspaceStore = useWorkspaceStore();
 const panelOptions = [
   { label: "画布", value: "canvas", icon: IconLayoutDashboard },
@@ -157,10 +155,8 @@ async function switchPanel(value: string | number | boolean) {
   if (value !== "canvas" && value !== "document") return false;
   try {
     if (activePanel.value === "document") await documentPanelRef.value?.flushSave();
-    const changed = activePanel.value !== value;
     activePanel.value = value;
     await nextTick();
-    if (changed) anonymousData.track(value === "canvas" ? "workspace.canvas" : "workspace.document");
     return true;
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : "文本保存失败");

@@ -142,12 +142,12 @@ const themes = [
   { value: "system", label: "跟随系统", description: "自动切换", icon: IconDeviceDesktop },
 ];
 const colors = [
-  { value: "#409eff", label: "天空蓝" },
-  { value: "#6366f1", label: "鸢尾紫" },
-  { value: "#a855f7", label: "薰衣紫" },
-  { value: "#e34b83", label: "蔷薇粉" },
-  { value: "#e89524", label: "琥珀橙" },
-  { value: "#18a17c", label: "松石绿" },
+  { value: "#1F8A70", label: "竹青" },
+  { value: "#16694F", label: "松绿" },
+  { value: "#4FA88A", label: "苔绿" },
+  { value: "#8FA65A", label: "芥黄绿" },
+  { value: "#0F6E78", label: "黛青" },
+  { value: "#C2703C", label: "赭石" },
 ];
 function changeColor(value: string | null) {
   if (value) updateUiSettings({ primaryColor: value });

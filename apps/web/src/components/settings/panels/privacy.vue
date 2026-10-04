@@ -1,30 +1,40 @@
 <template>
   <div class="privacy">
-    <section class="settingSection" aria-labelledby="collectionTitle">
+    <section class="settingSection" aria-labelledby="localTitle">
       <div class="settingHeader">
-        <h3 id="collectionTitle">匿名使用统计</h3>
-        <el-switch
-          :modelValue="privacySettings.dataCollectionEnabled"
-          aria-label="匿名使用统计"
-          @change="(value) => settings.privacy = { ...privacySettings, dataCollectionEnabled: value === true }" />
+        <h3 id="localTitle">数据只在本机</h3>
+        <el-tag type="success" size="small" round>无遥测</el-tag>
       </div>
-      <p class="description">帮助我们了解常用功能，改进使用体验。默认开启，可随时关闭。</p>
+      <p class="description">
+        本软件不收集、不上报任何使用数据，也没有匿名统计。没有需要你关闭的开关，因为它从来就不发送。
+      </p>
     </section>
 
-    <section class="settingSection" aria-labelledby="metricsTitle">
-      <h3 id="metricsTitle">统计内容</h3>
+    <section class="settingSection" aria-labelledby="whereTitle">
+      <h3 id="whereTitle">数据存在哪里</h3>
       <dl class="metricList">
-        <div v-for="metric in metrics" :key="metric.label" class="metricItem">
-          <dt>{{ metric.label }}</dt>
-          <dd>{{ metric.description }}</dd>
+        <div v-for="item in locations" :key="item.label" class="metricItem">
+          <dt>{{ item.label }}</dt>
+          <dd>{{ item.description }}</dd>
         </div>
       </dl>
-      <p class="description">统计不包含提示词、对话、文件内容、项目名称、路径、账号或密钥。</p>
     </section>
 
-    <section class="settingSection" aria-labelledby="anonymousIdTitle">
-      <h3 id="anonymousIdTitle">匿名 ID</h3>
-      <code class="anonymousId">{{ privacySettings.anonymousId || "开启后自动生成" }}</code>
+    <section class="settingSection" aria-labelledby="networkTitle">
+      <h3 id="networkTitle">什么时候会联网</h3>
+      <p class="description">
+        只有这些情况会发出网络请求：你在设置里配置的模型供应商（生成文本／图片／视频／语音时）、
+        FFmpeg 下载（由你手动触发）、以及你主动装载的插件与 MCP 服务。
+        除此之外，本软件不主动连接任何服务器。
+      </p>
+    </section>
+
+    <section class="settingSection" aria-labelledby="eraseTitle">
+      <h3 id="eraseTitle">怎么彻底清掉</h3>
+      <p class="description">
+        删除数据目录即可移除全部本机数据（项目、素材、设置、对话历史都在其中）。
+        卸载时可勾选“同时删除用户数据”。
+      </p>
     </section>
   </div>
 </template>
@@ -32,15 +42,11 @@
 <script setup lang="ts">
 import { translate } from "@toonflow/i18n/vue";
 
-import { privacySettings, settings } from "@/stores/settings";
-
-const metrics = [
-  { get label() { return translate("使用与回访"); }, get description() { return translate("随机匿名标识、访问次数与时间"); } },
-  { get label() { return translate("使用活跃"); }, get description() { return translate("使用时长和交互次数，不含输入内容"); } },
-  { get label() { return translate("运行环境"); }, get description() { return translate("软件版本、桌面或网页端、系统、浏览器和语言"); } },
-  { get label() { return translate("功能使用"); }, get description() { return translate("引导、画布与文档的使用情况"); } },
-  { get label() { return translate("使用规模"); }, get description() { return translate("项目、模型配置、节点与连线数量，以及节点类型"); } },
-  { get label() { return translate("Agent 使用"); }, get description() { return translate("发送次数、完成情况和耗时"); } },
+const locations = [
+  { get label() { return translate("设置与偏好"); }, get description() { return translate("数据目录下的 settings.json"); } },
+  { get label() { return translate("项目与素材"); }, get description() { return translate("你为项目选择的工作目录，以及数据目录下的内容"); } },
+  { get label() { return translate("对话历史"); }, get description() { return translate("工作目录内的会话文件，仅本机可读"); } },
+  { get label() { return translate("模型密钥"); }, get description() { return translate("保存在本机设置中，只在你调用对应供应商时使用"); } },
 ];
 </script>
 
@@ -93,18 +99,6 @@ const metrics = [
         dt { color: var(--el-text-color-regular); }
         dd { margin: 0; color: var(--el-text-color-secondary); }
       }
-    }
-
-    .anonymousId {
-      display: block;
-      padding: 10px 12px;
-      border-radius: var(--el-border-radius-base);
-      background: var(--el-fill-color-light);
-      color: var(--el-text-color-regular);
-      overflow-wrap: anywhere;
-      user-select: text;
-      font-family: monospace;
-      font-size: 12px;
     }
   }
 }

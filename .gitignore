@@ -30,3 +30,9 @@ Thumbs.db
 *.p8
 *.keychain
 *.keychain-db
+
+# 本机构建用的临时 TEMP 目录（沙箱下系统 Temp 不可用时改指到工作区）
+/.tmp-build/
+/.tmp-install/
+/.tmp-verify/
+/_artifact-server.mjs

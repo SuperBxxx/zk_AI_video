@@ -124,7 +124,9 @@ onBeforeUnmount(() => {
 
 <style lang="scss" scoped>
 .creativeBackground {
-  --sparkleColor: color-mix(in srgb, var(--el-color-primary) 45%, #b58aff);
+  /* ACT: 原为 color-mix(..., 45%, #b58aff) —— 那个紫色是给旧的蓝色主题配的，绿色下会显脏。
+     改为同色系高明度变体，保持"环境光有两层"的层次感，又不引入突兀色相。 */
+  --sparkleColor: color-mix(in srgb, var(--el-color-primary) 46%, #7FD4B4);
   position: absolute;
   inset: 0;
   overflow: hidden;

@@ -26,7 +26,10 @@ export const settingsStorage = {
   },
 };
 
-export const defaultUiSettings = { theme: "light", language: "system", primaryColor: "#409eff", fontScale: 100, radius: 8, startupAnimation: true };
+// ACT: primaryColor 原为 Element Plus 出厂蓝 #409eff —— 那是"一眼就是默认皮肤"的主要来源。
+// 改为住凯AI视频的品牌深青绿。派生色阶（light-1..9 / dark-2）由 App.vue 用 color-mix 运行时生成，
+// 所以改这一处即可全站生效，不需要手工维护色阶。
+export const defaultUiSettings = { theme: "light", language: "system", primaryColor: "#1F8A70", fontScale: 100, radius: 8, startupAnimation: true };
 export const uiSettings = computed(() => {
   const raw = settings.value.ui;
   const ui = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
@@ -74,15 +77,6 @@ export function updateGeneralSettings(patch: Partial<typeof generalSettings.valu
   const current = settings.value.general;
   settings.value = { ...settings.value, general: { ...(current && typeof current === "object" && !Array.isArray(current) ? current : {}), ...patch } };
 }
-
-export const privacySettings = computed(() => {
-  const raw = settings.value.privacy;
-  const privacy = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
-  return {
-    dataCollectionEnabled: privacy.dataCollectionEnabled !== false,
-    anonymousId: typeof privacy.anonymousId === "string" ? privacy.anonymousId : "",
-  };
-});
 
 export type CustomProviderModel = { id: string; label: string; contextWindow?: number; maxOutputTokens?: number };
 export type CustomProvider = { id: string; label: string; version?: string; apiUrl: string; apiKey: string; protocol: string; models: CustomProviderModel[] };
