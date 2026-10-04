@@ -37,9 +37,19 @@ if (!isMac) {
   const protocolDir = resolve(projectDir, "build/desktop/protocol");
   const csc = resolve(process.env.WINDIR!, "Microsoft.NET/Framework64/v4.0.30319/csc.exe");
   mkdirSync(protocolDir, { recursive: true });
-  await $`${csc} /nologo /target:winexe /platform:x64 /optimize+ /reference:System.Windows.Forms.dll /reference:System.Web.Extensions.dll /out:${resolve(protocolDir, "protocolLauncher.exe")} ${resolve(projectDir, "apps/desktop/native/protocolLauncher.cs")}`;
-  await $`${csc} /nologo /target:winexe /platform:x64 /optimize+ /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /out:${resolve(protocolDir, "saveFileDialog.exe")} ${resolve(projectDir, "apps/desktop/native/saveFileDialog.cs")}`;
-  await $`${csc} /nologo /target:winexe /platform:x64 /optimize+ /reference:System.Web.Extensions.dll /reference:System.Windows.Forms.dll /reference:Microsoft.CSharp.dll /out:${resolve(protocolDir, "updateHelper.exe")} ${resolve(projectDir, "apps/desktop/native/updateHelper.cs")}`;
+  // ACT: csc.exe（32 位 .NET Framework 编译器）由 Bun 拉起时一律报 CS0016「拒绝访问」——换 C 盘输出、
+  // 换 spawnSync 启动都复现，PowerShell 下同一条命令则成功，属 Bun 与本机 csc 的不兼容。
+  // 因此已存在的产物不再重编；缺失时仍照常编译并如实报错。需要强制重编就删掉 build/desktop/protocol。
+  const natives = [
+    ["protocolLauncher.exe", ["/reference:System.Windows.Forms.dll", "/reference:System.Web.Extensions.dll"], "apps/desktop/native/protocolLauncher.cs"],
+    ["saveFileDialog.exe", ["/reference:System.Windows.Forms.dll", "/reference:System.Drawing.dll"], "apps/desktop/native/saveFileDialog.cs"],
+    ["updateHelper.exe", ["/reference:System.Web.Extensions.dll", "/reference:System.Windows.Forms.dll", "/reference:Microsoft.CSharp.dll"], "apps/desktop/native/updateHelper.cs"],
+  ] as const;
+  for (const [name, references, source] of natives) {
+    const out = resolve(protocolDir, name);
+    if (existsSync(out)) continue;
+    await $`${csc} /nologo /target:winexe /platform:x64 /optimize+ ${references} /out:${out} ${resolve(projectDir, source)}`;
+  }
 }
 // ACT: 团队暂不打包；恢复时也在 package.json 的 dev:plugins 中加回 --filter './packages/teams/*'。
 for (const script of mode === "dev" ? ["dev:plugins"] : [
@@ -56,7 +66,13 @@ if (isIntelMac) {
   await $`${process.execPath} ${resolve(projectDir, "compat/macIntel/build.ts")} ${mode === "package" ? "build" : mode}`.cwd(projectDir);
   process.exit(0);
 }
-const cli = resolve(projectDir, "apps/desktop/node_modules/electrobun/bin/electrobun.cjs");
+// ACT: electrobun 在 hoisted 布局下会被提升到仓库根 node_modules，嵌套布局则留在 apps/desktop 下。两处都找。
+const cliCandidates = [
+  resolve(projectDir, "apps/desktop/node_modules/electrobun/bin/electrobun.cjs"),
+  resolve(projectDir, "node_modules/electrobun/bin/electrobun.cjs"),
+];
+const cli = cliCandidates.find((candidate) => existsSync(candidate));
+if (!cli) throw new Error(`未找到 electrobun CLI，已查找：\n${cliCandidates.join("\n")}`);
 await $`${process.execPath} ${cli} ${mode === "dev" ? "dev" : "build"} ${mode === "dev" ? [] : ["--env=stable"]}`.cwd(projectDir);
 if (mode === "package" && !isMac) {
   await $`${process.execPath} ${resolve(import.meta.dir, "packageWindows.ts")}`.cwd(projectDir);
