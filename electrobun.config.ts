@@ -4,10 +4,10 @@ const startupTarget = process.platform === "darwin" ? (process.arch === "x64" ? 
 
 export default {
   app: {
-    name: "toonflow",
-    identifier: "local.toonflow.desktop",
+    name: "zhukai",
+    identifier: "local.zhukai.desktop",
     version: process.env.appVersion ?? "2.0.0",
-    urlSchemes: ["toonflow"],
+    urlSchemes: ["zhukai"],
   },
   build: {
     mainProcess: "bun",

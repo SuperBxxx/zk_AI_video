@@ -6,7 +6,7 @@ XPStyle on
 ManifestDPIAware true
 SetFont "Microsoft YaHei UI" 9
 
-!define appName "Toonflow"
+!define appName "住凯AI视频"
 !define uninstallKey "Software\Microsoft\Windows\CurrentVersion\Uninstall\${appIdentifier}.stable"
 Var removeUserData
 Var removeUserDataCheckbox
@@ -27,11 +27,11 @@ ShowInstDetails show
 !include MUI2.nsh
 !define MUI_ICON "${appIcon}"
 !define MUI_UNICON "${appIcon}"
-!define MUI_DIRECTORYPAGE_TEXT_TOP "请选择 Toonflow 的安装目录。"
+!define MUI_DIRECTORYPAGE_TEXT_TOP "请选择 住凯AI视频 的安装目录。"
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !define MUI_FINISHPAGE_RUN "$INSTDIR\app\bin\launcher.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "立即打开 Toonflow"
+!define MUI_FINISHPAGE_RUN_TEXT "立即打开 住凯AI视频"
 !define MUI_PAGE_CUSTOMFUNCTION_SHOW showFinishPage
 !insertmacro MUI_PAGE_FINISH
 UninstPage custom un.showUninstallOptions un.leaveUninstallOptions
@@ -56,9 +56,9 @@ checkRunning:
   Pop $1
   ${If} $0 != 0
     ${If} $0 == 1
-      StrCpy $2 "Toonflow 仍在运行，请先关闭此安装目录的应用，再点击“重试”。$\r$\n$INSTDIR$\r$\n$1"
+      StrCpy $2 "住凯AI视频 仍在运行，请先关闭此安装目录的应用，再点击“重试”。$\r$\n$INSTDIR$\r$\n$1"
     ${Else}
-      StrCpy $2 "无法确认 Toonflow 是否已关闭，已停止${operation}。请关闭应用后重试。$\r$\n检测返回码：$0$\r$\n$1"
+      StrCpy $2 "无法确认 住凯AI视频 是否已关闭，已停止${operation}。请关闭应用后重试。$\r$\n检测返回码：$0$\r$\n$1"
     ${EndIf}
     DetailPrint "$2"
     MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$2" /SD IDCANCEL IDRETRY checkRunning
@@ -96,7 +96,7 @@ Function un.showUninstallOptions
     SetErrorLevel 2
     Quit
   ${EndIf}
-  ${NSD_CreateLabel} 0 0 100% 24u "即将卸载 Toonflow，点击“卸载”继续。"
+  ${NSD_CreateLabel} 0 0 100% 24u "即将卸载 住凯AI视频，点击“卸载”继续。"
   Pop $0
   ${NSD_CreateCheckbox} 0 36u 100% 14u "同时删除用户数据"
   Pop $removeUserDataCheckbox
@@ -124,9 +124,9 @@ Section "Install"
   IfErrors installFailed
   StrCpy $INSTDIR $0
   IfFileExists "$INSTDIR\app\*.*" 0 installApp
-  ReadINIStr $0 "$INSTDIR\toonflow.ini" "application" "identifier"
+  ReadINIStr $0 "$INSTDIR\zhukai.ini" "application" "identifier"
   ${If} $0 != "${appIdentifier}"
-    MessageBox MB_OK|MB_ICONSTOP "所选目录中已有不属于 Toonflow 的 app 文件夹，请选择其他安装目录。" /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "所选目录中已有不属于 住凯AI视频 的 app 文件夹，请选择其他安装目录。" /SD IDOK
     SetErrorLevel 2
     Abort
   ${EndIf}
@@ -145,10 +145,10 @@ tarReady:
   SetOutPath "$INSTDIR\app"
   IfErrors installFailed
   StrCpy $installStep "写入安装标识"
-  WriteINIStr "$INSTDIR\toonflow.ini" "application" "identifier" "${appIdentifier}"
+  WriteINIStr "$INSTDIR\zhukai.ini" "application" "identifier" "${appIdentifier}"
   IfErrors installFailed
   StrCpy $installStep "保存安装目录"
-  WriteINIStr "$INSTDIR\toonflow.ini" "application" "installDirectory" "$INSTDIR"
+  WriteINIStr "$INSTDIR\zhukai.ini" "application" "installDirectory" "$INSTDIR"
   IfErrors installFailed
   StrCpy $installStep "创建更新文件目录"
   SetOutPath "$INSTDIR\self-extraction"
@@ -172,7 +172,7 @@ tarReady:
   Pop $0
   Pop $1
   ${If} $0 != 0
-    MessageBox MB_OK|MB_ICONSTOP "应用解压失败，请确认目标目录可写并关闭正在运行的 Toonflow 后重试。$\r$\n解压返回码：$0$\r$\n$1" /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "应用解压失败，请确认目标目录可写并关闭正在运行的 住凯AI视频 后重试。$\r$\n解压返回码：$0$\r$\n$1" /SD IDOK
     SetErrorLevel 2
     Abort
   ${EndIf}
@@ -204,20 +204,20 @@ tarReady:
   WriteRegStr HKCU "${uninstallKey}" "UninstallString" '$\"$INSTDIR\UninstallNSIS.exe$\"'
   WriteRegStr HKCU "${uninstallKey}" "QuietUninstallString" '$\"$INSTDIR\UninstallNSIS.exe$\" /S'
   IfErrors installFailed
-  StrCpy $installStep "注册 toonflow:// 协议"
-  WriteRegStr HKCU "Software\Classes\toonflow" "" "URL:Toonflow Protocol"
-  WriteRegStr HKCU "Software\Classes\toonflow" "URL Protocol" ""
-  WriteRegStr HKCU "Software\Classes\toonflow\DefaultIcon" "" '$\"$INSTDIR\app\Resources\app.ico$\",0'
-  WriteRegStr HKCU "Software\Classes\toonflow\shell\open\command" "" '$\"$INSTDIR\app\Resources\app\protocolLauncher.exe$\" $\"%1$\"'
+  StrCpy $installStep "注册 zhukai:// 协议"
+  WriteRegStr HKCU "Software\Classes\zhukai" "" "URL:住凯AI视频 Protocol"
+  WriteRegStr HKCU "Software\Classes\zhukai" "URL Protocol" ""
+  WriteRegStr HKCU "Software\Classes\zhukai\DefaultIcon" "" '$\"$INSTDIR\app\Resources\app.ico$\",0'
+  WriteRegStr HKCU "Software\Classes\zhukai\shell\open\command" "" '$\"$INSTDIR\app\Resources\app\protocolLauncher.exe$\" $\"%1$\"'
   IfErrors installFailed
   CreateShortCut "$DESKTOP\${appName}.lnk" "$INSTDIR\app\bin\launcher.exe" "" "$INSTDIR\app\Resources\app.ico"
   IfErrors 0 installDone
   ; ACT: 快捷方式不影响程序使用，失败时保留成功安装结果并告知手动启动路径。
-  MessageBox MB_OK|MB_ICONEXCLAMATION "Toonflow 已安装，但无法创建桌面快捷方式。可以从以下位置启动：$\r$\n$INSTDIR\app\bin\launcher.exe" /SD IDOK
+  MessageBox MB_OK|MB_ICONEXCLAMATION "住凯AI视频 已安装，但无法创建桌面快捷方式。可以从以下位置启动：$\r$\n$INSTDIR\app\bin\launcher.exe" /SD IDOK
   Goto installDone
 
 installFailed:
-  MessageBox MB_OK|MB_ICONSTOP "安装未完成。$\r$\n失败步骤：$installStep$\r$\n安装目录：$INSTDIR$\r$\n$\r$\n请确认目录可写并关闭 Toonflow 后重试，详细信息见安装窗口。" /SD IDOK
+  MessageBox MB_OK|MB_ICONSTOP "安装未完成。$\r$\n失败步骤：$installStep$\r$\n安装目录：$INSTDIR$\r$\n$\r$\n请确认目录可写并关闭 住凯AI视频 后重试，详细信息见安装窗口。" /SD IDOK
   SetErrorLevel 2
   Abort
 installDone:
@@ -226,15 +226,15 @@ SectionEnd
 Section "Uninstall"
   SetShellVarContext current
   GetFullPathName $0 "$INSTDIR"
-  ReadINIStr $1 "$INSTDIR\toonflow.ini" "application" "installDirectory"
+  ReadINIStr $1 "$INSTDIR\zhukai.ini" "application" "installDirectory"
   ${If} $0 != $1
-    MessageBox MB_OK|MB_ICONSTOP "卸载目录与 Toonflow 的安装目录不一致，已停止卸载。" /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "卸载目录与 住凯AI视频 的安装目录不一致，已停止卸载。" /SD IDOK
     SetErrorLevel 2
     Abort
   ${EndIf}
-  ReadINIStr $0 "$INSTDIR\toonflow.ini" "application" "identifier"
+  ReadINIStr $0 "$INSTDIR\zhukai.ini" "application" "identifier"
   ${If} $0 != "${appIdentifier}"
-    MessageBox MB_OK|MB_ICONSTOP "无法确认此目录属于 Toonflow，已停止卸载。" /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "无法确认此目录属于 住凯AI视频，已停止卸载。" /SD IDOK
     SetErrorLevel 2
     Abort
   ${EndIf}
@@ -264,7 +264,7 @@ Section "Uninstall"
   ; ACT: 清理成功后才移除卸载入口；文件被占用时保留入口供用户重试。
   Delete "$INSTDIR\UninstallNSIS.exe"
   IfErrors uninstallFailed
-  Delete "$INSTDIR\toonflow.ini"
+  Delete "$INSTDIR\zhukai.ini"
   IfErrors uninstallMetadataFailed
   ReadRegStr $0 HKCU "${uninstallKey}" "toonflowInstallDirectory"
   ${If} $0 == $INSTDIR
@@ -272,9 +272,9 @@ Section "Uninstall"
     IfErrors uninstallMetadataFailed
   ${EndIf}
   ClearErrors
-  ReadRegStr $0 HKCU "Software\Classes\toonflow\shell\open\command" ""
+  ReadRegStr $0 HKCU "Software\Classes\zhukai\shell\open\command" ""
   ${If} $0 == '$\"$INSTDIR\app\Resources\app\protocolLauncher.exe$\" $\"%1$\"'
-    DeleteRegKey HKCU "Software\Classes\toonflow"
+    DeleteRegKey HKCU "Software\Classes\zhukai"
     IfErrors uninstallMetadataFailed
   ${EndIf}
   ClearErrors
@@ -290,7 +290,7 @@ uninstallMetadataFailed:
   SetErrorLevel 2
   Goto uninstallDone
 uninstallFailed:
-  MessageBox MB_OK|MB_ICONSTOP "未能删除全部文件，请关闭 Toonflow 及相关窗口后重新卸载。用户数据仅按刚才的选择处理。" /SD IDOK
+  MessageBox MB_OK|MB_ICONSTOP "未能删除全部文件，请关闭 住凯AI视频 及相关窗口后重新卸载。用户数据仅按刚才的选择处理。" /SD IDOK
   SetErrorLevel 2
   Abort
 uninstallDone:

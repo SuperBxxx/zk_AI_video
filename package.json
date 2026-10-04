@@ -1,6 +1,6 @@
 {
-  "name": "toonflow",
-  "description": "Toonflow 是一款 AI 短剧漫剧工具，能够利用 AI 技术将小说自动转化为剧本，并结合 AI 生成的图片和视频，实现高效的短剧创作。",
+  "name": "zhukai-video",
+  "description": "住凯AI视频 —— AI 短剧漫剧与短视频创作工具。基于 Toonflow（MIT，Copyright (c) 2026 HBAI-Ltd）改造。",
   "author": "HBAI-Ltd <ltlctools@outlook.com>",
   "license": "MIT",
   "homepage": "https://github.com/HBAI-Ltd/Toonflow-app#readme",
