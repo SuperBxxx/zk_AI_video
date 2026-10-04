@@ -4,7 +4,7 @@ await createToolConfig({
   name: "askUser",
   displayName: "提问器",
   description: "一次向用户提出一个或多个问题，支持回答或跳过本次提问。",
-  author: "Toonflow",
+  author: "住凯AI视频",
   github: "https://github.com/HBAI-Ltd/Toonflow-app",
   prompt: `问题简短具体，相关问题合并提问。问题默认允许留空，不必把每项都设为 required。
 参数校验失败表示表单尚未生成，读取工具返回的错误，修正参数并重新调用 askUser；不要让用户排查技术错误，也不要把失败当作已回答、已跳过或已授权。

@@ -7,6 +7,8 @@ import { isWithin, writeWorkspaceFile } from "@/utils/workspace/files";
 export const maxBytes = 20 * 1024 * 1024;
 // 记录附属文件的手动排序；不改动真实文件名，避免影响 SKILL.md 内部的相对链接。
 const orderFileName = ".toonflowOrder.json";
+// 内置技能在 SKILL.md frontmatter 里署的作者名，用于禁止卸载。
+const builtinSkillAuthor = "住凯AI视频";
 
 export function directory() {
   return resolve(dirname(conf.path), "skills");
@@ -70,7 +72,9 @@ export async function uninstall(name: string) {
   const { frontmatter } = parseFrontmatter(await readFile(mainTarget, "utf8"));
   const metadata = frontmatter.metadata && typeof frontmatter.metadata === "object" && !Array.isArray(frontmatter.metadata)
     ? frontmatter.metadata as Record<string, unknown> : {};
-  if (metadata.author === "Toonflow") {
+  // ACT: 与 packages/skills/*/SKILL.md 的 frontmatter metadata.author 成对。
+  // 改品牌时必须两边一起改，否则"内置技能不能卸载"会失效，内置技能变成可删除。
+  if (metadata.author === builtinSkillAuthor) {
     throw Object.assign(new Error("内置技能不能卸载"), { status: 403 });
   }
   if (isDirectorySkill) {

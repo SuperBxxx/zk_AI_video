@@ -26,12 +26,12 @@
         </span>
       </template>
     </el-segmented>
-    <el-tooltip v-if="!agentVisible" content="Toonflow Agent" placement="bottom" :showArrow="false" :hideAfter="0">
+    <el-tooltip v-if="!agentVisible" content="AI 助手" placement="bottom" :showArrow="false" :hideAfter="0">
       <el-button
         class="agentButton"
         :class="{ active: agentVisible }"
         :aria-expanded="agentVisible"
-        aria-label="Toonflow Agent"
+        aria-label="AI 助手"
         aria-controls="agentPanel"
         @click="agentVisible = !agentVisible"></el-button>
     </el-tooltip>
