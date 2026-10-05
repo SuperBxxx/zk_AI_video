@@ -28,6 +28,35 @@
   按原始字节写入，前端补一个上传入口即可；注意 exclusive 表示不覆盖，重名需避让。）
 - ⬜ 声音面板本体、音色创建（`voice-enrollment`）、声音设计、试听、音色 json 落库。
 
+**P4 剩余部分的准确设计（本轮已探明，供下轮直接实施）**
+
+1. **素材库上传已就绪**（`ab6592b`）：工具栏「上传素材」+ 隐藏 file input，落到当前文件夹，
+   重名自动避让 `(1)(2)…`。服务端未改动。
+2. **面板形态**：在 `assetLibrary.vue` 内加标签切换（「素材」/「声音」），
+   而不是新建浮层——与 D1「加进现有素材库」一致。画布与首页两处入口自动同时获得。
+3. **音色创建必须由前端提交字节**：`ProviderTools` 没有读取工作区文件的能力
+   （只有 fetch / errorMessage / hash / image / audio.convert / ffmpeg），
+   因此服务端拿不到样本文件内容。做法：前端用 `/api/assets/read` 读成 Blob，
+   转成 `MediaInput`（`{ type: "base64", data: data URL, mimeType }`）随请求提交。
+4. **服务端可复用既有解析**：`apps/server/src/utils/media/generation.ts:141-149` 已有
+   `getMediaProvider(providerId)` → 校验 model → 读 `settings.mediaProviderConfigs` →
+   `loadMediaProviderSource(...)` → 校验 apiKey 的完整流程。
+   新增音色接口应沿用同一套，不要另写一份。
+5. **供应商契约需要扩一个可选方法**（与 `generateImage/generateVideo/generateAudio` 并列）：
+   建议 `createVoice?(request): Promise<{ voice: string }>`，由 generation.ts 在
+   `mediaType === "audio"` 且 operation 为建音色时调用。百炼实现里区分两条路径：
+   · `model: "voice-enrollment"` + `input.action: "create_voice"`，样本走 **`input.url`（公网 URL）**；
+   · `model: "qwen-voice-enrollment"` + `input.action: "create"`，样本走 **`input.audio.data`（Base64）**。
+   本产品无法提供公网托管，故**只走后者**（详见 §1.6 与 §3 P2 的设计影响 2）。
+   `target_model` 必须与后续合成模型一致；音色 json 需记录它。
+6. **录音**：按 D11 不选设备（系统默认麦克风）、限 30 秒。
+   浏览器 `MediaRecorder` 默认多为 webm/opus，而百炼该路径要 `audio/wav|mpeg|mp4`，
+   因此录完需转码：可用 `ProviderTools.audio.convert`（仅接受 WAV 内存字节）
+   或既有 ffmpeg 工具。**实施前需实测转换链路**。
+7. **音色落库**：按 D3 在素材库建「声音」文件夹，存
+   `{ 名称, voiceId, targetModel, 来源(克隆/设计), 创建时间 }` 的 json。
+   写入复用 `PUT /api/assets/save`（注意 exclusive 不覆盖，需避让重名）。
+
 ---
 
 ## 0. 目标
