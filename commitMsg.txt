@@ -1,0 +1,36 @@
+feat(assets): 替换项目内遗留的上游 Toonflow 图标，并修复 dev 脚本
+
+图标替换（全部换成「取景框」符号）
+- packages/assets/logo.svg：重写为符号的 8 倍放大版，保持 viewBox 0 0 2048 2048
+  与上游一致，避免 5 处消费者的尺寸回归。单色实心形状，因此仍可直接作
+  CSS mask 使用（conversation.vue 依赖 alpha 通道）
+- packages/assets/logo.ico：多尺寸 ICO，含 16/32/48/64/128/256 六帧。
+  体积 168.8 KB → 4.4 KB
+- packages/assets/logo.iconset/*：10 个文件（16/32/128/256/512 及 @2x）全部重生成
+- apps/web/public/favicon.svg：浏览器标签页图标，用**小尺寸简化版**（无准星），
+  因为 16px 下准星会糊成灰点
+- apps/web/public/favicon.ico：16/32/48 三帧
+
+顺带修掉一个替换图标会触发的 bug
+- hello/index.vue 的深绿面板靠 `:deep(path) { fill: #fff }` 把标志涂白。
+  上游标志是 <path>，而新标志是 12 个 <rect> —— 只选 path 会让深绿底上
+  渲染出黑标、几乎看不见。已改为同时覆盖 path 与 rect
+
+dev 脚本修复（这是长期困扰的「改了代码但页面不变」的根因）
+- 根 package.json 的 dev 原为
+    bun run --filter '@toonflow/web' --filter '@toonflow/server' dev
+  实测该写法**只启动第一个 filter**（服务端），Vite 不启动且无任何报错，
+  于是 3000 由 Express 提供 build/web 的上一次构建产物
+- 新增 scripts/dev.mjs 显式并行启动两个进程，任一退出即结束另一个
+- README 补充说明
+
+辅助脚本
+- scripts/buildAppLogo.mjs      生成 packages/assets/logo.svg
+- scripts/assembleAppIcons.mjs  用已渲染的 PNG 组装 ICO / iconset / favicon
+  （渲染由 render_png.py 从 PowerShell 批跑；从 Bun 内逐次调用会失败）
+
+验证
+- dev 下两个端口同时就绪（5173 Vite / 3000 API），/、/favicon.svg、
+  /favicon.ico 均 200，/api 代理连通
+- apps/web typecheck 保持既有基线 7 个；生产构建通过
+- ICO 帧数与 iconset 文件数已校验

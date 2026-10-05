@@ -75,6 +75,13 @@ bun run dev
 > `3000` 是 API 服务端（`bun --watch src/index.ts`），Vite 把 `/api` 代理过去。
 > 直接开 3000 只会拿到 `build/web` 里的**上一次构建产物**，看起来像"改动没生效"。
 
+> **`bun run dev` 走的是 `scripts/dev.mjs`**，不是 `bun run --filter a --filter b`。
+> 后者实测**只启动第一个 filter**（服务端），Vite 不会启动，而且**没有任何报错**——
+> 结果就是 3000 上的旧产物看起来像"页面没更新"。`scripts/dev.mjs` 显式并行起两个进程，
+> 任一退出即结束另一个。
+>
+> 只想单独起一个时：`bun run dev:web` / `bun run dev:server`。
+
 > **Vite 必须带 `--configLoader runner`**（`apps/web/package.json` 的 `dev` 与 `build` 都已带）。
 > 工作区包以裸 `.ts` 形式发布，默认的 `bundle` 加载器会报
 > `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`，dev 服务器会直接起不来 ——

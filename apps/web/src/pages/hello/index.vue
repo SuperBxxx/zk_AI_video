@@ -258,7 +258,11 @@ async function completeSetup() {
           height: 100%;
         }
 
-        :deep(path) {
+        /* ACT: 原先只选 path —— 上游标志是 <path>，而现在的标志是 12 个 <rect>，
+           只选 path 会让深绿面板上渲染出黑标、几乎看不见。
+           改为同时覆盖 path 与 rect，两者都写，换图形时不会再踩同一个坑。 */
+        :deep(path),
+        :deep(rect) {
           fill: #fff;
         }
       }
