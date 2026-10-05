@@ -1,4 +1,4 @@
-﻿// 把字标「住凯AI视频」转成轮廓路径，消除 live text。
+// 把字标「住凯AI视频」转成轮廓路径，消除 live text。
 //
 // 为什么需要：svg_audit 对含 <text> 的最终标志报 FAIL —— 字体因机器而异，
 // 正式标志必须转曲。本仓库环境没有字体文件，但系统有 msyhbd.ttc，
@@ -11,16 +11,16 @@ import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 
 const FONT = "C:\\\\Windows\\\\Fonts\\\\msyhbd.ttc";
-const FONT_INDEX = 0;
-const TEXT = "住凯AI视频";
-const TRACKING = -0.02; // em
+const fontFaceIndex = 0;
+const wordmarkText = "住凯AI视频";
+const tracking = -0.02; // em
 
 const script = `
 import json, sys
 from fontTools.ttLib import TTCollection
 from fontTools.pens.svgPathPen import SVGPathPen
 
-font = TTCollection(r"${FONT}").fonts[${FONT_INDEX}]
+font = TTCollection(r"${FONT}").fonts[${fontFaceIndex}]
 upm = font["head"].unitsPerEm
 cmap = font.getBestCmap()
 glyphSet = font.getGlyphSet()
@@ -32,8 +32,8 @@ if "GPOS" in font:
     except Exception:
         pass
 
-text = ${JSON.stringify(TEXT)}
-tracking = ${TRACKING} * upm
+text = ${JSON.stringify(wordmarkText)}
+tracking = ${tracking} * upm
 out = []
 x = 0.0
 for ch in text:
@@ -93,7 +93,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} 256" role
     横排锁定：符号在左、字标在右。**字标已转曲**（无 live text）。
 
     转曲来源：Microsoft YaHei Bold（msyhbd.ttc，unitsPerEm=${data.upm}）
-      缩放 ${scale.toFixed(3)}（capHeight ${data.capHeight} → ${targetCap}），字距 ${TRACKING}em
+      缩放 ${scale.toFixed(3)}（capHeight ${data.capHeight} → ${targetCap}），字距 ${tracking}em
       基线 y=${baseline.toFixed(1)}；符号占 0..192，净空 48，文字自 x=240 起
 
     ⚠ 版权：Microsoft YaHei 为微软商用字体，其轮廓不可随产品分发。

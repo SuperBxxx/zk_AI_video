@@ -3,6 +3,8 @@
     <div class="libraryToolbar">
       <el-input v-model="searchQuery" class="searchInput" :prefixIcon="IconSearch" placeholder="搜索素材" aria-label="搜索素材" clearable @keydown.esc.stop="searchQuery = ''" />
       <el-button class="toolbarButton" text :icon="IconFolderPlus" title="新建文件夹" aria-label="新建文件夹" :disabled="newFolderParent !== undefined" @click="startFolder" />
+      <el-button class="toolbarButton" text :icon="IconUpload" :loading="uploading" title="上传素材到当前文件夹" aria-label="上传素材" @click="uploadInput?.click()" />
+      <input ref="uploadInput" class="uploadInput" type="file" multiple aria-label="选择要上传的素材" @change="uploadFiles" />
       <el-button class="toolbarButton" text :icon="IconX" title="关闭素材库" aria-label="关闭素材库" @click="visible = false" />
     </div>
     <el-scrollbar class="libraryScroll" maxHeight="min(440px, calc(100dvh - 198px))">
@@ -88,7 +90,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import axios from "axios";
 import { ElMessage, ElTree, type InputInstance, type TreeNodeData } from "element-plus";
-import { IconDots, IconEye, IconFile, IconFolderFilled, IconFolderPlus, IconMusic, IconPhoto, IconSearch, IconVideo, IconX } from "@tabler/icons-vue";
+import { IconDots, IconEye, IconFile, IconFolderFilled, IconFolderPlus, IconMusic, IconPhoto, IconSearch, IconUpload, IconVideo, IconX } from "@tabler/icons-vue";
 import type { NodeOutput } from "@toonflow/nodes-scaffold/values";
 import { startAssetDrag } from "../canvasDrop";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
@@ -119,6 +121,8 @@ const folderInput = ref<InputInstance>();
 const newFolderParent = ref<string>();
 const newFolderName = ref("");
 const folderSaving = ref(false);
+const uploading = ref(false);
+const uploadInput = ref<HTMLInputElement>();
 const assetMenuRef = ref<InstanceType<typeof assetMenu>>();
 const previewAsset = ref<{ name: string; url: string; kind: "image" | "audio" | "video" }>();
 const previewError = ref("");
@@ -251,6 +255,61 @@ function selectFolder(entry: AssetEntry) {
   folder.value = folder.value === path ? "." : path;
 }
 
+// ACT: 上传素材。服务端 assets/save 以 exclusive 方式写入（不覆盖），
+// 因此重名时必须自己避让：在扩展名前依次尝试 (1)(2)…，最多 99 次。
+function assetPath(directory: string, name: string) {
+  return directory === "." ? name : `${directory}/${name}`;
+}
+
+async function existsInAssets(path: string) {
+  try {
+    await axios.get("/api/assets/read", { params: { path }, responseType: "blob" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function availableAssetPath(name: string) {
+  const dot = name.lastIndexOf(".");
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : "";
+  let index = 0;
+  let candidate = assetPath(folder.value, name);
+  while (await existsInAssets(candidate)) {
+    if (++index > 99) throw new Error("同名素材过多，请先重命名或换一个文件夹");
+    candidate = assetPath(folder.value, `${base}(${index})${ext}`);
+  }
+  return candidate;
+}
+
+async function uploadFiles(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const files = [...(input.files ?? [])];
+  input.value = "";
+  if (!files.length || uploading.value) return;
+  uploading.value = true;
+  let done = 0;
+  const failures: string[] = [];
+  try {
+    for (const file of files) {
+      try {
+        const path = await availableAssetPath(file.name);
+        const content = await file.arrayBuffer();
+        await axios.put("/api/assets/save", content, { params: { path }, headers: { "Content-Type": "application/octet-stream" } });
+        done++;
+      } catch (error) {
+        failures.push(`${file.name}：${error instanceof Error ? error.message : "上传失败"}`);
+      }
+    }
+    await refreshAssets();
+    if (failures.length) showError(new Error(failures.join("；")));
+    else if (done) ElMessage.success(`已上传 ${done} 个素材`);
+  } finally {
+    uploading.value = false;
+  }
+}
+
 async function startSaveFolder() {
   saveFolderName.value = "新建文件夹";
   await nextTick();
@@ -354,6 +413,8 @@ defineExpose({ openSave });
       flex: 1;
       min-width: 0;
     }
+
+    .uploadInput { display: none; }
   }
 
   .libraryScroll {

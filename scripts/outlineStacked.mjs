@@ -1,28 +1,28 @@
-﻿// 生成竖排锁定（符号在上、字标在下）与 favicon 专用版。
+// 生成竖排锁定（符号在上、字标在下）与 favicon 专用版。
 // 复用 outlineWordmark.mjs 的转曲结果思路：字标轮廓从字体取出后写入独立文件。
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 
 const FONT = "C:\\\\Windows\\\\Fonts\\\\msyhbd.ttc";
-const FONT_INDEX = 0;
-const TEXT = "住凯AI视频";
-const TRACKING = -0.02; // em
+const fontFaceIndex = 0;
+const wordmarkText = "住凯AI视频";
+const tracking = -0.02; // em
 
 const script = `
 import json
 from fontTools.ttLib import TTCollection
 from fontTools.pens.svgPathPen import SVGPathPen
 
-font = TTCollection(r"${FONT}").fonts[${FONT_INDEX}]
+font = TTCollection(r"${FONT}").fonts[${fontFaceIndex}]
 upm = font["head"].unitsPerEm
 cmap = font.getBestCmap()
 glyphSet = font.getGlyphSet()
 hmtx = font["hmtx"]
 
-tracking = ${TRACKING} * upm
+tracking = ${tracking} * upm
 out = []
 x = 0.0
-for ch in ${JSON.stringify(TEXT)}:
+for ch in ${JSON.stringify(wordmarkText)}:
     gname = cmap[ord(ch)]
     pen = SVGPathPen(glyphSet)
     glyphSet[gname].draw(pen)
@@ -72,7 +72,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${canvas} ${he
       画布宽 256；符号缩到 192 后居中，上边距 ${symbolOffset}
       净空 ${textGap}；字标 cap height ${textTargetCap}，水平居中
       基线 y=${baseline.toFixed(1)}；总高 ${height}
-      转曲来源 Microsoft YaHei Bold，缩放 ${scale.toFixed(3)}，字距 ${TRACKING}em
+      转曲来源 Microsoft YaHei Bold，缩放 ${scale.toFixed(3)}，字距 ${tracking}em
 
     ⚠ 版权：Microsoft YaHei 为微软商用字体，轮廓不可随产品分发。
       本文件用于审阅与版式验证；发布前须换可商用开源字体重做。
