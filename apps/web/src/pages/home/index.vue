@@ -78,8 +78,10 @@
          canvas=false 关闭画布专属能力（拖拽到画布、保存节点输出）。 -->
     <el-dialog v-model="assetsVisible" title="素材库" width="min(860px, 94vw)" alignCenter appendToBody destroyOnClose>
       <!-- 必须绑定 v-model：assetLibrary 内部用 visible 控制根节点的 v-if，
-           不绑定就一直是默认的 false，对话框里会是一片空白。 -->
-      <assetLibrary v-model="assetsVisible" :canvas="false" />
+           不绑定就一直是默认的 false，对话框里会是一片空白。
+           fill 让卡片撑满对话框：默认样式是画布浮层的 320px 固定宽度，
+           放进对话框会把内容区压成 0，同样是「什么都没有」。 -->
+      <assetLibrary v-model="assetsVisible" :canvas="false" fill />
     </el-dialog>
     <workspacePicker ref="relocationPicker" hideTrigger />
   </el-container>
