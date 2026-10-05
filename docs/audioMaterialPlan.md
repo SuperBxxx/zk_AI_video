@@ -13,7 +13,7 @@
 | P2 音频供应商（百炼 + APIMart TTS） | ✅ 完成 | `259182d`、`98f3ebe` |
 | P3 语音模型面板 + 媒体面板按类型筛选 | ✅ 完成 | `a0cf6e1` |
 | P4 素材库声音面板 | ✅ 完成 | `ffa4c1e`、`ab6592b`、`4e37c6a`、`8558cf0`、`4f709ba` |
-| P5 给 agent 新增「素材库」工具 | ⬜ 未开始（设计已摸清，见下） | — |
+| P5 给 agent 新增「素材库」工具 | ✅ 完成 | `c1c65d6` |
 | P6 打包与安装验证 | ⬜ 未开始 | — |
 
 **P4 完成的细节**
@@ -31,39 +31,28 @@
 **仍未验证**：没有真实百炼 API Key，因此「录音 → 克隆 → 试听 → 保存」的端到端
 行为、`qwen-voice-enrollment` 的实际返回、MediaRecorder 真机行为、音色质量均未验证。
 
-**P5 的准确设计（本轮已摸清代码链路，供下一轮直接实施）**
+**P5 已完成**（`c1c65d6`）
 
-目标（D7/D10）：agent 能把素材库某个文件夹或指定素材导入画布，配音与素材不必手工搬运。
+- 新增工具包 `packages/tools/assetLibrary/`：`listAssets`（浏览素材库，按扩展名标注种类）
+  与 `importAssets`（复制进工作区并按种类放到画布节点）。
+- `ToolContext` 增加可选 `assets`（只有 `readdir` 与 `importToWorkspace` 两个窄接口）。
+- 服务端 `resolvePath` 在只读时放行素材库根（照搬技能目录的既有先例）；
+  `importToWorkspace` 用 `COPYFILE_EXCL` 落到 `assets/imported`，重名加序号。
+- **关键坑已按计划处理**：节点 `path` 是工作区相对路径，素材库在工作区之外，
+  因此导入先复制进工作区再建节点。
 
-需要改 4 处：
+**实施中发现并修掉的一个开发流程缺陷**（值得记住）
 
-1. **工具上下文要能看到素材库**。`ToolContext`（`packages/toolScaffold/src/runtime.ts:189`）
-   目前只有 `cwd` / `files` / `canvas` / `media` / `question` / `skills` / `sdk`，
-   而 `files` 经 `resolvePath` 被限制在工作区（`apps/server/src/agent/tools/index.ts:18-22`），
-   够不到全局的 `{数据目录}/assets`。
-   现成先例：同一处已允许 `readOnly` 时访问工作区之外的 `skillsDirectory`
-   （`const root = readOnly && isWithin(skillsDirectory, absolute) ? skillsDirectory : cwd`），
-   素材库照此加一个只读根即可，不必新造机制。
+`initializePlugins` 的判断是「marker 存在且 revision 未变就跳过」，
+而独立 server（`apps/server/src/index.ts`）**不传 revision**，
+于是 `data/tools/initialized` 一旦存在就永远不再同步 ——
+新增工具包表现为「构建成功、`data/tools` 里却没有该文件、接口也列不出来」。
+实测复现：首次启动后 `data/tools` 缺 `assetLibrary.tool.js`，删除 marker 重启即出现。
+已在 `scripts/dev.mjs` 启动前清理 `data/{tools,nodes}/initialized`；
+生产由 desktop 传入的 `pluginRevision`（构建 hash）负责，不受影响。
 
-2. **新增工具包** `packages/tools/assetLibrary/`（名称待定），提供两个工具：
-   · 列出素材库（可指定子文件夹）：返回相对路径、名称、类型、媒体种类；
-   · 把素材放入画布：按媒体种类建 `remote-imageNode` / `remote-videoNode` /
-     `remote-audioNode` 并调用对应 `node:set*`。
-   放置逻辑与 `tools/mediaGeneration`、`tools/ffmpeg` 里已有的实现同构，
-   可考虑是否抽公共函数（三处重复时再抽，先不抽）。
-   注意：节点 setter 的 `path` 是**工作区相对路径**，而素材库在工作区之外，
-   因此导入素材时必须先**复制到工作区**再建节点，否则 set 会因越界失败。
-   这是 P5 最容易踩的坑。
-
-3. **服务端装配**：`createAgentToolContext` 增加 `assets` 根（`u.assets.getAssetsDirectory()`），
-   并让 `resolvePath` 在只读时也允许该根。
-
-4. **工具分发机制（已确认无需额外处理）**：
-   `listTools()` 读 `{数据目录}/tools`，`initializePlugins`
-   （`apps/server/src/app.ts:39`）在启动时把 `build/tools` 复制过去并以
-   `pluginRevision`（桌面端为 `apps/desktop/src/index.ts:121` 的 `hash`）判断是否重刷；
-   开发环境 marker 为空、且无 revision，故每次启动都会同步，新增工具文件自动生效。
-   只需保证新包被 `build:tools`（根 package.json 的 `--filter './packages/tools/*'`）覆盖。
+**仍未验证**：没有真实调用 `listAssets` / `importAssets` 跑通「导入素材到画布」的
+完整效果（缺供应商与已打开的项目画布）；工具只是可加载、可在接口中列出。
 
 **P4 进行中的细节**
 
