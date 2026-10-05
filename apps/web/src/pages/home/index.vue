@@ -77,7 +77,9 @@
          因此首页也能直接管理：新建文件夹、上传、生成内容都可用。
          canvas=false 关闭画布专属能力（拖拽到画布、保存节点输出）。 -->
     <el-dialog v-model="assetsVisible" title="素材库" width="min(860px, 94vw)" alignCenter appendToBody destroyOnClose>
-      <assetLibrary :canvas="false" />
+      <!-- 必须绑定 v-model：assetLibrary 内部用 visible 控制根节点的 v-if，
+           不绑定就一直是默认的 false，对话框里会是一片空白。 -->
+      <assetLibrary v-model="assetsVisible" :canvas="false" />
     </el-dialog>
     <workspacePicker ref="relocationPicker" hideTrigger />
   </el-container>
