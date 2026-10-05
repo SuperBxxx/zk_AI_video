@@ -20,6 +20,8 @@
               <div class="composerFooter">
                 <workspacePicker ref="promptWorkspacePicker" v-model="workspaceDirectory" :disabled="creating || opening" />
                 <el-space class="sendActions" wrap :size="12">
+                  <input ref="attachmentInput" class="attachmentInput" type="file" accept="image/*" multiple aria-label="选择参考图片" @change="addAttachments" />
+                  <el-button :icon="IconPaperclip" :disabled="creating || opening" aria-label="添加参考图片" @click="attachmentInput?.click()">参考图片</el-button>
                   <modelPopover v-model="selectedModel" v-model:reasoningEffort="reasoningEffort" class="modelSelect" :disabled="creating || opening" />
                   <el-button class="sendButton" type="primary" :circle="!!workspaceDirectory" :icon="workspaceDirectory ? IconArrowUp : IconFolder" :loading="creating" :disabled="creating || opening" :aria-label="workspaceDirectory ? '发送' : '选择工作目录'" @click="workspaceDirectory ? createProject() : promptWorkspacePicker?.chooseDirectory()">
                     <template v-if="!workspaceDirectory" #default>选择工作目录</template>
@@ -79,7 +81,7 @@ import {
   IconArrowUp, IconLayoutGrid,
   IconList, IconSortDescending,
   IconSortAscending, IconFolder, IconEdit,
-  IconTrash, IconFolderPlus, IconFolderOpen as iconFolderOpen,
+  IconTrash, IconFolderPlus, IconFolderOpen as iconFolderOpen, IconPaperclip,
 } from "@tabler/icons-vue";
 import modelPopover from "@/components/modelPopover.vue";
 import attachmentList from "@/components/agent/attachmentList.vue";
@@ -102,6 +104,9 @@ const relocationPicker = ref<InstanceType<typeof workspacePicker>>();
 const prompt = ref("");
 const promptInput = ref<InputInstance>();
 const promptAttachments = ref<AgentAttachment[]>([]);
+const attachmentInput = ref<HTMLInputElement>();
+// 与 AI 助手对话的附件上限保持一致，避免进工作区后才发现超出。
+const maxAttachments = 20;
 const workspaceStore = useWorkspaceStore();
 const { project, projectList } = storeToRefs(workspaceStore);
 const workspaceDirectory = ref(project.value?.directory ?? "");
@@ -144,6 +149,22 @@ async function restoreAttachment(index: number) {
     promptInput.value?.textarea?.setSelectionRange(prompt.value.length, prompt.value.length);
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : "取回文本失败，请重试");
+  }
+}
+
+// ACT: 首页只负责"选中图片"，不做上传 —— 此刻工作目录可能还没选。
+// 附件先以 File 形式留在内存，进工作区后由 conversation 的 uploadAttachments
+// 统一写入 assets/chat/ 并回填 path，与 AI 助手对话里的附件走同一条落地路径。
+function addAttachments(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const files = [...(input.files ?? [])];
+  input.value = "";
+  if (!files.length || creating.value || opening.value) return;
+  const room = maxAttachments - promptAttachments.value.length;
+  if (room <= 0) return ElMessage.warning(`最多添加 ${maxAttachments} 个附件`);
+  if (files.length > room) ElMessage.warning(`最多添加 ${maxAttachments} 个附件，已保留前 ${room} 个`);
+  for (const file of files.slice(0, room)) {
+    promptAttachments.value.push({ name: file.name, path: "", mimeType: file.type, file });
   }
 }
 
@@ -297,6 +318,8 @@ async function createProject(fromPrompt = true) {
           :deep(.el-card__footer) {
             background: var(--el-fill-color-extra-light);
           }
+
+          .attachmentInput { display: none; }
 
           .composerFooter {
             display: flex;
