@@ -7,7 +7,11 @@ export default async function initializePlugins(targetDirectory: string, sourceD
     if (error.code === "ENOENT") return null;
     throw error;
   });
-  if (initialized !== null && (revision === undefined || initialized === revision)) return;
+  // ACT: 没有 revision 时（独立 server、开发环境）不能把「marker 存在」当作已同步 ——
+  // 那会让首次启动写入的空标记永久阻断后续同步，新增的工具包/节点表现为
+  // 「构建成功、data/ 下却没有该文件」，且没有任何报错。改为每次都重新同步；
+  // 有 revision 时仍按内容比对，构建变化会触发覆盖（同版本重装也适用）。
+  if (initialized !== null && revision !== undefined && initialized === revision) return;
 
   const entries = await readdir(sourceDirectory, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
     if (error.code === "ENOENT") return null;
