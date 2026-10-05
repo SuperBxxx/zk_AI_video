@@ -1,7 +1,7 @@
 <template>
   <div v-if="loaded" class="providerList">
     <div class="itemList">
-      <el-card v-for="item in sortedProviders" :key="item.fileName" class="providerItem" shadow="never">
+      <el-card v-for="item in visibleProviders" :key="item.fileName" class="providerItem" shadow="never">
         <div class="providerHeader">
           <div class="providerInfo">
             <div class="providerHeading">
@@ -26,6 +26,9 @@
         </div>
       </el-card>
     </div>
+    <el-text v-if="!visibleProviders.length" class="emptyHint" size="small" type="info">
+      {{ kind === "audio" ? "还没有可用的语音供应商。点下方「添加供应商」选择阿里云百炼或 APIMart，填入 API Key 后即可合成配音。" : "还没有可用的媒体供应商。点下方「添加供应商」选择厂商，填入 API Key 后即可生成图片与视频。" }}
+    </el-text>
     <div class="providerActions">
       <el-button class="addButton" :icon="IconPlus" @click="openAdd('builtin')">添加供应商</el-button>
       <el-button class="addButton" :icon="IconSettings" @click="openAdd('custom')">添加自定义供应商</el-button>
@@ -44,12 +47,23 @@ import type { MediaProvider } from "./types";
 import { settings, saveSettings } from "@/stores/settings";
 import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";
 
-const { visible = true } = defineProps<{ visible?: boolean }>();
+const { visible = true, kind = "media" } = defineProps<{ visible?: boolean; kind?: "media" | "audio" }>();
 const mediaProviderDialog = shallowRef<Component>();
 const editProviderDialog = shallowRef<Component>();
 const providers = ref<MediaProvider[]>([]);
 // ACT: 原先把上游自家的 tfRouter 强制排在最前。中转已移除，按加载顺序展示。
 const sortedProviders = computed(() => [...providers.value]);
+// 按 D9：供应商全局共享，两个面板各自按模型 type 筛选展示。
+// kind="media"（媒体模型）只显示含图片/视频模型的供应商；
+// kind="audio"（语音模型）只显示含音频模型的供应商。
+// 同一供应商（如 APIMart、百炼）同时具备两类能力时会在两个面板都出现，
+// 因为供应商文件本身是共享的、配置也是同一份，这里的筛选只影响展示，
+// 编辑模型时仍会看到该供应商的全部模型。
+const visibleProviders = computed(() => {
+  const wantAudio = kind === "audio";
+  return sortedProviders.value.filter(item =>
+    item.models.some(model => wantAudio ? model.type === "audio" : model.type === "image" || model.type === "video"));
+});
 const loaded = ref(false);
 const providerDialogVisible = ref(false);
 const editorVisible = ref(false);

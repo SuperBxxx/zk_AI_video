@@ -26,7 +26,7 @@
 
 <script setup lang="ts">
 import { defineAsyncComponent, shallowRef } from "vue";
-import { IconPhotoVideo, IconInfoCircle, IconSubtitlesAi, IconTransform } from "@tabler/icons-vue";
+import { IconPhotoVideo, IconInfoCircle, IconMicrophone2, IconSubtitlesAi, IconTransform } from "@tabler/icons-vue";
 
 // ACT: 只保留模型配置、FFmpeg 与开源许可。界面设置、常规配置、MCP、隐私、开发者选项
 // 已按产品要求隐藏（对应面板文件仍在，需要时把条目加回来即可）。
@@ -39,6 +39,7 @@ const settingsPanels = [
     component: defineAsyncComponent(() => import("./panels/languageModel/index.vue")),
   },
   { id: "mediaModel", label: "媒体模型", icon: IconPhotoVideo, component: defineAsyncComponent(() => import("./panels/mediaModel/index.vue")) },
+  { id: "voiceModel", label: "语音模型", icon: IconMicrophone2, component: defineAsyncComponent(() => import("./panels/voiceModel/index.vue")) },
   { id: "ffmpeg", label: "FFmpeg", icon: IconTransform, groupLabel: "其他", component: defineAsyncComponent(() => import("./panels/ffmpeg/index.vue")) },
   { id: "about", label: "关于", icon: IconInfoCircle, component: defineAsyncComponent(() => import("./panels/about.vue")) },
 ];
