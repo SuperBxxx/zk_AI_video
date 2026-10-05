@@ -3,6 +3,7 @@
 import deepSeek from "./src/language/deepSeek";
 import apiMartLanguage from "./src/language/apiMart";
 import apiMart from "./src/media/apiMart";
+import bailian from "./src/media/bailian";
 import meta from "./src/media/meta";
 
 export type Provider = ProviderDefinition;
@@ -19,4 +20,4 @@ export type { FfmpegFactory, FfmpegCommand } from "@toonflow/ffmpeg/types";
 // 若不再需要，删掉相应 import 与注册项、以及文件即可。
 // 语言版与媒体版同名，这里用别名区分（名称冲突是唯一理由）。
 export const languageProviders = [deepSeek, apiMartLanguage] as const;
-export const mediaProviders = [apiMart, meta] as const;
+export const mediaProviders = [apiMart, bailian, meta] as const;
