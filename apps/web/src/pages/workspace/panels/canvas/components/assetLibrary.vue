@@ -527,15 +527,16 @@ defineExpose({ openSave });
     :deep(.el-tree-node__content) {
       height: 44px;
       padding-right: 6px;
-      border-radius: var(--el-border-radius-base);
     }
 
-    /* ACT: el-tree 的默认当前项高亮是 --el-fill-color-light，非常淡，
-       而且点文件也会显示选中态、与「上传目标」的语义混在一起。
-       这里只强调「选中的文件夹」：品牌色底 + 左侧色条 + 图标着色。 */
+    /* ACT: 选中态用左侧色条 + 品牌色底强调，不再用 Element Plus 的
+       .is-current 方角背景（它是整行直角高亮，与圆角行不搭）。
+       圆角交给行的 border-radius，色条用内阴影叠在最左侧。 */
     :deep(.el-tree-node.is-current > .el-tree-node__content) {
       background: var(--el-color-primary-light-9);
       box-shadow: inset 3px 0 0 var(--el-color-primary);
+      border-top-left-radius: var(--el-border-radius-base);
+      border-bottom-left-radius: var(--el-border-radius-base);
     }
 
     :deep(.el-tree-node.is-current > .el-tree-node__content .folderIcon) {

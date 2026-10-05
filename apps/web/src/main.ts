@@ -7,6 +7,11 @@ import "@/assets/main.scss";
 import "element-plus/es/components/message-box/style/css";
 import "element-plus/es/components/button/style/css";
 import "element-plus/es/components/result/style/css";
+// ACT: el-tree 的样式没有被自动导入带上（产物 CSS 里连 display:flex 与
+// --el-tree-node-content-height 都没有），于是 el-tree-node__content 退回
+// display:block，展开三角与文件夹图标重叠在一起，缩进也乱。
+// 这里显式引入，而不是在组件里手写一份 Element Plus 的样式。
+import "element-plus/es/components/tree/style/css";
 
 import router from "@/router";
 import { registerDesktopProtocol } from "@/lib/desktopProtocol";
