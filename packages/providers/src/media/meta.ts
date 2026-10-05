@@ -61,8 +61,14 @@ export default {
   id: "meta",
   label: "秘塔版MiniMax H3",
   version,
-  readme: `秘塔科技提供高性价比的 MiniMax H3 视频生成服务：768P 仅 0.09 元/秒，2K 仅 0.15 元/秒。支持原生 2K、音画同步，API 兼容 OpenAI 协议，同时支持 ComfyUI、无限画布，无需自行部署 GPU。
- \n 👉 点击 [前往平台](https://metaso.cn/minimax-h3/?s=toon) 获取密钥`,
+  // ACT: 去掉上游 readme 里的价格宣传话术与渠道码（原链接为
+  // https://metaso.cn/minimax-h3/?s=toon，?s= 是上游作者的推广参数，
+  // 与 APIMart 那处返利链接同性质）。只保留官方平台地址。
+  readme: `## 秘塔版 MiniMax H3
+
+提供 MiniMax H3 视频生成服务，支持原生 2K 与音画同步，API 兼容 OpenAI 协议，无需自行部署 GPU。
+
+前往平台获取密钥：<https://metaso.cn/minimax-h3/>`,
   rules,
   models: [
     {
