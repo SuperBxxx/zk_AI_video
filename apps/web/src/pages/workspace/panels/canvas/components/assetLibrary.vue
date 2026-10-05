@@ -12,6 +12,11 @@
       <input ref="uploadInput" class="uploadInput" type="file" multiple aria-label="选择要上传的素材" @change="uploadFiles" />
       <el-button class="toolbarButton" text :icon="IconX" title="关闭素材库" aria-label="关闭素材库" @click="visible = false" />
     </div>
+    <!-- 上传目标必须一直看得见：原先只有上传按钮的 tooltip 提了一句，
+         提示消失后就无法判断文件会落到哪里。 -->
+    <div class="uploadTarget">
+      上传到：<el-text tag="strong" size="small">{{ folderLabel }}</el-text>
+    </div>
     <el-scrollbar class="libraryScroll" :maxHeight="scrollMaxHeight">
       <el-tree ref="assetTree" class="assetTree" :data="displayEntries" nodeKey="path" :props="{ label: 'name' }" :currentNodeKey="folder === '.' ? undefined : folder" :filterNodeMethod="filterEntry" defaultExpandAll highlightCurrent emptyText="" @nodeClick="selectFolder">
         <template #default="{ data }">
@@ -287,6 +292,9 @@ function selectFolder(entry: AssetEntry) {
   folder.value = folder.value === path ? "." : path;
 }
 
+// 上传目标的展示文本；"." 表示素材库根目录。
+const folderLabel = computed(() => folder.value === "." ? "素材库（根目录）" : `素材库 / ${folder.value.split("/").join(" / ")}`);
+
 // ACT: 上传素材。服务端 assets/save 以 exclusive 方式写入（不覆盖），
 // 因此重名时必须自己避让：在扩展名前依次尝试 (1)(2)…，最多 99 次。
 function assetPath(directory: string, name: string) {
@@ -469,6 +477,20 @@ defineExpose({ openSave });
     .uploadInput { display: none; }
   }
 
+  /* 固定一行高度，切换目标时不会让下面的列表跳动。 */
+  .uploadTarget {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 22px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    line-height: 18px;
+    color: var(--el-text-color-secondary);
+
+    :deep(.el-text) { color: var(--el-color-primary); }
+  }
+
   .libraryScroll {
     min-height: 0;
     max-height: 440px;
@@ -506,6 +528,18 @@ defineExpose({ openSave });
       height: 44px;
       padding-right: 6px;
       border-radius: var(--el-border-radius-base);
+    }
+
+    /* ACT: el-tree 的默认当前项高亮是 --el-fill-color-light，非常淡，
+       而且点文件也会显示选中态、与「上传目标」的语义混在一起。
+       这里只强调「选中的文件夹」：品牌色底 + 左侧色条 + 图标着色。 */
+    :deep(.el-tree-node.is-current > .el-tree-node__content) {
+      background: var(--el-color-primary-light-9);
+      box-shadow: inset 3px 0 0 var(--el-color-primary);
+    }
+
+    :deep(.el-tree-node.is-current > .el-tree-node__content .folderIcon) {
+      color: var(--el-color-primary);
     }
 
     .assetEntry {
