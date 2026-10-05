@@ -240,6 +240,11 @@ const canvasHistory = useCanvasHistory(flow, () =>
 const { canUndo, canRedo } = canvasHistory;
 provide("batchCanvasHistory", canvasHistory.batch);
 const getNodeTools = useNodeToolsContext();
+// ACT: 把「调用节点已注册的函数」透给节点自身。节点里的后台任务产出结果后，
+// 需要把文件写进一个已存在的空素材节点（例如复用画布上空的 videoNode），
+// 但节点包不能直接引用画布实现，只能靠注入。用箭头函数包装，保证每次调用
+// 都读取当前注册表，而不是复制一份快照。
+provide("callNodeTool", (nodeId: string, name: `node:${string}`, args: Record<string, unknown>) => getNodeTools().call({ nodeId, name, args }));
 const { addNodes, addEdges, removeEdges, findEdge, findNode, toObject, viewport, screenToFlowCoordinate } = flow;
 provide("copyNodeToClipboard", (node: Parameters<typeof copyNodeToClipboard>[0]) => copyNodeToClipboard(node, project.value?.directory ?? ""));
 provide("retainNodeFiles", true);

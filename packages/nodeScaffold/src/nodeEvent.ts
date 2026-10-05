@@ -97,20 +97,53 @@ export function useNodeEvent(nodeId = useNodeId(), canvas = useVueFlow()) {
 //
 // 为什么放在这里：节点包不引用 apps/web，只能靠注入拿宿主能力；
 // 画布上下文已在 useNodeEvent 里注入过，这里沿用同一套注入键。
-// 宿主侧来源：canvasHost.vue 的 provide("notifyCanvasChange")。
+// 宿主侧来源：canvas/index.vue 与 canvasHost.vue 的 provide。
 export function useCanvasOutput() {
   const flow = useVueFlow();
   const notify = inject<((label: string, kind: string, nodeId?: string) => void) | undefined>("notifyCanvasChange", undefined);
+  // 宿主侧来源：canvas/index.vue 的 provide("callNodeTool")。
+  const callNodeTool = inject<((nodeId: string, name: `node:${string}`, args: Record<string, unknown>) => Promise<unknown>) | undefined>("callNodeTool", undefined);
   const id = useNodeId();
+
+  // 节点是否已经挂了输出；videoNode 把素材持久化在 node.data.outputs.video。
+  function hasOutput(nodeId: string) {
+    return !!flow.findNode(nodeId)?.data?.outputs?.video;
+  }
+
+  // ACT: 优先复用半径内的空素材节点，而不是无脑新建。
+  // 为什么限定半径：多镜头工作流里同画布可能有多个空的 videoNode，
+  // 取全局第一个会把 A 段的产出挂到 B 段的节点上；取最近的一般正是它对应的那个。
+  // 半径 800 是经验值（节点间距通常 400 上下），超出就认为不在同一区域。
+  function findReusableVideoNode(position: { x: number; y: number }) {
+    const candidates = flow.getNodes.value.filter(node => node.type === "remote-videoNode" && !hasOutput(node.id));
+    if (!candidates.length) return undefined;
+    const nearest = candidates
+      .map(node => ({ node, distance: Math.hypot(node.position.x - position.x, node.position.y - position.y) }))
+      .sort((left, right) => left.distance - right.distance)[0]!;
+    return nearest.distance <= 800 ? nearest.node : undefined;
+  }
 
   return async function placeOutput(output: { url: string; mimeType: string }, label: string) {
     const node = id ? flow.findNode(id) : undefined;
+    // 放在源节点右侧，尽量不与已有节点重叠。
+    const position = { x: node ? node.position.x + 420 : 0, y: node ? node.position.y : 0 };
+    // 复用前必须能调用节点函数，否则挂不上文件，不如照旧新建。
+    const reused = callNodeTool ? findReusableVideoNode(position) : undefined;
+    if (reused) {
+      // 空节点只有 source 端口、没有输入，只能通过它自己注册的 setVideo 把文件挂上去。
+      await callNodeTool!(reused.id, "node:setVideo", { path: output.url, mimeType: output.mimeType });
+      await nextTick();
+      if (node) flow.addEdges({ id: crypto.randomUUID(), source: id!, sourceHandle: "video", target: reused.id, targetHandle: "video" });
+      await nextTick();
+      notify?.(label, "视频", reused.id);
+      return reused.id;
+    }
+
     const newId = crypto.randomUUID();
     flow.addNodes({
       id: newId,
       type: "remote-videoNode",
-      // 放在源节点右侧，尽量不与已有节点重叠。
-      position: node ? { x: node.position.x + 420, y: node.position.y } : { x: 0, y: 0 },
+      position,
       data: { label },
     });
     await nextTick();
