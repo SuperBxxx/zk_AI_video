@@ -10,9 +10,45 @@ const configSchema = z.strictObject({
 
 const plugin: ToolPlugin = {
   validateConfig: config => configSchema.parse(config),
-  createTools({ media, config }) {
+  createTools(context) {
+    const { media, config } = context;
     if (!media) return [];
     const permissions = configSchema.parse(config);
+    // 生成结果自动放到画布上，不依赖 agent 自觉调用画布工具。
+    // 用各节点自己注册的 set* 函数写入，它们会做各自的校验（例如 videoNode 的
+    // setVideo 会校验文件可读且不超过 100 MB），工具层不重复校验。
+    // ACT: 与 tools/ffmpeg 的做法一致；任何失败只静默跳过，绝不影响生成结果本身。
+    const nodeTargets = {
+      image: { type: "remote-imageNode", setter: "node:setImage" },
+      video: { type: "remote-videoNode", setter: "node:setVideo" },
+      audio: { type: "remote-audioNode", setter: "node:setAudio" },
+    } as const;
+    async function placeOnCanvas(assets: { mediaType: "image" | "video" | "audio"; path: string; mimeType?: string }[]): Promise<string> {
+      if (!context.canvas) return "";
+      const placed: string[] = [];
+      for (const asset of assets) {
+        const target = nodeTargets[asset.mediaType];
+        if (!target) continue;
+        const name = asset.path.replaceAll("\\", "/").split("/").pop() || asset.path;
+        try {
+          const node = await context.canvas.call({
+            name: "addNode",
+            args: { type: target.type, position: { x: 0, y: 0 }, label: name },
+          }) as { node?: { id?: string } };
+          const nodeId = node?.node?.id;
+          if (!nodeId) continue;
+          await context.canvas.call({
+            name: "nodeTools",
+            args: { nodeId, name: target.setter, args: { path: asset.path, mimeType: asset.mimeType ?? "" } },
+          });
+          placed.push(name);
+        } catch {
+          // 单个素材失败不影响其余，也不影响工具本身的返回值。
+        }
+      }
+      return placed.length ? `已将 ${placed.join("、")} 放到画布上。` : "";
+    }
+
     const generationTools = ([
       { name: "generateImage", mediaType: "image", enabled: permissions.allowImage, label: "生成图片", parameters: imageGenerationSchema, description: "根据提示词和可选的工作区参考图生成图片。" },
       { name: "generateVideo", mediaType: "video", enabled: permissions.allowVideo, label: "生成视频", parameters: videoGenerationSchema, description: "根据提示词和可选的工作区图片、视频、音频、首尾帧生成视频。按模型能力设置生成模式、时长、分辨率和音频。" },
@@ -41,12 +77,13 @@ const plugin: ToolPlugin = {
       async execute(_id, params, signal) {
         signal?.throwIfAborted();
         const result = await media[operation.name](operation.parameters.parse(params), signal);
+        const placed = await placeOnCanvas(result);
         const text = result.map(asset => {
           const url = asset.path.replaceAll("\\", "/").split("/").map(encodeURIComponent).join("/");
           const preview = asset.mediaType === "image" ? `![生成图片](<${url}>)` : `[${asset.mediaType === "audio" ? "播放生成音频" : "查看生成视频"}](<${url}>)`;
           return `${preview}\n工作区文件：${asset.path}`;
         }).join("\n\n");
-        return { content: [{ type: "text", text }], details: result };
+        return { content: [{ type: "text", text: placed ? `${text}\n\n${placed}` : text }], details: result };
       },
     }))];
   },
