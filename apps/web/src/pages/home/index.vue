@@ -15,7 +15,7 @@
         <div class="promptArea">
           <el-card class="promptCard" shadow="never" :bodyStyle="{ padding: '20px' }" :footerStyle="{ padding: '12px 16px' }">
             <attachmentList v-if="promptAttachments.length" class="promptAttachments" :attachments="promptAttachments" removable restorable :disabled="creating || opening" @remove="promptAttachments.splice($event, 1)" @restore="restoreAttachment" />
-            <el-input ref="promptInput" v-model="prompt" type="textarea" :rows="4" resize="none" :disabled="creating || opening" :placeholder="promptPlaceholder" aria-label="创作描述" @paste.capture="pasteText" />
+            <el-input ref="promptInput" v-model="prompt" type="textarea" :rows="4" resize="none" :disabled="creating || opening" aria-label="创作描述" @paste.capture="pasteText" />
             <template #footer>
               <div class="composerFooter">
                 <workspacePicker ref="promptWorkspacePicker" v-model="workspaceDirectory" :disabled="creating || opening" />
@@ -68,10 +68,10 @@
 </template>
 
 <script setup lang="ts">
-import { locale, translate } from "@toonflow/i18n/vue";
+import { locale } from "@toonflow/i18n/vue";
 import axios from "axios";
 import { storeToRefs } from "pinia";
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage, ElMessageBox, type InputInstance } from "element-plus";
 import {
@@ -105,56 +105,6 @@ const promptAttachments = ref<AgentAttachment[]>([]);
 const workspaceStore = useWorkspaceStore();
 const { project, projectList } = storeToRefs(workspaceStore);
 const workspaceDirectory = ref(project.value?.directory ?? "");
-const placeholderPhrases = [
-  "描述你想创作的内容，让灵感从这里开始…",
-  "把一个故事灵感，变成一段精彩的短片…",
-  "为你的主角设计独特的外形和性格…",
-  "创作一段雨夜街头的电影感镜头…",
-  "把这段文字拆解成连贯的分镜画面…",
-  "为一场奇幻冒险生成场景和角色…",
-  "为你的画面配上一段合适的音乐…",
-  "写一段温暖的旁白，讲述这个故事…",
-  "设计一支富有想象力的产品宣传片…",
-  "从一句话开始，搭建你的创作工作流…",
-];
-const promptPlaceholder = ref(translate(placeholderPhrases[0]!));
-
-onMounted(() => {
-  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  let phraseIndex = 0;
-  watch([() => !!prompt.value, locale], ([hasInput], _previous, onCleanup) => {
-    if (reduceMotion) {
-      promptPlaceholder.value = translate(placeholderPhrases[0]!);
-      return;
-    }
-    if (hasInput) return;
-    const segmenter = new Intl.Segmenter(locale.value, { granularity: "grapheme" });
-    const phrases = placeholderPhrases.map(phrase => [...segmenter.segment(translate(phrase))].map(part => part.segment));
-    let characterCount = 0;
-    let deleting = false;
-    let timer: ReturnType<typeof setTimeout>;
-    promptPlaceholder.value = "";
-
-    function typePlaceholder() {
-      const phrase = phrases[phraseIndex]!;
-      characterCount += deleting ? -1 : 1;
-      promptPlaceholder.value = phrase.slice(0, characterCount).join("");
-      let delay = deleting ? 35 : 85;
-      if (characterCount === phrase.length) {
-        deleting = true;
-        delay = 1800;
-      } else if (characterCount === 0) {
-        deleting = false;
-        phraseIndex = (phraseIndex + 1) % placeholderPhrases.length;
-        delay = 300;
-      }
-      timer = setTimeout(typePlaceholder, delay);
-    }
-
-    timer = setTimeout(typePlaceholder, 300);
-    onCleanup(() => clearTimeout(timer));
-  }, { immediate: true });
-});
 
 const selectedModel = ref("");
 const reasoningEffort = ref("");
