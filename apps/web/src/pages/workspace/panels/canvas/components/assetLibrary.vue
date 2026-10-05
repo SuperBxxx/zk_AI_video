@@ -1,5 +1,5 @@
 <template>
-  <el-card v-if="visible" class="assetLibrary" shadow="never" :bodyStyle="{ padding: '8px' }" role="region" aria-label="素材库" @dblclick.stop>
+  <el-card v-if="visible" class="assetLibrary" :class="{ filled }" shadow="never" :bodyStyle="{ padding: '8px' }" role="region" aria-label="素材库" @dblclick.stop>
     <el-radio-group v-model="activeTab" class="libraryTabs" size="small" aria-label="素材库分页">
       <el-radio-button value="asset">素材</el-radio-button>
       <el-radio-button value="voice">声音</el-radio-button>
@@ -12,7 +12,7 @@
       <input ref="uploadInput" class="uploadInput" type="file" multiple aria-label="选择要上传的素材" @change="uploadFiles" />
       <el-button class="toolbarButton" text :icon="IconX" title="关闭素材库" aria-label="关闭素材库" @click="visible = false" />
     </div>
-    <el-scrollbar class="libraryScroll" maxHeight="min(440px, calc(100dvh - 198px))">
+    <el-scrollbar class="libraryScroll" :maxHeight="scrollMaxHeight">
       <el-tree ref="assetTree" class="assetTree" :data="displayEntries" nodeKey="path" :props="{ label: 'name' }" :currentNodeKey="folder === '.' ? undefined : folder" :filterNodeMethod="filterEntry" defaultExpandAll highlightCurrent emptyText="" @nodeClick="selectFolder">
         <template #default="{ data }">
           <div class="assetEntry" :title="data.name" :draggable="canvasMode && data.type === 'file'" @dragstart.stop="canvasMode && startAssetDrag($event, data)" @dblclick.stop="openPreview(data)" @contextmenu="openItemMenu($event, data)">
@@ -32,6 +32,11 @@
           </div>
         </template>
       </el-tree>
+      <!-- 空目录提示：el-tree 的 emptyText 被设为空串，没有这段的话空素材库
+           与「组件坏掉」看起来完全一样。 -->
+      <el-text v-if="!displayEntries.length" class="emptyHint" size="small" type="info">
+        素材库还是空的。用上方工具栏的上传按钮添加素材，或到「声音」分页创建音色。
+      </el-text>
     </el-scrollbar>
     <div v-if="previewAsset?.kind === 'audio'" class="audioPreview">
       <div class="audioHeader">
@@ -44,7 +49,7 @@
     </template>
     <!-- 声音面板：克隆与设计出的音色以 json 素材存在素材库的声音文件夹里，
          因此与素材浏览同属一个素材库界面，用分页而不是另开浮层。 -->
-    <el-scrollbar v-else class="libraryScroll" maxHeight="min(440px, calc(100dvh - 198px))">
+    <el-scrollbar v-else class="libraryScroll" :maxHeight="scrollMaxHeight">
       <voicePanel :voiceFolder="voiceFolder" :directory="directory" @saved="refreshAssets()" />
     </el-scrollbar>
   </el-card>
@@ -98,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import axios from "axios";
 import { ElMessage, ElTree, type InputInstance, type TreeNodeData } from "element-plus";
 import { IconDots, IconEye, IconFile, IconFolderFilled, IconFolderPlus, IconMusic, IconPhoto, IconSearch, IconUpload, IconVideo, IconX } from "@tabler/icons-vue";
@@ -111,7 +116,12 @@ import voicePanel from "./voicePanel.vue";
 type AssetEntry = { name: string; path: string; type: "file" | "directory"; children?: AssetEntry[]; draft?: boolean };
 type AssetOutput = { label: string; output: NodeOutput };
 
-const props = defineProps<{ directory?: string; canvas?: boolean }>();
+const props = defineProps<{ directory?: string; canvas?: boolean; fill?: boolean }>();
+// ACT: 画布里的素材库是浮层，宽度固定 320px；放进对话框（fill）时需要撑满并给内容区足够高度，
+// 否则 320px 宽度与 max-height 会把内容区压成 0，表现为「对话框打开了但里面什么都没有」。
+const filled = computed(() => props.fill === true);
+// 浮层里限高避免超出画布；对话框里不限高，改由 .filled 的 min-height 撑开内容区。
+const scrollMaxHeight = computed(() => filled.value ? "none" : "min(440px, calc(100dvh - 198px))");
 const directory = computed(() => props.directory);
 // 音色按 D3 以 json 素材存在素材库的这个文件夹里，方便与素材一起浏览与备份。
 const voiceFolder = "声音";
@@ -264,6 +274,12 @@ watch(visible, opened => {
     previewAsset.value = undefined;
   }
 });
+// ACT: 组件在对话框里是「打开时才挂载」，此时 visible 从一开始就是 true，
+// watch 因没有变化而不触发，素材列表就永远不会加载（表现为树是空的）。
+// 画布里面板常驻 DOM，visible 会 false → true，所以一直没暴露这个问题。
+onMounted(() => {
+  if (visible.value) loadEntries().catch(showError);
+});
 
 function selectFolder(entry: AssetEntry) {
   if (entry.draft) return;
@@ -401,6 +417,18 @@ defineExpose({ openSave });
   width: min(320px, calc(100vw - 30px));
   max-height: calc(100dvh - 140px);
 
+  /* 对话框里撑满可用宽度，并给内容区一个下限高度，避免被压成 0。 */
+  &.filled {
+    width: 100%;
+    max-height: calc(100dvh - 220px);
+
+    /* 覆盖浮层的 440px 限高与 min-height:0，否则对话框里内容区仍会被压扁。 */
+    .libraryScroll {
+      min-height: 280px;
+      max-height: none;
+    }
+  }
+
   :deep(.el-card__body) {
     display: flex;
     flex-direction: column;
@@ -444,6 +472,12 @@ defineExpose({ openSave });
   .libraryScroll {
     min-height: 0;
     max-height: 440px;
+  }
+
+  .emptyHint {
+    display: block;
+    padding: 12px 4px;
+    line-height: 18px;
   }
 
   .audioPreview {
