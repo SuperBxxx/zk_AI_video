@@ -24,6 +24,7 @@ import type { CanvasContext } from "@toonflow/tool-canvas/runtime";
 import { waitForControlValue } from "@/lib/mcpControl";
 import canvasPanel from "./index.vue";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
+import { getCanvasChangeNotifier } from "@/lib/canvasChange";
 import { useWorkspaceStore } from "@/stores/workspace";
 import { createCanvasMention, mentionNodeOutputs, queryMentionNodes, type MentionCanvasSource } from "@toonflow/server/agent/mentionSources";
 
@@ -39,6 +40,9 @@ const lifetime = new AbortController();
 const workspaceStore = useWorkspaceStore();
 const canvases = shallowRef<{ id: string }[]>([]);
 provide("canvasList", canvases);
+// ACT: 把「通知 agent」透给节点：节点里的后台任务完成后借此唤醒助手，用户不必再手动发一条消息。
+// 回调由 AI 助手挂载时注册（它与此处是兄弟组件，只能靠 lib/canvasChange.ts 这个单例桥接）。
+provide("notifyCanvasChange", (label: string, kind: string, nodeId?: string) => getCanvasChangeNotifier()?.(label, kind, nodeId));
 provide("canvasAssetNodes", (id: string) => [...instances.values()].find(panel => panel.canvasId === id)?.getRetainedNodes() ?? []);
 watch(canvases, (current, previous) => {
   const removed = new Set(previous.filter(canvas => !current.includes(canvas)).map(canvas => canvas.id));

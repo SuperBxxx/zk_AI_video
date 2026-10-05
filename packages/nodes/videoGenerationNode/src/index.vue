@@ -83,7 +83,7 @@
 import { computed, nextTick, onMounted, onScopeDispose, ref, watch } from "vue";
 import { ElButton, ElCard, ElSelect, ElOption, ElOptionGroup, ElLoading } from "element-plus";
 import { IconCameraAi, IconSparkles, IconArrowUp, IconPlayerStop, IconTransfer } from "@tabler/icons-vue";
-import { groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useNode, useNodeGeneration, useNodeReferences, z, type NodeMediaModel, type NodeVideoRequest, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
+import { groupNodeModels, nodeSkeleton, nodeTools, showNodeError, useCanvasOutput, useNode, useNodeGeneration, useNodeReferences, z, type NodeMediaModel, type NodeVideoRequest, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import promptInput from "@toonflow/nodes-scaffold/promptInput";
 import videoPlayer from "@toonflow/nodes-scaffold/videoPlayer";
 import referenceItem from "@toonflow/nodes-scaffold/referenceItem";
@@ -125,6 +125,22 @@ const generationState = useNodeGeneration(outputs, () => generationController?.a
 const { generating } = generationState;
 let generation: Promise<void> | undefined;
 let modelsRequest: Promise<void> | undefined;
+const placeCanvasOutput = useCanvasOutput();
+// ACT: 生成完成后把成片放成画布上的视频节点，并通知 agent 汇报结果 ——
+// 否则 agent 那一轮早已结束（generateVideo 立即返回 generating），
+// 用户必须再发一条消息才能确认生成结果。
+// 用 URL 去重：output:video 是 immediate 的 watch，初始会以 undefined 触发一次。
+let placedVideoUrl = "";
+nodeEvent.on("output:video", (output) => {
+  const produced = output?.dataType === "VIDEO" ? output.value : undefined;
+  const url = produced?.url;
+  if (!url || url === placedVideoUrl) return;
+  placedVideoUrl = url;
+  const label = url.split(/[\\/]/).pop() || "成片";
+  void placeCanvasOutput({ url, mimeType: produced!.mimeType }, label)
+    .then(() => { updateNodeInternals(); })
+    .catch(() => { placedVideoUrl = ""; });
+});
 // ACT: 供应商未声明视频比例范围，沿用界面的通用比例，具体支持范围由供应商校验。
 const ratioOptions = ["16:9", "9:16", "1:1", "4:3", "3:4"];
 const selectedModel = computed(() => models.value.find((item) => JSON.stringify([item.providerId, item.modelId]) === data.value.model));

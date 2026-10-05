@@ -320,7 +320,19 @@ function receiveEvent(event: AgentEvent) {
   applyEvent(event);
 }
 
-defineExpose({ receiveEvent });
+// ACT: 节点里的后台任务（视频生成等）完成时，靠这个方法把消息送回会话。
+// 写入 pendingAgentMessage 后由下方 watch 触发一次正常发送，复用既有的填入与发送通道，
+// 不另造注入机制；用户不必再手动发一条消息来触发 agent 确认结果。
+function notifyCanvasChange(label: string, kind: string, nodeId?: string) {
+  if (!directory || !props.active || locked.value) return;
+  const id = nodeId ? `（节点 ${nodeId}）` : "";
+  workspaceStore.pendingAgentMessage = {
+    directory,
+    prompt: `画布上的${kind}「${label}」已经完成${id}，请查看它的输出并向用户简要说明结果。`,
+  };
+}
+
+defineExpose({ receiveEvent, notifyCanvasChange });
 
 function getDraftContent() {
   return sender?.getModel().map((line, lineIndex) => line.map((tag, tagIndex) => {

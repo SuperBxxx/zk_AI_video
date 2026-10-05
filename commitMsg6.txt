@@ -1,0 +1,35 @@
+feat(视频生成): 生成完成后自动上画布并唤醒 agent
+
+问题
+- videoGenerationNode 的 generateVideo 工具是异步的：调用后立即返回
+  {status:"generating"}，真正的生成在后台跑（provider 侧 pollVideo 轮询）。
+  agent 那一轮随即结束，它没有理由再调 getGenerationStatus，于是用户必须
+  额外发一条消息才能让 agent 确认结果。
+
+做法（复用既有通道，不新造机制）
+- 生成完成的判定用 nodeEvent.on("output:video")——它是 immediate 的 watch，
+  初次以 undefined 触发，因此用 URL 去重避免重复放置与重复打扰。
+- 命中后调用新的 useCanvasOutput()：把它放成画布上的 remote-videoNode，
+  并从源节点 video → 新节点 video 连一条边。
+
+跨层桥接（画布面板与 AI 助手是兄弟组件，prop 与组件级 provide 都传不过去）
+- lib/canvasChange.ts：进程内单例回调槽，助手挂载时注册、卸载时清空。
+- agent/index.vue：注册 notifyCanvasChange，只转发给当前显示的那个会话。
+- conversation.vue：defineExpose 出 notifyCanvasChange，写入
+  workspaceStore.pendingAgentMessage —— conversation 里已有的 watch 会自动
+  填入并发送，等于让 agent 主动汇报，用户不必再发消息。
+- canvasHost.vue：provide("notifyCanvasChange")，透给节点层。
+- nodeScaffold/nodeEvent.ts：useCanvasOutput() 统一做「上画布 + 通知」，
+  注入键沿用该文件里已有的注入方式，节点包因此不需要引用 apps/web。
+
+顺带修正
+- workspace store 的 pendingAgentMessage 里 model / reasoningEffort 改为可选：
+  它们只在首页创建项目时用于带上用户刚选的模型；程序化通知不传，
+  走会话当前已选的模型（conversation.vue 只在中初始化时读这两个字段）。
+
+验证
+- videoGenerationNode typecheck 无错误
+- apps/web typecheck 保持既有基线 7 个；生产构建通过
+- build:nodes 全量构建通过（退出码 0）
+- 产物 build/nodes/videoGenerationNode.umd.js 中确认含 remote-videoNode、
+  notifyCanvasChange、output:video、addEdges

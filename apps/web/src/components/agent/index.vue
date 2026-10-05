@@ -34,11 +34,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch, type ComponentPublicInstance } from "vue";
 import axios from "axios";
 import { translate } from "@toonflow/i18n/vue";
 import { ElMessage } from "element-plus";
 import { useWorkspaceStore } from "@/stores/workspace";
+import { setCanvasChangeNotifier } from "@/lib/canvasChange";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import type { AgentConversation, AgentHistory } from "./types";
 import type { AgentEvent, AgentSubAgent } from "@toonflow/server/agent/types";
@@ -78,6 +79,12 @@ function showConversation(session: AgentConversation | null, activate = true) {
   conversations.value.push(item);
   if (activate) conversationKey.value = key;
   return conversations.value[conversations.value.length - 1]!;
+}
+
+// ACT: 供节点层在后台任务完成后唤醒 agent。只送给当前显示的那个会话，避免打扰其他会话。
+function notifyCanvasChange(label: string, kind: string, nodeId?: string) {
+  if (!visible.value) return;
+  conversationRefs.get(conversationKey.value)?.notifyCanvasChange(label, kind, nodeId);
 }
 
 function setConversationRef(item: OpenConversation, instance: Element | ComponentPublicInstance | null) {
@@ -297,7 +304,12 @@ watch(() => workspaceStore.project?.directory, directory => {
 watch(visible, active => {
   if (active && !initialized.value) void loadHistory(true);
 });
-onBeforeUnmount(() => { requestId++; });
+// ACT: 挂载期间把「唤醒 agent」的能力注册给节点层，卸载时清空，避免持有失效实例。
+onMounted(() => setCanvasChangeNotifier(notifyCanvasChange));
+onBeforeUnmount(() => {
+  requestId++;
+  setCanvasChangeNotifier(undefined);
+});
 
 </script>
 

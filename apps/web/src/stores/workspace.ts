@@ -12,7 +12,9 @@ export type Project = {
 export const useWorkspaceStore = defineStore("workspace", () => {
   const project = ref<Project | null>(null);
   const projectList = ref<Project[]>([]);
-  const pendingAgentMessage = ref<{ directory: string; prompt: string; attachments?: AgentAttachment[]; model: string; reasoningEffort: string } | null>(null);
+  // model 与 reasoningEffort 只在首页创建项目时用来带上用户刚选的模型；
+  // 程序化通知（如节点后台任务完成后唤醒 agent）不传这两项，走会话当前已选的模型。
+  const pendingAgentMessage = ref<{ directory: string; prompt: string; attachments?: AgentAttachment[]; model?: string; reasoningEffort?: string } | null>(null);
 
   async function openProject(path: string, previousDirectory = path, signal?: AbortSignal) {
     const { data } = await axios.get<{ code: number; data?: { directory: string }; message?: string }>("/api/workspaces/check", {

@@ -1,4 +1,4 @@
-import { onScopeDispose, watch } from "vue";
+import { inject, nextTick, onScopeDispose, watch } from "vue";
 import { useNodeId, useVueFlow } from "@vue-flow/core";
 import type { ValidConnectionFunc } from "@vue-flow/core";
 import { useNodeInputs } from "./nodeInputs";
@@ -91,4 +91,32 @@ export function useNodeEvent(nodeId = useNodeId(), canvas = useVueFlow()) {
   }
 
   return { on, emit };
+}
+
+// 后台任务（视频生成等）产出结果后：把它放成画布上的一个节点，并通知 agent。
+//
+// 为什么放在这里：节点包不引用 apps/web，只能靠注入拿宿主能力；
+// 画布上下文已在 useNodeEvent 里注入过，这里沿用同一套注入键。
+// 宿主侧来源：canvasHost.vue 的 provide("notifyCanvasChange")。
+export function useCanvasOutput() {
+  const flow = useVueFlow();
+  const notify = inject<((label: string, kind: string, nodeId?: string) => void) | undefined>("notifyCanvasChange", undefined);
+  const id = useNodeId();
+
+  return async function placeOutput(output: { url: string; mimeType: string }, label: string) {
+    const node = id ? flow.findNode(id) : undefined;
+    const newId = crypto.randomUUID();
+    flow.addNodes({
+      id: newId,
+      type: "remote-videoNode",
+      // 放在源节点右侧，尽量不与已有节点重叠。
+      position: node ? { x: node.position.x + 420, y: node.position.y } : { x: 0, y: 0 },
+      data: { label },
+    });
+    await nextTick();
+    if (node) flow.addEdges({ id: crypto.randomUUID(), source: id!, sourceHandle: "video", target: newId, targetHandle: "video" });
+    await nextTick();
+    notify?.(label, "视频", newId);
+    return newId;
+  };
 }
