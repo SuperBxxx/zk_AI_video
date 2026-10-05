@@ -1,0 +1,311 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>住凯AI视频 — logo 变体（第 1 轮）</title>
+<style>
+  /* 第 1 轮 logo 变体展示。按 logo-design 技能要求：
+     覆盖多种 mark 结构（wordmark / lockup / symbol-only / letterform-as-symbol / monogram），
+     每个变体给出结构、字体、信号与拒绝项，并做小尺寸测试。
+     字体使用系统栈 —— 系统内无 webfont；字标本就应配字体规格（见 logo-variants.md）。 */
+  :root {
+    --ink: #0e1110;
+    --panel: #151a18;
+    --line: #242b28;
+    --paper: #f2f4f2;
+    --muted: #7d8783;
+    --dim: #4a5450;
+    --brand: #2e9e6b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { overflow: hidden; }
+  body {
+    width: 2600px;
+    /* 显式高度，配合 --window-size 精确截图，避免底部大片空白 */
+    height: 1880px;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 56px 64px;
+  }
+
+  header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+  header h1 { font-size: 40px; font-weight: 650; letter-spacing: -0.01em; }
+  header span { font-size: 22px; color: var(--muted); letter-spacing: 0.16em; }
+  .lede { font-size: 22px; color: var(--muted); margin-bottom: 44px; }
+
+  section { margin-bottom: 34px; }
+  .secHead {
+    display: flex; align-items: baseline; gap: 18px;
+    padding-bottom: 14px; margin-bottom: 22px;
+    border-bottom: 1px solid var(--line);
+  }
+  .secHead h2 { font-size: 26px; font-weight: 600; letter-spacing: 0.02em; }
+  .secHead em { font-style: normal; font-size: 20px; color: var(--dim); letter-spacing: 0.14em; }
+
+  .grid { display: grid; gap: 22px; }
+  .cols3 { grid-template-columns: repeat(3, 1fr); }
+  .cols4 { grid-template-columns: repeat(4, 1fr); }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-height: 260px;
+  }
+  .card .idx { font-size: 18px; color: var(--dim); font-variant-numeric: tabular-nums; letter-spacing: 0.1em; }
+  .stage {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    min-height: 120px;
+  }
+  .note { font-size: 19px; color: var(--muted); line-height: 1.55; }
+  .note b { color: var(--paper); font-weight: 600; }
+
+  svg { display: block; }
+
+  /* ---------- 字标 ---------- */
+  .wm { white-space: nowrap; line-height: 1; }
+  .wm .lat { display: block; }
+
+  .wmGeo { font-weight: 500; letter-spacing: 0.01em; }
+  .wmHumanist { font-weight: 600; letter-spacing: -0.015em; }
+  .wmSerif { font-family: Georgia, "Songti SC", "SimSun", serif; font-weight: 600; letter-spacing: 0.01em; }
+  .wmCustom .zhu { font-weight: 700; letter-spacing: -0.04em; }
+  .wmCustom .rest { font-weight: 400; letter-spacing: 0.02em; color: #cfd6d2; }
+  .wmCustom .tag { display: block; font-size: 20px; color: var(--dim); letter-spacing: 0.34em; margin-top: 14px; font-weight: 400; }
+
+  /* ---------- 小尺寸测试条 ---------- */
+  .sizeRow { display: flex; align-items: flex-end; gap: 26px; }
+  .sizeItem { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .sizeItem span { font-size: 15px; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .box { display: grid; place-items: center; }
+  .box.ink { background: #000; border-radius: 4px; }
+  .box.paper { background: var(--paper); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>住凯AI视频 — logo 变体</h1>
+  <span>第 1 轮 · 12 个变体 · 5 种结构</span>
+</header>
+<p class="lede">
+  结构分层：字标（01–04）→ 组合（05–07）→ 纯符号（08–09）→ 字母形符号（10–11）→ 字组（12）。
+  每个变体的完整规格（字体、信号、拒绝项、应用限制）见 <code>logo-variants.md</code>。
+</p>
+
+<!-- ============ 字标 ============ -->
+<section>
+  <div class="secHead"><h2>字标 Wordmark</h2><em>01 – 04 · 只由字体构成，小尺寸需回退符号</em></div>
+  <div class="grid cols4">
+
+    <div class="card">
+      <span class="idx">01 · 几何无衬线</span>
+      <div class="stage"><div class="wm wmGeo" style="font-size:72px">住凯AI视频</div></div>
+      <p class="note"><b>信号</b> 现代、中性、AI 品类默认。<b>拒绝</b> 个性。</p>
+    </div>
+
+    <div class="card">
+      <span class="idx">02 · 人文无衬线</span>
+      <div class="stage"><div class="wm wmHumanist" style="font-size:72px">住凯AI视频</div></div>
+      <p class="note"><b>信号</b> 专业但温和，适合创作者工具。<b>拒绝</b> 冷硬科技感。</p>
+    </div>
+
+    <div class="card">
+      <span class="idx">03 · 过渡衬线</span>
+      <div class="stage"><div class="wm wmSerif" style="font-size:72px">住凯AI视频</div></div>
+      <p class="note"><b>信号</b> 编辑感、严肃。<b>拒绝</b> 品类惯例 —— 视频工具极少用衬线，是可用的差异化位。</p>
+    </div>
+
+    <div class="card">
+      <span class="idx">04 · 定制字重对比</span>
+      <div class="stage">
+        <div class="wm wmCustom" style="font-size:66px">
+          <span class="zhu">住凯</span><span class="rest">AI视频</span>
+          <span class="tag">Z H U K A I</span>
+        </div>
+      </div>
+      <p class="note"><b>信号</b> 靠字重把「住凯」与品类词分开，无需符号即可有节奏。<b>拒绝</b> 平均用力的字标。</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ 组合 ============ -->
+<section>
+  <div class="secHead"><h2>组合 Lockup</h2><em>05 – 07 · 符号 + 字标，主用形态</em></div>
+  <div class="grid cols3">
+
+    <div class="card">
+      <span class="idx">05 · 横排（符号在左）</span>
+      <div class="stage" style="gap:26px">
+        <svg width="86" height="86" viewBox="0 0 256 256" fill="currentColor" aria-label="符号">
+          <path d="M32 32 H224 V62 H32 Z" /><path d="M32 62 H62 V224 H32 Z" />
+          <path d="M194 62 H224 V164 H194 Z" /><path d="M62 194 H194 V224 H62 Z" />
+          <path d="M98 88 L143 127 L98 166 Z" />
+        </svg>
+        <div class="wm wmHumanist" style="font-size:56px">住凯AI视频</div>
+      </div>
+      <p class="note"><b>用于</b> 网页页眉、文档抬头、邮件签名。<b>小尺寸</b> 回退到 08。</p>
+    </div>
+
+    <div class="card">
+      <span class="idx">06 · 竖排（符号在上）</span>
+      <div class="stage" style="flex-direction:column;gap:20px">
+        <svg width="82" height="82" viewBox="0 0 256 256" fill="currentColor" aria-label="符号">
+          <path d="M32 32 H224 V62 H32 Z" /><path d="M32 62 H62 V224 H32 Z" />
+          <path d="M194 62 H224 V164 H194 Z" /><path d="M62 194 H194 V224 H62 Z" />
+          <path d="M98 88 L143 127 L98 166 Z" />
+        </svg>
+        <div class="wm wmHumanist" style="font-size:38px">住凯AI视频</div>
+      </div>
+      <p class="note"><b>用于</b> 社交头像、名片、包装正面等方形场景。<b>小尺寸</b> 回退到 08。</p>
+    </div>
+
+    <div class="card">
+      <span class="idx">07 · 框内嵌字（方形）</span>
+      <div class="stage">
+        <svg width="210" height="140" viewBox="0 0 384 256" aria-label="框内嵌字">
+          <g fill="currentColor">
+            <path d="M0 0 H384 V30 H0 Z" /><path d="M0 30 H30 V256 H0 Z" />
+            <path d="M354 30 H384 V226 H354 Z" /><path d="M30 226 H354 V256 H30 Z" />
+          </g>
+          <text x="192" y="150" text-anchor="middle" fill="currentColor"
+                font-size="72" font-weight="600"
+                font-family="system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif">住凯</text>
+        </svg>
+      </div>
+      <p class="note"><b>信号</b> 把「画布」直接做成外框，标志本体即产品。<b>风险</b> 缺口的开放性在此变体里被牺牲，与符号语义略有冲突。</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ 纯符号 ============ -->
+<section>
+  <div class="secHead"><h2>纯符号 Symbol</h2><em>08 – 09 · favicon、应用图标、刺绣</em></div>
+  <div class="grid cols3">
+
+    <div class="card">
+      <span class="idx">08 · 框与三角（现状）</span>
+      <div class="stage">
+        <svg width="150" height="150" viewBox="0 0 256 256" fill="currentColor" aria-label="符号">
+          <path d="M32 32 H224 V62 H32 Z" /><path d="M32 62 H62 V224 H32 Z" />
+          <path d="M194 62 H224 V164 H194 Z" /><path d="M62 194 H194 V224 H62 Z" />
+          <path d="M98 88 L143 127 L98 166 Z" />
+        </svg>
+      </div>
+      <p class="note"><b>信号</b> 画布 + 播放，右下开放。<b>风险</b> 播放三角是本品类最被用尽的符号。</p>
+    </div>
+
+    <div class="card">
+      <span class="idx">09 · 框与三角（蓝本加厚）</span>
+      <div class="stage">
+        <svg width="150" height="150" viewBox="0 0 256 256" fill="currentColor" aria-label="符号">
+          <path d="M28 28 H228 V64 H28 Z" /><path d="M28 64 H64 V228 H28 Z" />
+          <path d="M192 64 H228 V172 H192 Z" /><path d="M64 192 H192 V228 H64 Z" />
+          <path d="M96 92 L146 128 L96 164 Z" />
+        </svg>
+      </div>
+      <p class="note"><b>信号</b> 边宽 36 更重，16px 与刺绣下更稳。<b>比较</b> 与 08 二选一，需看实机 16px 表现。</p>
+    </div>
+
+    <div class="card">
+      <span class="idx">10 · 住字标（字母形符号）</span>
+      <div class="stage">
+        <svg width="150" height="150" viewBox="0 0 256 256" fill="currentColor" aria-label="住">
+          <rect x="48" y="104" width="24" height="104" />
+          <path d="M48 104 L72 80 L88 96 L64 120 Z" />
+          <rect x="112" y="48" width="40" height="24" />
+          <rect x="96" y="80" width="112" height="24" />
+          <rect x="96" y="128" width="88" height="24" />
+          <rect x="152" y="48" width="24" height="160" />
+        </svg>
+      </div>
+      <p class="note"><b>信号</b> 与中文名直接绑定，别人无法复制。<b>风险</b> 是「近似」而非规范字形，可能被挑字。</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ 字组 ============ -->
+<section>
+  <div class="secHead"><h2>字组 Monogram</h2><em>11 – 12 · 方形场景与极简小尺寸</em></div>
+  <div class="grid cols3">
+
+    <div class="card">
+      <span class="idx">11 · 凯 K 字组</span>
+      <div class="stage">
+        <svg width="150" height="150" viewBox="0 0 256 256" fill="currentColor" aria-label="K 字组">
+          <!-- K：竖笔 + 两条斜臂，直角化处理以贴合整体几何 -->
+          <rect x="56" y="40" width="32" height="176" />
+          <path d="M88 128 L200 40 L200 82 L128 128 Z" />
+          <path d="M88 128 L200 216 L200 174 L128 128 Z" />
+        </svg>
+      </div>
+      <p class="note"><b>信号</b> 取「凯」的拼音首字母，几何 K 与画布语言一致。<b>风险</b> 单独一个 K 与品牌关联弱。</p>
+    </div>
+
+    <div class="card">
+      <span class="idx">12 · 住字组（方框内嵌）</span>
+      <div class="stage">
+        <svg width="150" height="150" viewBox="0 0 256 256" aria-label="住字组">
+          <g fill="none" stroke="currentColor" stroke-width="18">
+            <rect x="36" y="36" width="184" height="184" />
+          </g>
+          <g fill="currentColor">
+            <rect x="66" y="104" width="18" height="80" />
+            <path d="M66 104 L84 86 L96 98 L78 116 Z" />
+            <rect x="116" y="62" width="30" height="18" />
+            <rect x="104" y="88" width="84" height="18" />
+            <rect x="104" y="130" width="62" height="18" />
+            <rect x="146" y="62" width="18" height="122" />
+          </g>
+        </svg>
+      </div>
+      <p class="note"><b>信号</b> 把「住」放进画框，字与画布合一。<b>风险</b> 笔画细到 18，16px 下可能糊。</p>
+    </div>
+
+    <div class="card">
+      <span class="idx">小尺寸测试</span>
+      <div class="stage" style="flex-direction:column;gap:20px">
+        <div class="sizeRow">
+          <div class="sizeItem">
+            <div class="box ink" style="width:64px;height:64px">
+              <svg width="34" height="34" viewBox="0 0 256 256" fill="#fff"><path d="M32 32 H224 V62 H32 Z" /><path d="M32 62 H62 V224 H32 Z" /><path d="M194 62 H224 V164 H194 Z" /><path d="M62 194 H194 V224 H62 Z" /><path d="M98 88 L143 127 L98 166 Z" /></svg>
+            </div><span>64</span>
+          </div>
+          <div class="sizeItem">
+            <div class="box ink" style="width:32px;height:32px">
+              <svg width="18" height="18" viewBox="0 0 256 256" fill="#fff"><path d="M32 32 H224 V62 H32 Z" /><path d="M32 62 H62 V224 H32 Z" /><path d="M194 62 H224 V164 H194 Z" /><path d="M62 194 H194 V224 H62 Z" /><path d="M98 88 L143 127 L98 166 Z" /></svg>
+            </div><span>32</span>
+          </div>
+          <div class="sizeItem">
+            <div class="box ink" style="width:16px;height:16px">
+              <svg width="10" height="10" viewBox="0 0 256 256" fill="#fff"><path d="M32 32 H224 V62 H32 Z" /><path d="M32 62 H62 V224 H32 Z" /><path d="M194 62 H224 V164 H194 Z" /><path d="M62 194 H194 V224 H62 Z" /><path d="M98 88 L143 127 L98 166 Z" /></svg>
+            </div><span>16</span>
+          </div>
+          <div class="sizeItem">
+            <div class="box paper" style="width:32px;height:32px">
+              <svg width="18" height="18" viewBox="0 0 256 256" fill="#0e1110"><path d="M32 32 H224 V62 H32 Z" /><path d="M32 62 H62 V224 H32 Z" /><path d="M194 62 H224 V164 H194 Z" /><path d="M62 194 H194 V224 H62 Z" /><path d="M98 88 L143 127 L98 166 Z" /></svg>
+            </div><span>反白</span>
+          </div>
+        </div>
+        <p class="note" style="text-align:center">单色可辨 · 反白成立 · 无渐变依赖</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</body>
+</html>
