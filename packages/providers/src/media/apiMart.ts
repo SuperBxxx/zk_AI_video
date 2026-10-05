@@ -137,7 +137,7 @@ export default {
   label: "APIMart",
   version,
   readme: `## APIMart
-<svg aria-label="APIMart" role="img" viewBox="480 470 1100 1100" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0; color: currentColor; width: 1.2rem; height: 1.2rem; display: inline-block; vertical-align: middle; margin-right: 6px;"><path d="M 508 528 L 509 1514 L 586 1514 L 588 1512 L 587 610 L 589 607 L 670 607 L 1022 1009 L 1027 1007 L 1388 607 L 1467 607 L 1469 609 L 1470 738 L 1469 1513 L 1551 1513 L 1551 528 L 1350 528 L 1026 901 L 841 687 L 707 528 Z" fill="currentColor"></path><path d="M 627 646 L 626 1513 L 699 1513 L 700 785 L 1008 1131 L 1025 1147 L 1359 781 L 1360 1513 L 1434 1514 L 1435 646 L 1394 647 L 1240 821 L 1024 1059 L 1009 1045 L 789 795 L 661 646 Z" fill="currentColor"></path><path d="M 732 872 L 732 1513 L 802 1514 L 805 1512 L 805 1052 L 808 1053 L 888 1145 L 1024 1293 L 1250 1047 L 1250 1513 L 1322 1514 L 1324 1512 L 1323 872 L 1304 890 L 1026 1196 L 1021 1195 Z" fill="currentColor"></path></svg>APIMart 是 AI 图片与视频生成 API 平台：图片、视频共用一套异步接口，提交任务拿到 ID，再查询结果。填入 API Key 后点「获取模型列表」即可看到可用模型。
+<svg aria-label="APIMart" role="img" viewBox="480 470 1100 1100" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0; color: currentColor; width: 1.2rem; height: 1.2rem; display: inline-block; vertical-align: middle; margin-right: 6px;"><path d="M 508 528 L 509 1514 L 586 1514 L 588 1512 L 587 610 L 589 607 L 670 607 L 1022 1009 L 1027 1007 L 1388 607 L 1467 607 L 1469 609 L 1470 738 L 1469 1513 L 1551 1513 L 1551 528 L 1350 528 L 1026 901 L 841 687 L 707 528 Z" fill="currentColor"></path><path d="M 627 646 L 626 1513 L 699 1513 L 700 785 L 1008 1131 L 1025 1147 L 1359 781 L 1360 1513 L 1434 1514 L 1435 646 L 1394 647 L 1240 821 L 1024 1059 L 1009 1045 L 789 795 L 661 646 Z" fill="currentColor"></path><path d="M 732 872 L 732 1513 L 802 1514 L 805 1512 L 805 1052 L 808 1053 L 888 1145 L 1024 1293 L 1250 1047 L 1250 1513 L 1322 1514 L 1324 1512 L 1323 872 L 1304 890 L 1026 1196 L 1021 1195 Z" fill="currentColor"></path></svg>APIMart 是 AI 图片、视频与语音生成 API 平台：共用一套接口，图片与视频为异步任务（提交任务拿 ID 再查询结果），语音合成为同步返回。填入 API Key 后点「获取模型列表」即可看到可用模型。
 
 官网：<https://apimart.ai/>`,
   rules,
@@ -199,6 +199,21 @@ export default {
     { id: "gpt-image-2", label: "gpt-image-2", type: "image", mode: ["text", "singleImage", "multiReference"] },
     { id: "gemini-3-pro-image-preview", label: "Nano banana Pro", type: "image", mode: ["text", "singleImage", "multiReference"] },
     { id: "gemini-3.1-flash-image-preview", label: "Nano banana2", type: "image", mode: ["text", "singleImage", "multiReference"] },
+    {
+      id: "gpt-4o-mini-tts",
+      label: "GPT-4o mini TTS",
+      type: "audio",
+      // 音色与格式取自官方 TTS 文档（/v1/audio/speech）：
+      // 6 个音色固定；输出格式支持 wav/opus/aac/flac/pcm，默认 wav。
+      voices: [
+        { title: "alloy（中性·均衡）", voice: "alloy" },
+        { title: "echo（男声·沉稳）", voice: "echo" },
+        { title: "fable（英式·叙述）", voice: "fable" },
+        { title: "onyx（男声·低沉）", voice: "onyx" },
+        { title: "nova（女声·有活力）", voice: "nova" },
+        { title: "shimmer（女声·温柔）", voice: "shimmer" },
+      ],
+    },
   ] satisfies ProviderModel[],
   async generateImage(request: ImageRequest): Promise<MediaAsset[]> {
     const apiKey = this.config.apiKey?.trim();
@@ -328,6 +343,36 @@ export default {
       return url;
     });
     return [{ mediaType: "video", type: "url", url }];
+  },
+  async generateAudio(request: AudioRequest): Promise<MediaAsset[]> {
+    const apiKey = this.config.apiKey?.trim();
+    if (!apiKey) throw new Error("请填写 API Key");
+    const baseUrl = getBaseUrl(this.config.isOverseas);
+    const text = request.text?.trim();
+    if (!text) throw new Error("请提供要合成的文本");
+
+    // ACT: 该端点返回的是音频二进制流（不是 URL），因此转成 base64 交给宿主。
+    // 宿主的 assetBytes 会识别 base64 并落盘（apps/server/src/utils/media/generation.ts）。
+    // 格式固定 wav：既是官方默认值，也能被宿主的 detectMimeType 按 RIFF 头识别。
+    const response = await this.tool.fetch(`${baseUrl}/audio/speech`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: request.model,
+        input: text,
+        voice: request.voice?.trim() || "alloy",
+        response_format: "wav",
+        speed: request.speed ?? 1,
+      }),
+      signal: AbortSignal.any([AbortSignal.timeout(5 * 60_000), ...(this.signal ? [this.signal] : [])]),
+    });
+    if (!response.ok) {
+      const failure = await response.json().catch(() => undefined);
+      throw new Error(this.tool.errorMessage(failure) || `语音合成失败：HTTP ${response.status}`);
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (!buffer.byteLength) throw new Error("供应商未返回音频内容");
+    return [{ mediaType: "audio", type: "base64", data: buffer.toString("base64"), mimeType: "audio/wav" }];
   },
   async updateVendor(): Promise<string> {
     const apiKey = this.config.apiKey?.trim();
