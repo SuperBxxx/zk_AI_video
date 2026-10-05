@@ -1,0 +1,14 @@
+cleanup: 清除替换图标后暴露的死代码与残留排序
+
+替换 logo 后检查引用时又发现三处遗漏：
+
+- mediaModel/addCustomProviderDialog.vue：判断 item.id 是否等于 tfRouter 的分支恒为假
+  （该供应商已删），连带 logoUrl 导入与 .providerLogo 样式成为孤儿，一并移除
+- modelPopover.vue：模型列表仍把 tfRouter 强制排在最前
+  （用 Number(right.id === tfRouter) - Number(left.id === tfRouter) 作比较，恒为 0）。
+  这是与设置页同一类的排序特例，我上一轮清了两处却漏了这里；
+  现改为与设置页一致的「按配置顺序」
+- 移除随之不再使用的 @toonflow/assets/logo.svg 导入
+
+验证：apps/web typecheck 保持既有基线 7 个；生产构建通过；
+全项目 tfRouter 引用只剩说明性注释。

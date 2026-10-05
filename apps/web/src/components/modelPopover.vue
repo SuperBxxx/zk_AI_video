@@ -56,7 +56,9 @@ const reasoningOptions = [
   { label: "中", value: "medium" },
   { label: "高", value: "high" },
 ];
-const modelGroups = computed(() => customProviders.value.toSorted((left, right) => Number(right.id === "tfRouter") - Number(left.id === "tfRouter")));
+// ACT: 原先把上游自家的 tfRouter 强制排在最前（Number(right.id === "tfRouter") - …）。
+// 该中转已移除，这个比较恒为 0，只是无意义的残留；与设置页一致，改为按配置顺序展示。
+const modelGroups = computed(() => customProviders.value);
 const selectedModelChoice = computed(() => modelChoices.value.find(item => item.value === selectedModel.value));
 const reasoningLabel = computed(() => reasoningOptions.find(item => item.value === reasoningEffort.value)?.label ?? "默认");
 watch(selectedModel, () => { reasoningEffort.value = ""; });
