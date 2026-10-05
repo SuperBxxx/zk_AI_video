@@ -1,6 +1,11 @@
 <template>
   <el-card v-if="visible" class="assetLibrary" shadow="never" :bodyStyle="{ padding: '8px' }" role="region" aria-label="素材库" @dblclick.stop>
-    <div class="libraryToolbar">
+    <el-radio-group v-model="activeTab" class="libraryTabs" size="small" aria-label="素材库分页">
+      <el-radio-button value="asset">素材</el-radio-button>
+      <el-radio-button value="voice">声音</el-radio-button>
+    </el-radio-group>
+    <template v-if="activeTab === 'asset'">
+      <div class="libraryToolbar">
       <el-input v-model="searchQuery" class="searchInput" :prefixIcon="IconSearch" placeholder="搜索素材" aria-label="搜索素材" clearable @keydown.esc.stop="searchQuery = ''" />
       <el-button class="toolbarButton" text :icon="IconFolderPlus" title="新建文件夹" aria-label="新建文件夹" :disabled="newFolderParent !== undefined" @click="startFolder" />
       <el-button class="toolbarButton" text :icon="IconUpload" :loading="uploading" title="上传素材到当前文件夹" aria-label="上传素材" @click="uploadInput?.click()" />
@@ -36,6 +41,12 @@
       <el-alert v-if="previewError" :title="previewError" type="error" :closable="false" showIcon />
       <audio v-else :key="previewAsset.url" :src="previewAsset.url" :aria-label="previewAsset.name" controls preload="metadata" @error="previewError = '音频无法播放，文件可能已损坏或当前浏览器不支持其编码。'" />
     </div>
+    </template>
+    <!-- 声音面板：克隆与设计出的音色以 json 素材存在素材库的声音文件夹里，
+         因此与素材浏览同属一个素材库界面，用分页而不是另开浮层。 -->
+    <el-scrollbar v-else class="libraryScroll" maxHeight="min(440px, calc(100dvh - 198px))">
+      <voicePanel :voiceFolder="voiceFolder" :directory="directory" @saved="refreshAssets()" />
+    </el-scrollbar>
   </el-card>
 
   <assetMenu v-if="visible" ref="assetMenuRef" :entries="entries" @changed="refreshAssets" />
@@ -95,11 +106,16 @@ import type { NodeOutput } from "@toonflow/nodes-scaffold/values";
 import { startAssetDrag } from "../canvasDrop";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import assetMenu from "./assetMenu.vue";
+import voicePanel from "./voicePanel.vue";
 
 type AssetEntry = { name: string; path: string; type: "file" | "directory"; children?: AssetEntry[]; draft?: boolean };
 type AssetOutput = { label: string; output: NodeOutput };
 
 const props = defineProps<{ directory?: string; canvas?: boolean }>();
+const directory = computed(() => props.directory);
+// 音色按 D3 以 json 素材存在素材库的这个文件夹里，方便与素材一起浏览与备份。
+const voiceFolder = "声音";
+const activeTab = ref<"asset" | "voice">("asset");
 // ACT: 画布专属能力（拖拽到画布、保存节点输出）只在画布内启用。
 // 素材库本身的数据是全局的（服务端 6 个接口都以 {数据目录}/assets 为根），
 // 因此首页等画布之外的场景传入 canvas=false 复用同一个组件，不必抽两份实现。
@@ -390,6 +406,14 @@ defineExpose({ openSave });
     flex-direction: column;
     max-height: inherit;
     box-sizing: border-box;
+  }
+
+  .libraryTabs {
+    display: flex;
+    margin-bottom: 8px;
+
+    :deep(.el-radio-button) { flex: 1; }
+    :deep(.el-radio-button__inner) { width: 100%; }
   }
 
   .libraryToolbar {
