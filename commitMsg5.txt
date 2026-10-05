@@ -1,0 +1,29 @@
+feat(ffmpeg): 产出的视频自动放到画布上
+
+背景
+- 原先 FFmpeg 工具只返回 {stdout, stderr, filenames} 一段 JSON，不创建任何画布节点，
+  「成片出现在画布上」要靠 agent 自觉调用画布工具，不可靠。
+
+实现（packages/tools/ffmpeg/src/index.ts）
+- execute 结束后取出 filenames 里的视频文件，用 ToolContext.canvas 主动上画布：
+  1) canvas.call({ name: "addNode", args: { type: "remote-videoNode", position, label } })
+     取回新节点 id；type 用 remote- 前缀是画布的既有约定。
+  2) canvas.call({ name: "nodeTools", args: { nodeId, name: "node:setVideo",
+     args: { path, mimeType } } })，复用 videoNode 自己注册的 setVideo ——
+     它已校验文件可读且不超过 100 MB，工具层不重复校验。
+- 只处理已知视频扩展名（mp4/m4v/mov/webm/mkv/avi），其余产出（图片、音频）不自动上画布。
+- 整个放置过程失败只静默跳过，绝不影响 FFmpeg 本身的执行结果；成功时在返回值里
+  增加 canvas 字段说明已放置的文件。
+- 同步更新工具 description 与 promptGuidelines，明确告知 agent 视频已自动上画布，
+  不要再重复添加节点或连线。
+
+验证
+- packages/tools/ffmpeg 构建通过（退出码 0）
+- 产物 build/tools/ffmpeg.tool.js 中确认含 remote-videoNode、node:setVideo、addNode、canvas
+
+未完成（下一步）
+- 视频生成节点完成后的自动唤醒：该节点是异步的（generateVideo 立即返回
+  status:generating，实际生成在后台），agent 调用一返回本轮就结束了，因此需要用户
+  再发一条消息才能确认结果。计划在生成完成回调里设置
+  workspaceStore.pendingAgentMessage（conversation.vue 已有 watcher 会把它送进会话），
+  由于 canvasPanel 与 floatingAgent 是兄弟组件，需由 workspace/index.vue 中转注入。
