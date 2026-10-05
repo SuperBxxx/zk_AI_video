@@ -1,0 +1,37 @@
+feat(首页): 移除快速开始页，未配置模型时改为首页模态提醒
+
+按产品要求：所有用户直接进首页；没有配置模型的，每次进入首页都通过模态提醒。
+
+路由
+- 移除 /hello 的组件与 beforeEnter 判断，/ 与 /hello 均改为重定向到 /home
+  （保留 /hello 条目以兼容旧地址）
+- 路由层不再引用 hello store
+
+删除
+- apps/web/src/pages/hello/index.vue
+- apps/web/src/stores/hello.ts
+- developer 面板里的「首次使用引导 / 重置并打开引导页」整块（它调 hello.reset()
+  并跳 /hello，页面没了就没有意义），连带 useHelloStore、useRouter、
+  resettingHello 与 storageBusy 中对该变量的引用一并清理
+
+新增
+- apps/web/src/components/modelSetupDialog.vue：未配置模型的提醒模态
+  两个出口：「去添加」打开设置（默认即「文本模型」面板）／「先随便看看」关闭
+- 首页 onMounted 判断一次；并 watch 设置对话框的关闭，覆盖
+  「点去添加 → 配好 → 关闭设置」这个来回（onMounted 只跑一次，覆盖不到）
+
+「可用模型」的定义与模型选择器保持一致
+- 供应商既填了非空 API Key、又至少有一个模型
+- 不阻断浏览：模态可关闭，发送侧原有的兜底（助手提示「请先选择模型」）仍在，
+  因此关闭模态不会造成静默失败
+
+i18n
+- 重新 extract：12 增 12 删（新增的是模态文案与四个模式名，
+  移除的是 hello 页与其引导重置相关文案）
+- 21 个语言文件重新对齐到 zhCn 的 1836 键，键集一致
+
+验证
+- apps/web typecheck 保持既有基线 7 个；生产构建通过
+- 82 个 .vue 经 Vue 官方 SFC 编译器检查结构错误 0
+- dev 下首页模块、模态组件、路由均编译通过（HTTP 200）；
+  路由编译产物已不含 useHelloStore

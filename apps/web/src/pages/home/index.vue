@@ -68,6 +68,7 @@
         </div>
       </section>
     </el-main>
+    <modelSetupDialog ref="modelSetupDialogRef" @openSettings="settingsVisible = true" />
     <settings v-model="settingsVisible" />
     <workspacePicker ref="relocationPicker" hideTrigger />
   </el-container>
@@ -77,7 +78,7 @@
 import { locale } from "@toonflow/i18n/vue";
 import axios from "axios";
 import { storeToRefs } from "pinia";
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage, ElMessageBox, type InputInstance } from "element-plus";
 import {
@@ -93,9 +94,11 @@ import { createPastedTextFile, readTextAttachment } from "@/components/agent/tex
 import type { AgentAttachment } from "@/components/agent/types";
 import logoUrl from "@toonflow/assets/logo.svg";
 import { useWorkspaceStore, type Project } from "@/stores/workspace";
+import { customProviders } from "@/stores/settings";
 import { hasDesktopUpdate } from "@/stores/desktopUpdate";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import settings from "@/components/settings/index.vue";
+import modelSetupDialog from "@/components/modelSetupDialog.vue";
 import minimalBackground from "@/components/minimalBackground.vue";
 import workspacePicker from "./workspacePicker.vue";
 import { createModes } from "./createModes";
@@ -110,6 +113,7 @@ const prompt = ref("");
 const promptInput = ref<InputInstance>();
 const promptAttachments = ref<AgentAttachment[]>([]);
 const attachmentInput = ref<HTMLInputElement>();
+const modelSetupDialogRef = ref<InstanceType<typeof modelSetupDialog>>();
 // 与 AI 助手对话的附件上限保持一致，避免进工作区后才发现超出。
 const maxAttachments = 20;
 // 创作模式：决定预置的提示词与画布节点。
@@ -249,6 +253,25 @@ async function createProject(fromPrompt = true) {
     creating.value = false;
   }
 }
+
+// ACT: 没有可用语言模型时，每次进入首页都提醒一次。
+// 原先这份提醒由独立的「快速开始」引导页承担，该页已移除，因此移到首页。
+// 「可用」的定义与模型选择器一致：供应商既填了 API Key、又至少有一个模型。
+// 不阻断浏览 —— 模态可关闭，发送侧的兜底（助手提示「请先选择模型」）仍在。
+function hasUsableModel() {
+  return customProviders.value.some(provider => provider.apiKey.trim() && provider.models.length);
+}
+
+onMounted(() => {
+  if (!hasUsableModel()) modelSetupDialogRef.value?.open();
+});
+
+// 用户点「去添加」进设置、配好后再关闭设置时，重新判断一次：
+// 配好了就不再打扰，没配好则继续提醒（onMounted 只跑一次，覆盖不到这个来回）。
+watch(settingsVisible, (open, wasOpen) => {
+  if (open || !wasOpen) return;
+  if (!hasUsableModel()) modelSetupDialogRef.value?.open();
+});
 </script>
 
 <style lang="scss" scoped>

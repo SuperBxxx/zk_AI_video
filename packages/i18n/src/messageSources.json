@@ -531,8 +531,7 @@
   ],
   "已完成": [
     "apps/web/src/components/agent/menu.vue",
-    "apps/web/src/components/agent/toolMessage.vue",
-    "apps/web/src/components/settings/panels/developer/index.vue"
+    "apps/web/src/components/agent/toolMessage.vue"
   ],
   "失败": [
     "apps/web/src/components/agent/menu.vue",
@@ -682,6 +681,27 @@
   "高": [
     "apps/web/src/components/modelPopover.vue"
   ],
+  "先添加一个模型供应商": [
+    "apps/web/src/components/modelSetupDialog.vue"
+  ],
+  "需要一个语言模型才能开始创作。添加你自己的供应商后即可使用；所有密钥与请求都只留在本机。": [
+    "apps/web/src/components/modelSetupDialog.vue"
+  ],
+  "点「去添加」打开设置的「文本模型」面板": [
+    "apps/web/src/components/modelSetupDialog.vue"
+  ],
+  "选择厂商或添加自定义供应商，填入 API Key 并获取模型列表": [
+    "apps/web/src/components/modelSetupDialog.vue"
+  ],
+  "返回首页即可选择模型并开始创作": [
+    "apps/web/src/components/modelSetupDialog.vue"
+  ],
+  "先随便看看": [
+    "apps/web/src/components/modelSetupDialog.vue"
+  ],
+  "去添加": [
+    "apps/web/src/components/modelSetupDialog.vue"
+  ],
   "安装完成后，请重新发起刚才的操作。": [
     "apps/web/src/components/settings/ffmpegRequired.vue"
   ],
@@ -731,7 +751,6 @@
   "住凯AI视频": [
     "apps/web/src/components/settings/panels/about.vue",
     "apps/web/src/components/updateBox.vue",
-    "apps/web/src/pages/hello/index.vue",
     "apps/web/src/pages/home/index.vue",
     "apps/server/src/utils/skills/files.ts",
     "apps/desktop/src/index.ts"
@@ -752,18 +771,6 @@
     "apps/web/src/components/settings/panels/developer/index.vue"
   ],
   "浏览器模式请从浏览器菜单打开开发者工具。": [
-    "apps/web/src/components/settings/panels/developer/index.vue"
-  ],
-  "首次使用引导": [
-    "apps/web/src/components/settings/panels/developer/index.vue"
-  ],
-  "未完成": [
-    "apps/web/src/components/settings/panels/developer/index.vue"
-  ],
-  "当前{0}。重置后打开引导页，保留已配置的模型。": [
-    "apps/web/src/components/settings/panels/developer/index.vue"
-  ],
-  "重置并打开引导页": [
     "apps/web/src/components/settings/panels/developer/index.vue"
   ],
   "更新说明": [
@@ -905,9 +912,6 @@
     "apps/web/src/components/settings/panels/developer/index.vue"
   ],
   "保存更新源失败": [
-    "apps/web/src/components/settings/panels/developer/index.vue"
-  ],
-  "重置引导失败，请重试": [
     "apps/web/src/components/settings/panels/developer/index.vue"
   ],
   "选择脚手架打包的 .umd.js 文件。": [
@@ -2214,8 +2218,7 @@
     "apps/web/src/components/updateBox.vue"
   ],
   "开始使用": [
-    "apps/web/src/components/updateBox.vue",
-    "apps/web/src/pages/hello/index.vue"
+    "apps/web/src/components/updateBox.vue"
   ],
   "成组": [
     "apps/web/src/lib/canvasShortcuts.ts"
@@ -2398,8 +2401,7 @@
     "apps/web/src/lib/i18n.ts"
   ],
   "返回": [
-    "apps/web/src/lib/i18n.ts",
-    "apps/web/src/pages/hello/index.vue"
+    "apps/web/src/lib/i18n.ts"
   ],
   "确认": [
     "apps/web/src/lib/i18n.ts"
@@ -2551,32 +2553,26 @@
   "前往微软官网更新": [
     "apps/web/src/main.ts"
   ],
-  "配置语言模型": [
-    "apps/web/src/pages/hello/index.vue"
+  "自由创作": [
+    "apps/web/src/pages/home/createModes.ts"
   ],
-  "快速开始": [
-    "apps/web/src/pages/hello/index.vue"
+  "营销 / 推广": [
+    "apps/web/src/pages/home/createModes.ts"
   ],
-  "添加你自己的模型供应商，配置完成后即可开始创作。所有密钥与请求都只留在本机。": [
-    "apps/web/src/pages/hello/index.vue"
+  "数字人 / 口播": [
+    "apps/web/src/pages/home/createModes.ts"
   ],
-  "添加模型供应商": [
-    "apps/web/src/pages/hello/index.vue"
-  ],
-  "稍后配置": [
-    "apps/web/src/pages/hello/index.vue"
-  ],
-  "© {0} 住凯AI视频 · 保留所有权利。": [
-    "apps/web/src/pages/hello/index.vue"
-  ],
-  "保存引导状态失败，请重试": [
-    "apps/web/src/pages/hello/index.vue"
+  "故事短剧": [
+    "apps/web/src/pages/home/createModes.ts"
   ],
   "设置，有新版本可用": [
     "apps/web/src/pages/home/index.vue",
     "apps/web/src/pages/workspace/components/workspaceMenu.vue"
   ],
   "创建项目": [
+    "apps/web/src/pages/home/index.vue"
+  ],
+  "创作模式": [
     "apps/web/src/pages/home/index.vue"
   ],
   "创作描述": [
