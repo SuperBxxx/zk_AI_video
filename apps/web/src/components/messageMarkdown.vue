@@ -15,6 +15,7 @@
       :components="markdownOverlays"
       :nodeRenderers="nodeRenderers"
       :parseMarkdownIntoBlocks="definitions ? keepChunk : undefined"
+      :hardenOptions="markdownHardenOptions"
       :locale="markdownLocale" />
   </div>
 </template>
@@ -28,7 +29,7 @@ import "vue-stream-markdown/index.css";
 import "vue-stream-markdown/theme.css";
 import markdownOverlays from "./markdownOverlays";
 import markdownImage from "./markdownImage.vue";
-import { markdownLocale } from "@/lib/i18n";
+import { markdownLocale, markdownHardenOptions } from "@/lib/i18n";
 
 const { content, streaming = false, codeOptions, directory } = defineProps<{ content: string; streaming?: boolean; codeOptions?: CodeOptions; directory?: string }>();
 const renderImage = (image: ImageNodeRendererProps) => h(markdownImage, { image, directory: directory! });

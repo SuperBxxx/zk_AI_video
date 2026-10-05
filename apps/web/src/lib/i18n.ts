@@ -74,6 +74,16 @@ export const markdownLocale = computed<LocaleConfig>(() => ({
   dialog: { fullscreen: translate("全屏预览"), imagePreview: translate("图片预览") },
 }));
 
+// ACT: 必须给 defaultOrigin，否则 Markdown 里指向工作区素材的相对路径会被库的
+// harden 全部拦掉、渲染成「已拦截」。原因是 transformUrl 用 new URL() 解析相对路径
+// 时需要 base，未提供时直接返回 null（见 @stream-markdown/core 的 transformUrl）。
+// markdownImage.vue 正是按「相对路径」识别工作区图片的，两者必须一致，否则
+// 图片/视频根本走不到自定义渲染器。
+// defaultOrigin 只用于把相对路径解析成可校验的 URL，不改写节点上的原始 url字符串。
+export const markdownHardenOptions = {
+  defaultOrigin: window.location.origin,
+};
+
 export const chatLocale = computed(() => ({
   placeholder: translate("请输入消息..."), stopBtnText: translate("中止"), refreshTipText: translate("重新生成"),
   copyTipText: translate("复制"), likeTipText: translate("点赞"), dislikeTipText: translate("点踩"),

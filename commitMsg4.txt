@@ -1,0 +1,32 @@
+fix(web): 修复聊天里工作区素材被 Markdown 安全策略拦截的问题
+
+现象
+- 聊天中指向工作区素材的相对路径被渲染成「dog_workday_full.mp4 [已拦截]」，
+  即 @stream-markdown 的 error.harden 文案。
+
+根因（已用库的 transformUrl 规则实测确认）
+- messageMarkdown.vue 没有传 hardenOptions，库使用默认值，其中 defaultOrigin 为空。
+- transformUrl 在 defaultOrigin 为空时无法解析相对路径，直接返回 null → 判定为拦截。
+- 而 markdownImage.vue 恰恰是按「相对路径」识别工作区图片的
+  （workspaceImage 正则排除协议、斜杠开头、# 开头），两者要求相互矛盾：
+  自定义渲染器收不到节点，全被前置的 harden 拦掉。
+
+修复
+- lib/i18n.ts 新增 markdownHardenOptions，把 defaultOrigin 设为 window.location.origin，
+  与既有 markdownLocale 放在一起就近维护。
+- messageMarkdown.vue 把它传给 <markdown> 的 hardenOptions。
+- defaultOrigin 只用于把相对路径解析成可校验的 URL，不改写节点上的原始 url 字符串，
+  因此 markdownImage.vue → useWorkspaceFiles.acquireUrl 的相对路径流程不受影响。
+
+实测（用库的 transformUrl 规则逐例验证）
+- assets/dog.mp4        拦截 → 通过
+- dog_workday_full.mp4  拦截 → 通过
+- 成片/dog.mp4          拦截 → 通过
+- blob: 预览地址         通过 → 通过（不受影响）
+
+已知未覆盖：agent 若输出 Windows 绝对路径（D:\...\x.mp4），new URL 会把 d: 当成
+协议，仍会被拦截。该情况需要让 agent 统一输出工作区相对路径，本次未改动提示词。
+
+验证
+- apps/web typecheck 保持既有基线 7 个
+- 生产构建通过；产物 index-*.js 中已包含 defaultOrigin 与 location.origin
