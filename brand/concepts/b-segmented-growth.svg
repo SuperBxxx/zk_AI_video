@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="t">
+  <title id="t">住凯AI视频 — concept B · 分节生长</title>
+  <!--
+    Concept B — 分节生长 (Segmented Growth) · abstract
+    Idea: 三根高低递进的竖条，每根在黄金位置被一道横向节缝断开 ——
+          像竹节，也像由左至右逐段推进的时间轴。最低的一根在末尾升起，
+          是"从想法到成片"的那一步。
+    构造: 三条宽 48、底部对齐于 y=224、顶端成阶梯；每条由两个矩形拼接，
+          接缝宽度 10（= 条宽的 1/5，保证 16px 下仍可见）。圆角 8。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <g fill="#000">
+    <!-- 第一条：最高 -->
+    <rect x="28" y="56" width="48" height="60" rx="8" />
+    <rect x="28" y="126" width="48" height="98" rx="8" />
+    <!-- 第二条：中等，节缝位置不同，避免机械重复 -->
+    <rect x="104" y="110" width="48" height="44" rx="8" />
+    <rect x="104" y="164" width="48" height="60" rx="8" />
+    <!-- 第三条：最低，但顶端有一小段"新芽" -->
+    <rect x="180" y="158" width="48" height="30" rx="8" />
+    <rect x="180" y="198" width="48" height="26" rx="8" />
+  </g>
+</svg>

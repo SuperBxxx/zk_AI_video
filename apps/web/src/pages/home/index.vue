@@ -14,6 +14,10 @@
         </div>
         <div class="promptArea">
           <el-card class="promptCard" shadow="never" :bodyStyle="{ padding: '20px' }" :footerStyle="{ padding: '12px 16px' }">
+            <div class="modePicker">
+              <span class="modeLabel">创作模式</span>
+              <el-segmented v-model="selectedMode" :options="modeOptions" :disabled="creating || opening" aria-label="创作模式" />
+            </div>
             <attachmentList v-if="promptAttachments.length" class="promptAttachments" :attachments="promptAttachments" removable restorable :disabled="creating || opening" @remove="promptAttachments.splice($event, 1)" @restore="restoreAttachment" />
             <el-input ref="promptInput" v-model="prompt" type="textarea" :rows="4" resize="none" :disabled="creating || opening" aria-label="创作描述" @paste.capture="pasteText" />
             <template #footer>
@@ -73,7 +77,7 @@
 import { locale } from "@toonflow/i18n/vue";
 import axios from "axios";
 import { storeToRefs } from "pinia";
-import { computed, nextTick, ref } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage, ElMessageBox, type InputInstance } from "element-plus";
 import {
@@ -94,6 +98,7 @@ import useWorkspaceFiles from "@/lib/workspaceFiles";
 import settings from "@/components/settings/index.vue";
 import minimalBackground from "@/components/minimalBackground.vue";
 import workspacePicker from "./workspacePicker.vue";
+import { createModes } from "./createModes";
 
 const settingsVisible = ref(false);
 const router = useRouter();
@@ -107,6 +112,18 @@ const promptAttachments = ref<AgentAttachment[]>([]);
 const attachmentInput = ref<HTMLInputElement>();
 // 与 AI 助手对话的附件上限保持一致，避免进工作区后才发现超出。
 const maxAttachments = 20;
+// 创作模式：决定预置的提示词与画布节点。
+const modeOptions = createModes.map(({ id, label }) => ({ label, value: id }));
+const selectedMode = ref(createModes[0]!.id);
+const activeMode = computed(() => createModes.find(mode => mode.id === selectedMode.value) ?? createModes[0]!);
+// 记录上一次由模式填入的文本。切换模式时只替换这段文本，
+// 用户自己写过或改过的内容一律保留。
+let appliedModePrompt = activeMode.value.prompt;
+watch(selectedMode, () => {
+  const next = activeMode.value.prompt;
+  if (prompt.value === appliedModePrompt) prompt.value = next;
+  appliedModePrompt = next;
+});
 const workspaceStore = useWorkspaceStore();
 const { project, projectList } = storeToRefs(workspaceStore);
 const workspaceDirectory = ref(project.value?.directory ?? "");
@@ -216,7 +233,9 @@ async function createProject(fromPrompt = true) {
     }
     const { directory, empty } = await useWorkspaceFiles(path).list();
     if (!empty) return ElMessage.warning("该文件夹不为空，请重新选择空文件夹；已有项目请使用“导入项目”或点击项目列表打开。");
-    await useWorkspaceFiles(directory).writeJson("画布1.json", { toonflowCanvas: true, nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } }, true);
+    // 按所选模式铺好画布。自由创作是空画布，与原先行为一致。
+    const { nodes, edges } = activeMode.value.build();
+    await useWorkspaceFiles(directory).writeJson("画布1.json", { toonflowCanvas: true, nodes, edges, viewport: { x: 0, y: 0, zoom: 1 } }, true);
     await workspaceStore.openProject(directory);
     if (fromPrompt && (prompt.value.trim() || promptAttachments.value.length)) {
       workspaceStore.pendingAgentMessage = { directory: workspaceStore.project!.directory, prompt: prompt.value, attachments: [...promptAttachments.value], model: selectedModel.value, reasoningEffort: reasoningEffort.value };
@@ -320,6 +339,26 @@ async function createProject(fromPrompt = true) {
           }
 
           .attachmentInput { display: none; }
+
+          /* ACT: 模式决定画布内容，所以放在卡片内、输入框之上，
+             与"描述"同属"要创作什么"；工作目录与模型属于环境设置，留在底部。 */
+          .modePicker {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+
+            .modeLabel {
+              flex-shrink: 0;
+              color: var(--el-text-color-secondary);
+              font-size: 13px;
+            }
+
+            .el-segmented {
+              --el-segmented-item-selected-bg-color: var(--el-color-primary);
+              --el-segmented-item-selected-color: #fff;
+            }
+          }
 
           .composerFooter {
             display: flex;

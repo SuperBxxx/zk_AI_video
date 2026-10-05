@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="t">
+  <title id="t">住凯AI视频 — concept C · 画格</title>
+  <!--
+    Concept C — 画格 (Frames) · abstract
+    Idea: 2×2 四格，一格为实心 —— 画布被切分成的分镜格，实心那格是"当前这一画面"。
+          用最客观的几何表达"成片是一格格画出来的"。
+    构造: 网格 40..216；每格 72×72，格间距 32（= 72 的 4/9，视觉呼吸）。描边 20，
+          与实心块厚度一致，避免粗细混杂。直角，不用圆角 —— 与画布的硬边一致。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <g fill="none" stroke="#000" stroke-width="20">
+    <rect x="50" y="50" width="52" height="52" />
+    <rect x="154" y="50" width="52" height="52" />
+    <rect x="50" y="154" width="52" height="52" />
+    <rect x="154" y="154" width="52" height="52" />
+  </g>
+  <rect x="40" y="40" width="72" height="72" fill="#000" />
+</svg>

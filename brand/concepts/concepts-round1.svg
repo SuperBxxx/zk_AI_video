@@ -1,0 +1,317 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1600" height="840" viewBox="0 0 1600 840"><defs><filter id="grey"><feColorMatrix type="saturate" values="0"/></filter></defs><rect width="1600" height="840" fill="#f7f7f4"/><text x="60" y="78" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="40" font-weight="700" fill="#161616">住凯AI视频 — logo 概念（第 1 轮）</text><text x="60" y="116" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="20" fill="#6b6b6b">Concepts for review — pick a direction (or tell me what you like in each).</text><rect x="60" y="150" width="474.667" height="630" rx="18" fill="#fff" stroke="#161616" stroke-width="2"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="90" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c0-t">住凯AI视频 — concept A · 住字标</title>
+  <!--
+    Concept A — 住 (geometric monogram) · letterform
+    Idea: 把「住」压成纯几何块面。左偏旁「亻」= 一根竖 + 一道短撇；
+          右旁「主」= 点、两横、一竖。看的人不一定逐笔认出，但会读到"一个方块字"，
+          而方块字 + 方画布正是这个产品的底色。
+    构造:
+      笔画厚度统一 24（256 的 3/32；16px 下约 1.5px，仍可见）。直角，与画布硬边一致。
+      外沿 48..208。
+      亻竖 x48..72 y104..208；短撇为 45° 平行四边形接在竖顶。
+      主：点 x112..152 y48..72（居中于中竖）；上横 x96..208 y80..104；
+          中横 x96..184 y128..152；竖 x152..176 y48..208。
+    v2: v1 的「主」只有两横，右半边读作「干」。现补上"点 + 上横"，
+        「主」的骨架完整（点 · 上横 · 中横 · 竖）。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <g fill="#000">
+    <!-- 亻：竖 -->
+    <rect x="48" y="104" width="24" height="104" />
+    <!-- 亻：撇（45°） -->
+    <path d="M48 104 L72 80 L88 96 L64 120 Z" />
+    <!-- 主：点 -->
+    <rect x="112" y="48" width="40" height="24" />
+    <!-- 主：上横 -->
+    <rect x="96" y="80" width="112" height="24" />
+    <!-- 主：中横 -->
+    <rect x="96" y="128" width="88" height="24" />
+    <!-- 主：竖 -->
+    <rect x="152" y="48" width="24" height="160" />
+  </g>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="90" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s064-t">住凯AI视频 — concept A · 住字标</title>
+  <!--
+    Concept A — 住 (geometric monogram) · letterform
+    Idea: 把「住」压成纯几何块面。左偏旁「亻」= 一根竖 + 一道短撇；
+          右旁「主」= 点、两横、一竖。看的人不一定逐笔认出，但会读到"一个方块字"，
+          而方块字 + 方画布正是这个产品的底色。
+    构造:
+      笔画厚度统一 24（256 的 3/32；16px 下约 1.5px，仍可见）。直角，与画布硬边一致。
+      外沿 48..208。
+      亻竖 x48..72 y104..208；短撇为 45° 平行四边形接在竖顶。
+      主：点 x112..152 y48..72（居中于中竖）；上横 x96..208 y80..104；
+          中横 x96..184 y128..152；竖 x152..176 y48..208。
+    v2: v1 的「主」只有两横，右半边读作「干」。现补上"点 + 上横"，
+        「主」的骨架完整（点 · 上横 · 中横 · 竖）。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <g fill="#000">
+    <!-- 亻：竖 -->
+    <rect x="48" y="104" width="24" height="104" />
+    <!-- 亻：撇（45°） -->
+    <path d="M48 104 L72 80 L88 96 L64 120 Z" />
+    <!-- 主：点 -->
+    <rect x="112" y="48" width="40" height="24" />
+    <!-- 主：上横 -->
+    <rect x="96" y="80" width="112" height="24" />
+    <!-- 主：中横 -->
+    <rect x="96" y="128" width="88" height="24" />
+    <!-- 主：竖 -->
+    <rect x="152" y="48" width="24" height="160" />
+  </g>
+</svg>
+</g><text x="122" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="180" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s032-t">住凯AI视频 — concept A · 住字标</title>
+  <!--
+    Concept A — 住 (geometric monogram) · letterform
+    Idea: 把「住」压成纯几何块面。左偏旁「亻」= 一根竖 + 一道短撇；
+          右旁「主」= 点、两横、一竖。看的人不一定逐笔认出，但会读到"一个方块字"，
+          而方块字 + 方画布正是这个产品的底色。
+    构造:
+      笔画厚度统一 24（256 的 3/32；16px 下约 1.5px，仍可见）。直角，与画布硬边一致。
+      外沿 48..208。
+      亻竖 x48..72 y104..208；短撇为 45° 平行四边形接在竖顶。
+      主：点 x112..152 y48..72（居中于中竖）；上横 x96..208 y80..104；
+          中横 x96..184 y128..152；竖 x152..176 y48..208。
+    v2: v1 的「主」只有两横，右半边读作「干」。现补上"点 + 上横"，
+        「主」的骨架完整（点 · 上横 · 中横 · 竖）。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <g fill="#000">
+    <!-- 亻：竖 -->
+    <rect x="48" y="104" width="24" height="104" />
+    <!-- 亻：撇（45°） -->
+    <path d="M48 104 L72 80 L88 96 L64 120 Z" />
+    <!-- 主：点 -->
+    <rect x="112" y="48" width="40" height="24" />
+    <!-- 主：上横 -->
+    <rect x="96" y="80" width="112" height="24" />
+    <!-- 主：中横 -->
+    <rect x="96" y="128" width="88" height="24" />
+    <!-- 主：竖 -->
+    <rect x="152" y="48" width="24" height="160" />
+  </g>
+</svg>
+</g><text x="196" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="238" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s016-t">住凯AI视频 — concept A · 住字标</title>
+  <!--
+    Concept A — 住 (geometric monogram) · letterform
+    Idea: 把「住」压成纯几何块面。左偏旁「亻」= 一根竖 + 一道短撇；
+          右旁「主」= 点、两横、一竖。看的人不一定逐笔认出，但会读到"一个方块字"，
+          而方块字 + 方画布正是这个产品的底色。
+    构造:
+      笔画厚度统一 24（256 的 3/32；16px 下约 1.5px，仍可见）。直角，与画布硬边一致。
+      外沿 48..208。
+      亻竖 x48..72 y104..208；短撇为 45° 平行四边形接在竖顶。
+      主：点 x112..152 y48..72（居中于中竖）；上横 x96..208 y80..104；
+          中横 x96..184 y128..152；竖 x152..176 y48..208。
+    v2: v1 的「主」只有两横，右半边读作「干」。现补上"点 + 上横"，
+        「主」的骨架完整（点 · 上横 · 中横 · 竖）。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <g fill="#000">
+    <!-- 亻：竖 -->
+    <rect x="48" y="104" width="24" height="104" />
+    <!-- 亻：撇（45°） -->
+    <path d="M48 104 L72 80 L88 96 L64 120 Z" />
+    <!-- 主：点 -->
+    <rect x="112" y="48" width="40" height="24" />
+    <!-- 主：上横 -->
+    <rect x="96" y="80" width="112" height="24" />
+    <!-- 主：中横 -->
+    <rect x="96" y="128" width="88" height="24" />
+    <!-- 主：竖 -->
+    <rect x="152" y="48" width="24" height="160" />
+  </g>
+</svg>
+</g><text x="246" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="90.0" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">A · 住字标</text><text x="90.0" y="664" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" fill="#161616" letter-spacing="1.5">RECOMMENDED</text><text x="90.0" y="698" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">把「住」压成纯几何块面：方块字 + 方画布。</text><rect x="562.667" y="150" width="474.667" height="630" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="592.667" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c1-t">住凯AI视频 — concept B · 框与三角</title>
+  <!--
+    Concept B — 框与三角 (Frame & Play) · abstract
+    Idea: 一个画框，右下角**整段缺席**——画布是开放的、没有边界；
+          框内切出一个视频三角，指向那个开口："从想法到成片"的出口。
+    构造:
+      外框 40..216，边宽 24。右下角缺口：底边止于 x184，右边止于 y168，
+      缺口长 32（= 边宽 24 的 4/3，够大才读得出）。
+      三角底边在左、顶点朝右、指向缺口。顶角按 tan(θ/2) = 半底 / 高 反算：
+        高 72（y92..164），半底 42 → 顶点 (138,128)，
+        θ = 2·atan(42/72) = 60.5°，与标准播放键的锐度一致。
+        底边 x96，长 84。
+      间距留白：上 92−64=28、下 192−164=28、左 96−64=32、右 192−138=54。
+        右侧刻意留更多 —— 三角指向缺口，那是"出口"，需要呼吸。
+    v4: 前三稿的角度都算错了 —— v3 里我把"底角 75°"当成顶角 30°，实际顶角 87.6°，
+        比标准播放键钝得多，显得发闷。
+    v5: v4 的三角是 (96,104)-(124,128)-(96,152) 的小三角，左距 32 而右距 68，
+        明显偏左下。现在放大并上移，四边留白收敛到 28/28/32/54。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <path fill="#000" fill-rule="evenodd" d="
+    M40 40 H216 V168 H192 V64 H64 V216 H40 Z
+    M96 92 L138 128 L96 164 Z
+  " />
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="592.667" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s164-t">住凯AI视频 — concept B · 框与三角</title>
+  <!--
+    Concept B — 框与三角 (Frame & Play) · abstract
+    Idea: 一个画框，右下角**整段缺席**——画布是开放的、没有边界；
+          框内切出一个视频三角，指向那个开口："从想法到成片"的出口。
+    构造:
+      外框 40..216，边宽 24。右下角缺口：底边止于 x184，右边止于 y168，
+      缺口长 32（= 边宽 24 的 4/3，够大才读得出）。
+      三角底边在左、顶点朝右、指向缺口。顶角按 tan(θ/2) = 半底 / 高 反算：
+        高 72（y92..164），半底 42 → 顶点 (138,128)，
+        θ = 2·atan(42/72) = 60.5°，与标准播放键的锐度一致。
+        底边 x96，长 84。
+      间距留白：上 92−64=28、下 192−164=28、左 96−64=32、右 192−138=54。
+        右侧刻意留更多 —— 三角指向缺口，那是"出口"，需要呼吸。
+    v4: 前三稿的角度都算错了 —— v3 里我把"底角 75°"当成顶角 30°，实际顶角 87.6°，
+        比标准播放键钝得多，显得发闷。
+    v5: v4 的三角是 (96,104)-(124,128)-(96,152) 的小三角，左距 32 而右距 68，
+        明显偏左下。现在放大并上移，四边留白收敛到 28/28/32/54。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <path fill="#000" fill-rule="evenodd" d="
+    M40 40 H216 V168 H192 V64 H64 V216 H40 Z
+    M96 92 L138 128 L96 164 Z
+  " />
+</svg>
+</g><text x="624.667" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="682.667" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s132-t">住凯AI视频 — concept B · 框与三角</title>
+  <!--
+    Concept B — 框与三角 (Frame & Play) · abstract
+    Idea: 一个画框，右下角**整段缺席**——画布是开放的、没有边界；
+          框内切出一个视频三角，指向那个开口："从想法到成片"的出口。
+    构造:
+      外框 40..216，边宽 24。右下角缺口：底边止于 x184，右边止于 y168，
+      缺口长 32（= 边宽 24 的 4/3，够大才读得出）。
+      三角底边在左、顶点朝右、指向缺口。顶角按 tan(θ/2) = 半底 / 高 反算：
+        高 72（y92..164），半底 42 → 顶点 (138,128)，
+        θ = 2·atan(42/72) = 60.5°，与标准播放键的锐度一致。
+        底边 x96，长 84。
+      间距留白：上 92−64=28、下 192−164=28、左 96−64=32、右 192−138=54。
+        右侧刻意留更多 —— 三角指向缺口，那是"出口"，需要呼吸。
+    v4: 前三稿的角度都算错了 —— v3 里我把"底角 75°"当成顶角 30°，实际顶角 87.6°，
+        比标准播放键钝得多，显得发闷。
+    v5: v4 的三角是 (96,104)-(124,128)-(96,152) 的小三角，左距 32 而右距 68，
+        明显偏左下。现在放大并上移，四边留白收敛到 28/28/32/54。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <path fill="#000" fill-rule="evenodd" d="
+    M40 40 H216 V168 H192 V64 H64 V216 H40 Z
+    M96 92 L138 128 L96 164 Z
+  " />
+</svg>
+</g><text x="698.667" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="740.667" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s116-t">住凯AI视频 — concept B · 框与三角</title>
+  <!--
+    Concept B — 框与三角 (Frame & Play) · abstract
+    Idea: 一个画框，右下角**整段缺席**——画布是开放的、没有边界；
+          框内切出一个视频三角，指向那个开口："从想法到成片"的出口。
+    构造:
+      外框 40..216，边宽 24。右下角缺口：底边止于 x184，右边止于 y168，
+      缺口长 32（= 边宽 24 的 4/3，够大才读得出）。
+      三角底边在左、顶点朝右、指向缺口。顶角按 tan(θ/2) = 半底 / 高 反算：
+        高 72（y92..164），半底 42 → 顶点 (138,128)，
+        θ = 2·atan(42/72) = 60.5°，与标准播放键的锐度一致。
+        底边 x96，长 84。
+      间距留白：上 92−64=28、下 192−164=28、左 96−64=32、右 192−138=54。
+        右侧刻意留更多 —— 三角指向缺口，那是"出口"，需要呼吸。
+    v4: 前三稿的角度都算错了 —— v3 里我把"底角 75°"当成顶角 30°，实际顶角 87.6°，
+        比标准播放键钝得多，显得发闷。
+    v5: v4 的三角是 (96,104)-(124,128)-(96,152) 的小三角，左距 32 而右距 68，
+        明显偏左下。现在放大并上移，四边留白收敛到 28/28/32/54。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <path fill="#000" fill-rule="evenodd" d="
+    M40 40 H216 V168 H192 V64 H64 V216 H40 Z
+    M96 92 L138 128 L96 164 Z
+  " />
+</svg>
+</g><text x="748.667" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="592.6666666666667" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">B · 框与三角</text><text x="592.6666666666667" y="670" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">画框右下角开放，框内三角指向出口。</text><rect x="1065.33" y="150" width="474.667" height="630" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="1095.33" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c2-t">住凯AI视频 — concept C · 叠帧</title>
+  <!--
+    Concept C — 叠帧 (Stacked Frames) · abstract
+    Idea: 三个画框沿对角线逐级错位，最完整的一个在右下 ——
+          走过的分镜叠在一起，当前这一格是完整的。
+    构造:
+      三个 128×128 方框，位置 (48,48) (88,88) (128,128)，每级位移 40。
+      三框描边统一 32（= 位移 40 的 4/5）—— 粗细一致是这类几何标记的底线，
+      v3 里前两框 40、第三框 24，尺寸不一，属手工错误。
+      位移 40 > 描边 32，因此三框互不相交，各自写"外框 + 内孔"的复合路径即可。
+      外沿 48..232；左右留白 48 / 24（右下是视觉出口，略偏即可）。
+    v4: v3 三个环的描边不一致（40/40/24）。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <g fill="#000" fill-rule="evenodd">
+    <path d="M48 48 H176 V80 H80 V176 H48 Z M80 80 H144 V144 H80 Z" />
+    <path d="M88 88 H216 V120 H120 V216 H88 Z M120 120 H184 V184 H120 Z" />
+    <path d="M128 128 H232 V160 H160 V232 H128 Z M160 160 H200 V200 H160 Z" />
+  </g>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="1095.33" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s264-t">住凯AI视频 — concept C · 叠帧</title>
+  <!--
+    Concept C — 叠帧 (Stacked Frames) · abstract
+    Idea: 三个画框沿对角线逐级错位，最完整的一个在右下 ——
+          走过的分镜叠在一起，当前这一格是完整的。
+    构造:
+      三个 128×128 方框，位置 (48,48) (88,88) (128,128)，每级位移 40。
+      三框描边统一 32（= 位移 40 的 4/5）—— 粗细一致是这类几何标记的底线，
+      v3 里前两框 40、第三框 24，尺寸不一，属手工错误。
+      位移 40 > 描边 32，因此三框互不相交，各自写"外框 + 内孔"的复合路径即可。
+      外沿 48..232；左右留白 48 / 24（右下是视觉出口，略偏即可）。
+    v4: v3 三个环的描边不一致（40/40/24）。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <g fill="#000" fill-rule="evenodd">
+    <path d="M48 48 H176 V80 H80 V176 H48 Z M80 80 H144 V144 H80 Z" />
+    <path d="M88 88 H216 V120 H120 V216 H88 Z M120 120 H184 V184 H120 Z" />
+    <path d="M128 128 H232 V160 H160 V232 H128 Z M160 160 H200 V200 H160 Z" />
+  </g>
+</svg>
+</g><text x="1127.33" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="1185.33" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s232-t">住凯AI视频 — concept C · 叠帧</title>
+  <!--
+    Concept C — 叠帧 (Stacked Frames) · abstract
+    Idea: 三个画框沿对角线逐级错位，最完整的一个在右下 ——
+          走过的分镜叠在一起，当前这一格是完整的。
+    构造:
+      三个 128×128 方框，位置 (48,48) (88,88) (128,128)，每级位移 40。
+      三框描边统一 32（= 位移 40 的 4/5）—— 粗细一致是这类几何标记的底线，
+      v3 里前两框 40、第三框 24，尺寸不一，属手工错误。
+      位移 40 > 描边 32，因此三框互不相交，各自写"外框 + 内孔"的复合路径即可。
+      外沿 48..232；左右留白 48 / 24（右下是视觉出口，略偏即可）。
+    v4: v3 三个环的描边不一致（40/40/24）。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <g fill="#000" fill-rule="evenodd">
+    <path d="M48 48 H176 V80 H80 V176 H48 Z M80 80 H144 V144 H80 Z" />
+    <path d="M88 88 H216 V120 H120 V216 H88 Z M120 120 H184 V184 H120 Z" />
+    <path d="M128 128 H232 V160 H160 V232 H128 Z M160 160 H200 V200 H160 Z" />
+  </g>
+</svg>
+</g><text x="1201.33" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="1243.33" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s216-t">住凯AI视频 — concept C · 叠帧</title>
+  <!--
+    Concept C — 叠帧 (Stacked Frames) · abstract
+    Idea: 三个画框沿对角线逐级错位，最完整的一个在右下 ——
+          走过的分镜叠在一起，当前这一格是完整的。
+    构造:
+      三个 128×128 方框，位置 (48,48) (88,88) (128,128)，每级位移 40。
+      三框描边统一 32（= 位移 40 的 4/5）—— 粗细一致是这类几何标记的底线，
+      v3 里前两框 40、第三框 24，尺寸不一，属手工错误。
+      位移 40 > 描边 32，因此三框互不相交，各自写"外框 + 内孔"的复合路径即可。
+      外沿 48..232；左右留白 48 / 24（右下是视觉出口，略偏即可）。
+    v4: v3 三个环的描边不一致（40/40/24）。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <g fill="#000" fill-rule="evenodd">
+    <path d="M48 48 H176 V80 H80 V176 H48 Z M80 80 H144 V144 H80 Z" />
+    <path d="M88 88 H216 V120 H120 V216 H88 Z M120 120 H184 V184 H120 Z" />
+    <path d="M128 128 H232 V160 H160 V232 H128 Z M160 160 H200 V200 H160 Z" />
+  </g>
+</svg>
+</g><text x="1251.33" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="1095.3333333333335" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">C · 叠帧</text><text x="1095.3333333333335" y="670" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">分镜沿对角线叠放，最后一个是完整帧。</text></svg>

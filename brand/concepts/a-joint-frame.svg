@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="t">
+  <title id="t">住凯AI视频 — concept A · 带节的画框</title>
+  <!--
+    Concept A — 带节的画框 (Joint Frame) · abstract
+    Idea: 画布方形外框的四边各有一个分段缺口；整体向左下逐段变厚，
+          形成"同一根竹子长出节"的节奏，也暗示一条时间轴。
+    构造: 外框 32..224，边宽 20。四边由 4 个矩形拼成，每个矩形的长度按
+          斐波那契式的递减节奏，接缝即成"竹节"。左/下边更厚，制造方向感。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <g fill="#000">
+    <!-- 上边：由两个矩形，中间留一道节缝 -->
+    <rect x="32" y="32" width="88" height="20" />
+    <rect x="136" y="32" width="88" height="20" />
+    <!-- 右边 -->
+    <rect x="204" y="52" width="20" height="80" />
+    <rect x="204" y="148" width="20" height="76" />
+    <!-- 下边 -->
+    <rect x="32" y="204" width="66" height="20" />
+    <rect x="114" y="204" width="110" height="20" />
+    <!-- 左边：更厚（28），体现"生长的一侧" -->
+    <rect x="32" y="52" width="28" height="62" />
+    <rect x="32" y="130" width="28" height="74" />
+  </g>
+</svg>

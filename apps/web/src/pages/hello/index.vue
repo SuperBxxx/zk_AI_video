@@ -230,7 +230,7 @@ async function completeSetup() {
     overflow: hidden;
     /* ACT: 上游这里是四层彩色径向渐变（含 #f3dcb1/#667ab5/#369889 等），视觉语言很"上游"。
        极简化后只留品牌色实底，纹理交给 minimalBackground 的点阵与柔光。 */
-    background: var(--brand-panel, #12544A);
+    background: var(--brand-panel, #14543C);
 
     /* 纹理层在下，只提供质感；上面的柔光由 minimalBackground 负责 */
     .artBg {

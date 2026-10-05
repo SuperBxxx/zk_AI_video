@@ -1,0 +1,269 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1600" height="840" viewBox="0 0 1600 840"><defs><filter id="grey"><feColorMatrix type="saturate" values="0"/></filter></defs><rect width="1600" height="840" fill="#f7f7f4"/><text x="60" y="78" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="40" font-weight="700" fill="#161616">住凯AI视频 — logo 紧凑化对比</text><text x="60" y="116" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="20" fill="#6b6b6b">Concepts for review — pick a direction (or tell me what you like in each).</text><rect x="60" y="150" width="726" height="630" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="90" y="190" width="666" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c0-t">住凯AI视频 — concept B · 框与三角</title>
+  <!--
+    Concept B — 框与三角 (Frame & Play) · abstract
+    Idea: 一个画框，右下角**整段缺席**——画布是开放的、没有边界；
+          框内切出一个视频三角，指向那个开口："从想法到成片"的出口。
+    构造:
+      外框 40..216，边宽 24。右下角缺口：底边止于 x184，右边止于 y168，
+      缺口长 32（= 边宽 24 的 4/3，够大才读得出）。
+      三角底边在左、顶点朝右、指向缺口。顶角按 tan(θ/2) = 半底 / 高 反算：
+        高 72（y92..164），半底 42 → 顶点 (138,128)，
+        θ = 2·atan(42/72) = 60.5°，与标准播放键的锐度一致。
+        底边 x96，长 84。
+      间距留白：上 92−64=28、下 192−164=28、左 96−64=32、右 192−138=54。
+        右侧刻意留更多 —— 三角指向缺口，那是"出口"，需要呼吸。
+    v4: 前三稿的角度都算错了 —— v3 里我把"底角 75°"当成顶角 30°，实际顶角 87.6°，
+        比标准播放键钝得多，显得发闷。
+    v5: v4 的三角是 (96,104)-(124,128)-(96,152) 的小三角，左距 32 而右距 68，
+        明显偏左下。现在放大并上移，四边留白收敛到 28/28/32/54。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <path fill="#000" fill-rule="evenodd" d="
+    M40 40 H216 V168 H192 V64 H64 V216 H40 Z
+    M96 92 L138 128 L96 164 Z
+  " />
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="90" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s064-t">住凯AI视频 — concept B · 框与三角</title>
+  <!--
+    Concept B — 框与三角 (Frame & Play) · abstract
+    Idea: 一个画框，右下角**整段缺席**——画布是开放的、没有边界；
+          框内切出一个视频三角，指向那个开口："从想法到成片"的出口。
+    构造:
+      外框 40..216，边宽 24。右下角缺口：底边止于 x184，右边止于 y168，
+      缺口长 32（= 边宽 24 的 4/3，够大才读得出）。
+      三角底边在左、顶点朝右、指向缺口。顶角按 tan(θ/2) = 半底 / 高 反算：
+        高 72（y92..164），半底 42 → 顶点 (138,128)，
+        θ = 2·atan(42/72) = 60.5°，与标准播放键的锐度一致。
+        底边 x96，长 84。
+      间距留白：上 92−64=28、下 192−164=28、左 96−64=32、右 192−138=54。
+        右侧刻意留更多 —— 三角指向缺口，那是"出口"，需要呼吸。
+    v4: 前三稿的角度都算错了 —— v3 里我把"底角 75°"当成顶角 30°，实际顶角 87.6°，
+        比标准播放键钝得多，显得发闷。
+    v5: v4 的三角是 (96,104)-(124,128)-(96,152) 的小三角，左距 32 而右距 68，
+        明显偏左下。现在放大并上移，四边留白收敛到 28/28/32/54。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <path fill="#000" fill-rule="evenodd" d="
+    M40 40 H216 V168 H192 V64 H64 V216 H40 Z
+    M96 92 L138 128 L96 164 Z
+  " />
+</svg>
+</g><text x="122" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="180" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s032-t">住凯AI视频 — concept B · 框与三角</title>
+  <!--
+    Concept B — 框与三角 (Frame & Play) · abstract
+    Idea: 一个画框，右下角**整段缺席**——画布是开放的、没有边界；
+          框内切出一个视频三角，指向那个开口："从想法到成片"的出口。
+    构造:
+      外框 40..216，边宽 24。右下角缺口：底边止于 x184，右边止于 y168，
+      缺口长 32（= 边宽 24 的 4/3，够大才读得出）。
+      三角底边在左、顶点朝右、指向缺口。顶角按 tan(θ/2) = 半底 / 高 反算：
+        高 72（y92..164），半底 42 → 顶点 (138,128)，
+        θ = 2·atan(42/72) = 60.5°，与标准播放键的锐度一致。
+        底边 x96，长 84。
+      间距留白：上 92−64=28、下 192−164=28、左 96−64=32、右 192−138=54。
+        右侧刻意留更多 —— 三角指向缺口，那是"出口"，需要呼吸。
+    v4: 前三稿的角度都算错了 —— v3 里我把"底角 75°"当成顶角 30°，实际顶角 87.6°，
+        比标准播放键钝得多，显得发闷。
+    v5: v4 的三角是 (96,104)-(124,128)-(96,152) 的小三角，左距 32 而右距 68，
+        明显偏左下。现在放大并上移，四边留白收敛到 28/28/32/54。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <path fill="#000" fill-rule="evenodd" d="
+    M40 40 H216 V168 H192 V64 H64 V216 H40 Z
+    M96 92 L138 128 L96 164 Z
+  " />
+</svg>
+</g><text x="196" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="238" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s016-t">住凯AI视频 — concept B · 框与三角</title>
+  <!--
+    Concept B — 框与三角 (Frame & Play) · abstract
+    Idea: 一个画框，右下角**整段缺席**——画布是开放的、没有边界；
+          框内切出一个视频三角，指向那个开口："从想法到成片"的出口。
+    构造:
+      外框 40..216，边宽 24。右下角缺口：底边止于 x184，右边止于 y168，
+      缺口长 32（= 边宽 24 的 4/3，够大才读得出）。
+      三角底边在左、顶点朝右、指向缺口。顶角按 tan(θ/2) = 半底 / 高 反算：
+        高 72（y92..164），半底 42 → 顶点 (138,128)，
+        θ = 2·atan(42/72) = 60.5°，与标准播放键的锐度一致。
+        底边 x96，长 84。
+      间距留白：上 92−64=28、下 192−164=28、左 96−64=32、右 192−138=54。
+        右侧刻意留更多 —— 三角指向缺口，那是"出口"，需要呼吸。
+    v4: 前三稿的角度都算错了 —— v3 里我把"底角 75°"当成顶角 30°，实际顶角 87.6°，
+        比标准播放键钝得多，显得发闷。
+    v5: v4 的三角是 (96,104)-(124,128)-(96,152) 的小三角，左距 32 而右距 68，
+        明显偏左下。现在放大并上移，四边留白收敛到 28/28/32/54。
+    黑白先行；颜色留到 Phase 7。
+  -->
+  <path fill="#000" fill-rule="evenodd" d="
+    M40 40 H216 V168 H192 V64 H64 V216 H40 Z
+    M96 92 L138 128 L96 164 Z
+  " />
+</svg>
+</g><text x="246" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="90.0" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">A · 原版（留白 40）</text><text x="90.0" y="670" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">标记占 69%，留白偏大。</text><rect x="814" y="150" width="726" height="630" rx="18" fill="#fff" stroke="#161616" stroke-width="2"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="844" y="190" width="666" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c1-t">住凯AI视频 — logo · 框与三角</title>
+  <!--
+    Logo — 框与三角 (Frame & Play) · abstract
+
+    Idea: 一个画框，右下角整段缺席 —— 画布是开放的、没有边界；
+          框内切出视频三角，指向那个开口，即"从想法到成片"的出口。
+
+    构造:
+      外沿 32..224（边长 192），边宽 30。四边留白均为 32 —— 居中。
+      标记占 192/256 = 75%。
+      右下缺口：底边止于 x194、右边止于 y164，缺口 30 见方（与边宽同值，缺掉一整个角）。
+      内区 62..194（132 见方）。
+
+      形状由四段实心矩形拼成（上 / 左 / 右 / 下），每段都是直角矩形：
+        上  (32,32)-(224,62)
+        左  (32,62)-(62,224)
+        右  (194,62)-(224,164)
+        下  (62,194)-(194,224)
+
+      三角：底边竖直在左、顶点朝右、指向缺口。
+        底 x98，y88..166（高 78）；顶点 (143,127)。
+        顶角 θ = 2·atan(45/78) = 59.9°，与标准播放键锐度一致。
+        角度按 tan(θ/2) = 半底 / 高 反算 —— 前几稿栽在 87.6° 与 46.2°，
+        都是手工估角的后果。
+        顶点 y=127 与内区垂直中心 (62+194)/2 = 128 对齐（取整差 1）。
+
+      三角四周留白：左 36、右 51、上 26、下 28。
+        右侧刻意留最多 —— 三角指向缺口，那是出口，需要呼吸。
+
+    v8: v7 的标记整体偏右下（实测外沿在 56..248，右/下留白仅 8）。
+        现平移 −24，四边留白均匀为 32。
+  -->
+  <g fill="#000" fill-rule="evenodd">
+    <path d="M32 32 H224 V62 H32 Z" />
+    <path d="M32 62 H62 V224 H32 Z" />
+    <path d="M194 62 H224 V164 H194 Z" />
+    <path d="M62 194 H194 V224 H62 Z" />
+    <path d="M98 88 L143 127 L98 166 Z" />
+  </g>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="844" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s164-t">住凯AI视频 — logo · 框与三角</title>
+  <!--
+    Logo — 框与三角 (Frame & Play) · abstract
+
+    Idea: 一个画框，右下角整段缺席 —— 画布是开放的、没有边界；
+          框内切出视频三角，指向那个开口，即"从想法到成片"的出口。
+
+    构造:
+      外沿 32..224（边长 192），边宽 30。四边留白均为 32 —— 居中。
+      标记占 192/256 = 75%。
+      右下缺口：底边止于 x194、右边止于 y164，缺口 30 见方（与边宽同值，缺掉一整个角）。
+      内区 62..194（132 见方）。
+
+      形状由四段实心矩形拼成（上 / 左 / 右 / 下），每段都是直角矩形：
+        上  (32,32)-(224,62)
+        左  (32,62)-(62,224)
+        右  (194,62)-(224,164)
+        下  (62,194)-(194,224)
+
+      三角：底边竖直在左、顶点朝右、指向缺口。
+        底 x98，y88..166（高 78）；顶点 (143,127)。
+        顶角 θ = 2·atan(45/78) = 59.9°，与标准播放键锐度一致。
+        角度按 tan(θ/2) = 半底 / 高 反算 —— 前几稿栽在 87.6° 与 46.2°，
+        都是手工估角的后果。
+        顶点 y=127 与内区垂直中心 (62+194)/2 = 128 对齐（取整差 1）。
+
+      三角四周留白：左 36、右 51、上 26、下 28。
+        右侧刻意留最多 —— 三角指向缺口，那是出口，需要呼吸。
+
+    v8: v7 的标记整体偏右下（实测外沿在 56..248，右/下留白仅 8）。
+        现平移 −24，四边留白均匀为 32。
+  -->
+  <g fill="#000" fill-rule="evenodd">
+    <path d="M32 32 H224 V62 H32 Z" />
+    <path d="M32 62 H62 V224 H32 Z" />
+    <path d="M194 62 H224 V164 H194 Z" />
+    <path d="M62 194 H194 V224 H62 Z" />
+    <path d="M98 88 L143 127 L98 166 Z" />
+  </g>
+</svg>
+</g><text x="876" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="934" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s132-t">住凯AI视频 — logo · 框与三角</title>
+  <!--
+    Logo — 框与三角 (Frame & Play) · abstract
+
+    Idea: 一个画框，右下角整段缺席 —— 画布是开放的、没有边界；
+          框内切出视频三角，指向那个开口，即"从想法到成片"的出口。
+
+    构造:
+      外沿 32..224（边长 192），边宽 30。四边留白均为 32 —— 居中。
+      标记占 192/256 = 75%。
+      右下缺口：底边止于 x194、右边止于 y164，缺口 30 见方（与边宽同值，缺掉一整个角）。
+      内区 62..194（132 见方）。
+
+      形状由四段实心矩形拼成（上 / 左 / 右 / 下），每段都是直角矩形：
+        上  (32,32)-(224,62)
+        左  (32,62)-(62,224)
+        右  (194,62)-(224,164)
+        下  (62,194)-(194,224)
+
+      三角：底边竖直在左、顶点朝右、指向缺口。
+        底 x98，y88..166（高 78）；顶点 (143,127)。
+        顶角 θ = 2·atan(45/78) = 59.9°，与标准播放键锐度一致。
+        角度按 tan(θ/2) = 半底 / 高 反算 —— 前几稿栽在 87.6° 与 46.2°，
+        都是手工估角的后果。
+        顶点 y=127 与内区垂直中心 (62+194)/2 = 128 对齐（取整差 1）。
+
+      三角四周留白：左 36、右 51、上 26、下 28。
+        右侧刻意留最多 —— 三角指向缺口，那是出口，需要呼吸。
+
+    v8: v7 的标记整体偏右下（实测外沿在 56..248，右/下留白仅 8）。
+        现平移 −24，四边留白均匀为 32。
+  -->
+  <g fill="#000" fill-rule="evenodd">
+    <path d="M32 32 H224 V62 H32 Z" />
+    <path d="M32 62 H62 V224 H32 Z" />
+    <path d="M194 62 H224 V164 H194 Z" />
+    <path d="M62 194 H194 V224 H62 Z" />
+    <path d="M98 88 L143 127 L98 166 Z" />
+  </g>
+</svg>
+</g><text x="950" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="992" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s116-t">住凯AI视频 — logo · 框与三角</title>
+  <!--
+    Logo — 框与三角 (Frame & Play) · abstract
+
+    Idea: 一个画框，右下角整段缺席 —— 画布是开放的、没有边界；
+          框内切出视频三角，指向那个开口，即"从想法到成片"的出口。
+
+    构造:
+      外沿 32..224（边长 192），边宽 30。四边留白均为 32 —— 居中。
+      标记占 192/256 = 75%。
+      右下缺口：底边止于 x194、右边止于 y164，缺口 30 见方（与边宽同值，缺掉一整个角）。
+      内区 62..194（132 见方）。
+
+      形状由四段实心矩形拼成（上 / 左 / 右 / 下），每段都是直角矩形：
+        上  (32,32)-(224,62)
+        左  (32,62)-(62,224)
+        右  (194,62)-(224,164)
+        下  (62,194)-(194,224)
+
+      三角：底边竖直在左、顶点朝右、指向缺口。
+        底 x98，y88..166（高 78）；顶点 (143,127)。
+        顶角 θ = 2·atan(45/78) = 59.9°，与标准播放键锐度一致。
+        角度按 tan(θ/2) = 半底 / 高 反算 —— 前几稿栽在 87.6° 与 46.2°，
+        都是手工估角的后果。
+        顶点 y=127 与内区垂直中心 (62+194)/2 = 128 对齐（取整差 1）。
+
+      三角四周留白：左 36、右 51、上 26、下 28。
+        右侧刻意留最多 —— 三角指向缺口，那是出口，需要呼吸。
+
+    v8: v7 的标记整体偏右下（实测外沿在 56..248，右/下留白仅 8）。
+        现平移 −24，四边留白均匀为 32。
+  -->
+  <g fill="#000" fill-rule="evenodd">
+    <path d="M32 32 H224 V62 H32 Z" />
+    <path d="M32 62 H62 V224 H32 Z" />
+    <path d="M194 62 H224 V164 H194 Z" />
+    <path d="M62 194 H194 V224 H62 Z" />
+    <path d="M98 88 L143 127 L98 166 Z" />
+  </g>
+</svg>
+</g><text x="1000" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="844.0" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">B · 紧凑版（留白 32）</text><text x="844.0" y="664" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" fill="#161616" letter-spacing="1.5">RECOMMENDED</text><text x="844.0" y="698" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">标记占 75%，四边均衡，缺口更醒目。</text></svg>
