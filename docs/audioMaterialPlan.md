@@ -14,89 +14,28 @@
 | P3 语音模型面板 + 媒体面板按类型筛选 | ✅ 完成 | `a0cf6e1` |
 | P4 素材库声音面板 | ✅ 完成 | `ffa4c1e`、`ab6592b`、`4e37c6a`、`8558cf0`、`4f709ba` |
 | P5 给 agent 新增「素材库」工具 | ✅ 完成 | `c1c65d6` |
-| P6 打包与安装验证 | ⬜ 未开始 | — |
+| P6 打包与安装验证 | 🟡 打包完成，安装未执行 | `1fa014b` |
 
-**P4 完成的细节**
+- **P4（声音面板）**：媒体生成结果自动上画布（`ffa4c1e`）、素材库上传能力（`ab6592b`）、
+  服务端音色链路与 `POST /api/ai/voices/create`（`4e37c6a`）、
+  浏览器端音频转 WAV（`8558cf0`）、声音面板本体（`4f709ba`）均已完成。
+  · 仍未验证：没有真实百炼 API Key，「录音 → 克隆 → 试听 → 保存」的端到端行为、
+    `qwen-voice-enrollment` 的实际返回、`MediaRecorder` 真机行为、音色质量均未验证。
 
-- ✅ 媒体生成结果自动放到画布上（`ffa4c1e`）——配音没有节点 UI，靠它落到 `remote-audioNode`。
-- ✅ 素材库上传能力（`ab6592b`）——原先只有 mkdir 与保存节点输出，没有上传。
-- ✅ 服务端音色链路（`4e37c6a`）——供应商契约加 `createVoice`，百炼实现，接口
-  `POST /api/ai/voices/create`。
-- ✅ 浏览器端音频转 WAV（`8558cf0`）——解决 webm/opus 与百炼格式要求的冲突。
-- ✅ 声音面板与音频生成入口（`4f709ba`）——素材库「素材/声音」分页、
-  上传/录制样本、克隆、设计、试听、音色 json 落库；
-  另把 `/api/ai/media/generate` 的 mediaType 扩到含 `audio`（此前音频只有
-  agent 工具路径，没有 HTTP 入口，试听无法实现）。
+- **P5（素材库工具）**：新增 `packages/tools/assetLibrary/`，提供 `listAssets` 与
+  `importAssets`；`ToolContext` 增加窄接口 `assets`（仅 `readdir` 与 `importToWorkspace`）；
+  服务端只读放行素材库根。关键点：节点 `path` 是工作区相对路径，素材库在工作区之外，
+  因此**导入必须先复制进工作区再建节点**。
+  · 仍未验证：未真实调用两个工具跑通「导入素材到画布」（缺供应商与已打开的项目画布）；
+    工具目前只是可加载、可在接口中列出。
 
-**仍未验证**：没有真实百炼 API Key，因此「录音 → 克隆 → 试听 → 保存」的端到端
-行为、`qwen-voice-enrollment` 的实际返回、MediaRecorder 真机行为、音色质量均未验证。
-
-**P5 已完成**（`c1c65d6`）
-
-- 新增工具包 `packages/tools/assetLibrary/`：`listAssets`（浏览素材库，按扩展名标注种类）
-  与 `importAssets`（复制进工作区并按种类放到画布节点）。
-- `ToolContext` 增加可选 `assets`（只有 `readdir` 与 `importToWorkspace` 两个窄接口）。
-- 服务端 `resolvePath` 在只读时放行素材库根（照搬技能目录的既有先例）；
-  `importToWorkspace` 用 `COPYFILE_EXCL` 落到 `assets/imported`，重名加序号。
-- **关键坑已按计划处理**：节点 `path` 是工作区相对路径，素材库在工作区之外，
-  因此导入先复制进工作区再建节点。
-
-**实施中发现并修掉的一个开发流程缺陷**（值得记住）
-
-`initializePlugins` 的判断是「marker 存在且 revision 未变就跳过」，
-而独立 server（`apps/server/src/index.ts`）**不传 revision**，
-于是 `data/tools/initialized` 一旦存在就永远不再同步 ——
-新增工具包表现为「构建成功、`data/tools` 里却没有该文件、接口也列不出来」。
-实测复现：首次启动后 `data/tools` 缺 `assetLibrary.tool.js`，删除 marker 重启即出现。
-已在 `scripts/dev.mjs` 启动前清理 `data/{tools,nodes}/initialized`；
-生产由 desktop 传入的 `pluginRevision`（构建 hash）负责，不受影响。
-
-**仍未验证**：没有真实调用 `listAssets` / `importAssets` 跑通「导入素材到画布」的
-完整效果（缺供应商与已打开的项目画布）；工具只是可加载、可在接口中列出。
-
-**P4 进行中的细节**
-
-- ✅ 已完成的前置：媒体生成结果自动放到画布上（`ffa4c1e`）。
-  由于没有音频生成节点，配音生成后靠这个机制落到 `remote-audioNode`。
-- ⬜ 待做，且**范围比原计划多一项**：素材库当前只有两个写操作
-  （`POST /api/assets/mkdir` 与 `PUT /api/assets/save` 保存节点输出），
-  **没有上传功能**。而声音面板必需上传样本与录制，
-  因此 P4 需要先给素材库加上传能力。
-  （服务端不必新增接口：`assets/save` 已用 `writeWorkspaceFile(..., exclusive=true)`
-  按原始字节写入，前端补一个上传入口即可；注意 exclusive 表示不覆盖，重名需避让。）
-- ⬜ 声音面板本体、音色创建（`voice-enrollment`）、声音设计、试听、音色 json 落库。
-
-**P4 剩余部分的准确设计（本轮已探明，供下轮直接实施）**
-
-1. **素材库上传已就绪**（`ab6592b`）：工具栏「上传素材」+ 隐藏 file input，落到当前文件夹，
-   重名自动避让 `(1)(2)…`。服务端未改动。
-2. **面板形态**：在 `assetLibrary.vue` 内加标签切换（「素材」/「声音」），
-   而不是新建浮层——与 D1「加进现有素材库」一致。画布与首页两处入口自动同时获得。
-3. **音色创建必须由前端提交字节**：`ProviderTools` 没有读取工作区文件的能力
-   （只有 fetch / errorMessage / hash / image / audio.convert / ffmpeg），
-   因此服务端拿不到样本文件内容。做法：前端用 `/api/assets/read` 读成 Blob，
-   转成 `MediaInput`（`{ type: "base64", data: data URL, mimeType }`）随请求提交。
-4. **服务端可复用既有解析**：`apps/server/src/utils/media/generation.ts:141-149` 已有
-   `getMediaProvider(providerId)` → 校验 model → 读 `settings.mediaProviderConfigs` →
-   `loadMediaProviderSource(...)` → 校验 apiKey 的完整流程。
-   新增音色接口应沿用同一套，不要另写一份。
-5. **供应商契约需要扩一个可选方法**（与 `generateImage/generateVideo/generateAudio` 并列）：
-   建议 `createVoice?(request): Promise<{ voice: string }>`，由 generation.ts 在
-   `mediaType === "audio"` 且 operation 为建音色时调用。百炼实现里区分两条路径：
-   · `model: "voice-enrollment"` + `input.action: "create_voice"`，样本走 **`input.url`（公网 URL）**；
-   · `model: "qwen-voice-enrollment"` + `input.action: "create"`，样本走 **`input.audio.data`（Base64）**。
-   本产品无法提供公网托管，故**只走后者**（详见 §1.6 与 §3 P2 的设计影响 2）。
-   `target_model` 必须与后续合成模型一致；音色 json 需记录它。
-6. **录音**：按 D11 不选设备（系统默认麦克风）、限 30 秒。
-   ✅ **格式问题已解决**（`8558cf0`）：浏览器 `MediaRecorder` 默认输出 webm/opus，
-   而百炼要 `audio/wav|mpeg|mp4`；服务端的 `convertAudio` 只吃 WAV 输入
-   （`audioProcessor.ts` 明确不解码压缩格式），帮不上忙。
-   已改为**在浏览器端转码**：`apps/web/src/lib/audioWav.ts` 用
-   `AudioContext.decodeAudioData` 解码后手工封装 16 位 PCM WAV，不依赖 ffmpeg、不引新依赖。
-   录音流程因此为：录制 → 转 WAV → 存入素材库 → 克隆时读出转 base64 提交。
-7. **音色落库**：按 D3 在素材库建「声音」文件夹，存
-   `{ 名称, voiceId, targetModel, 来源(克隆/设计), 创建时间 }` 的 json。
-   写入复用 `PUT /api/assets/save`（注意 exclusive 不覆盖，需避让重名）。
+- **P6（打包）**：产物 `build/desktop/artifacts/zhukai-2.0.0-Setup.exe`，38.72 MB，
+  SHA256 `9C9D247966F1C115D2473696B2BCB569E5B4B3DA72ADFE466D556D04257CDED1`。
+  载荷核对（解 tar.zst 共 462 项）：`app/tools/assetLibrary.tool.js` 存在、
+  `views/mainview/assets/assetLibrary-*.js` 存在且含新界面文案、**不含 `initialized` 标记**。
+  · 仍未验证：未在真实环境执行安装与启动（需管理员权限，且会覆盖已安装的 `E:\zk_video`），
+    因此各项界面与工具在安装包上的端到端可用性未验证，只验证了包内容与源码行为。
+  · 打包注意事项见下方 P6 小节。
 
 ---
 
@@ -417,8 +356,16 @@ POST https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/audi
 
 ### P6 · 打包与安装验证
 
-- 重新打包（注意：`RequestExecutionLevel admin`、TEMP 需在 E 盘等既有经验）
-- 安装后验证：首页素材库入口、语音模型面板、声音面板、克隆/设计、agent 导入全部可用
+依赖与注意事项（本轮实测）
+- 需要本地 artifact server（`_artifact-server.mjs`，端口 8899）与
+  `DASH_ARTIFACTS_BASE_URL=http://127.0.0.1:8899/v2.0.1`、`NSIS_PATH`。
+- `package:desktop` 会在 hutch 解析 Cottontail 时报 `AccessDenied`，
+  绕过方式：直接 `hutch electrobun build --env=stable`，
+  再单独 `bun apps/desktop/scripts/packageWindows.ts`。
+- NSIS 的安装段不会删除 `data/`（只有卸载段在勾选时删），
+  因此升级安装会保留用户设置；`initialized` 标记的同步问题已修（见 `1fa014b`）。
+- ACT: 未在真实环境执行安装（需管理员权限，且会覆盖已安装的 `E:\zk_video`）。
+  安装后的端到端验证需用户自行执行或授权。
 
 ---
 
@@ -441,14 +388,14 @@ P6（打包）              ── 依赖全部
 | 项 | 状态 | 说明 |
 | --- | --- | --- |
 | 口型对准精度 | ⚠️ **未验证** | 链路已确认可达；实际对准效果需真机验证，我无法保证 |
-| 百炼 `voice-enrollment` 接口结构 | ✅ **已核实** | 端点、请求体、返回体均已取得，见 P2；但**合成端点仍未取得** |
-| **复刻样本必须是公网 URL（CosyVoice 路径）** | 🔴 **设计约束** | `voice-enrollment` 的 `input.url` 要求公网可访问，而用户样本是本地文件/录音。**应改走支持 Base64 的 Qwen-TTS 路径**（方案见 P2 设计影响 2） |
-| `target_model` 与合成模型必须一致 | 🔴 **设计约束** | 音色 json 必须记录 `targetModel`；P3 的模型选择会决定已有音色能否使用 |
-| 录制音频格式兼容性 | ⚠️ **未核实** | Qwen-TTS 路径支持 `audio/wav`/`mpeg`/`mp4`，而浏览器 `MediaRecorder` 默认多为 webm/opus。**很可能需要先用 ffmpeg 转码** |
-| 录制样本体积 | ⚠️ **风险** | Base64 提交有体积上限风险，需限制时长并可能先裁剪 |
-| 百炼语音**合成**端点 | ⚠️ **未核实** | 抓取失败，未取得路径与请求体。**P2 实施前必须先确认** |
-| APIMart TTS 端点路径与参数 | ⚠️ **未核实** | 文档目录只列出「POST TTS 文字转语音」，未读其具体请求格式 |
-| APIMart 是否支持声音克隆 | ❌ **文档未提** | 只有「多种音色的 TTS」，克隆/设计应由百炼承担 |
+| 百炼 `voice-enrollment` 接口结构 | ✅ **已核实并实现** | 端点与请求体已取得；实际只走 Qwen-TTS 的 Base64 路径 |
+| **复刻样本必须是公网 URL（CosyVoice 路径）** | 🔴 **设计约束（已规避）** | `voice-enrollment` 的 `input.url` 要求公网可访问，而样本是本地文件/录音。已改走支持 Base64 的 Qwen-TTS 路径 |
+| `target_model` 与合成模型必须一致 | 🔴 **设计约束（已处理）** | 音色 json 已记录 `targetModel`；设置里的模型选择决定已有音色能否使用 |
+| 录制音频格式兼容性 | ✅ **已解决** | `MediaRecorder` 默认 webm/opus，而百炼要 wav/mpeg/mp4；服务端 `convertAudio` 只吃 WAV 输入，故改为**浏览器端转 WAV**（`apps/web/src/lib/audioWav.ts`）。**未在真机浏览器实测** |
+| 录制样本体积 | ✅ **已处理** | 转 WAV 后限制 20 MB、录制限 30 秒（D11），超出明确报错 |
+| 百炼语音**合成**端点 | ✅ **已核实并实现** | `POST {baseUrl}/services/aigc/multimodal-generation/generation`，返回 `output.audio.url`；实现在 `media/bailian.ts`。**未用真实 API Key 跑通** |
+| APIMart TTS 端点 | ✅ **已核实并实现** | `POST /v1/audio/speech`，请求 `{ model, input, voice, response_format, speed }`，成功返回**二进制音频流**（非 URL）。实现里转 base64 交给宿主落盘。**未用真实 API Key 跑通** |
+| APIMart 是否支持声音克隆 | ❌ **文档未提** | 只有「多种音色的 TTS」，克隆/设计由百炼承担 |
 | 音频生成节点（UI 载体） | 决定**不做** | 按用户选择「不做节点，agent 生成后自动上画布」 |
 
 ---
