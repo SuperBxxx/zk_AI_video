@@ -69,7 +69,16 @@ bun install --linker hoisted
 bun run dev
 ```
 
-打开 <http://localhost:3000>。改 `apps/web/**` 与 `apps/server/**` 会热更新。
+打开 **<http://localhost:5173>**。改 `apps/web/**` 与 `apps/server/**` 会热更新。
+
+> **两个端口，别搞混**：`5173` 是 Vite 开发服务器，**页面看这个**；
+> `3000` 是 API 服务端（`bun --watch src/index.ts`），Vite 把 `/api` 代理过去。
+> 直接开 3000 只会拿到 `build/web` 里的**上一次构建产物**，看起来像"改动没生效"。
+
+> **Vite 必须带 `--configLoader runner`**（`apps/web/package.json` 的 `dev` 与 `build` 都已带）。
+> 工作区包以裸 `.ts` 形式发布，默认的 `bundle` 加载器会报
+> `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`，dev 服务器会直接起不来 ——
+> 此时 3000 上的旧产物仍能打开，非常容易被误认为"改动没生效"。
 
 > **`--linker hoisted` 是必需的**：默认的隔离式链接器在部分环境会大量
 > `failed to symlink dependencies` 失败，导致 `node_modules` 顶层为空。

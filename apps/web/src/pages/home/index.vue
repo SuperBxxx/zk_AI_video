@@ -298,12 +298,12 @@ async function createProject(fromPrompt = true) {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 16px;
-        margin-bottom: 36px;
+        gap: 14px;
+        margin-bottom: 32px;
 
         .brandLogo {
-          width: 48px;
-          height: 48px;
+          width: 40px;
+          height: 40px;
 
           .dark & {
             filter: invert(1);
@@ -312,9 +312,9 @@ async function createProject(fromPrompt = true) {
 
         h1 {
           margin: 0;
-          font-size: clamp(30px, 4vw, 38px);
-          font-weight: 600;
-          letter-spacing: -1px;
+          font-size: clamp(26px, 3.2vw, 32px);
+          font-weight: 650;
+          letter-spacing: -0.02em;
         }
       }
 
@@ -322,12 +322,14 @@ async function createProject(fromPrompt = true) {
         position: relative;
 
         .promptCard {
-          border-radius: calc(var(--ui-radius) * 2.5);
+          /* ACT: 原为 radius × 2.5，是"软"观感最重的一处；收紧到单个倍率。 */
+          border-radius: var(--ui-radius-large);
           border-color: var(--el-border-color-lighter);
           box-shadow: var(--el-box-shadow-lighter);
+          transition: border-color 0.15s ease;
 
           &:focus-within {
-            border-color: var(--el-color-primary-light-5);
+            border-color: var(--el-color-primary);
           }
 
           .promptAttachments {
@@ -393,6 +395,15 @@ async function createProject(fromPrompt = true) {
 
         .projectCard {
           position: relative;
+          border-radius: var(--ui-radius);
+          border-color: var(--el-border-color-lighter);
+          transition: border-color 0.15s ease, background-color 0.15s ease;
+
+          /* ACT: 悬停只做"底色略抬 + 描边加深"，不做位移与投影 —— 位移会让网格视感发飘。 */
+          &:hover {
+            border-color: var(--el-color-primary-light-5);
+            background: var(--el-fill-color-light);
+          }
 
           .projectActions {
             position: absolute;
@@ -410,7 +421,7 @@ async function createProject(fromPrompt = true) {
           align-items: flex-start;
           gap: 12px;
           width: 100%;
-          padding: 20px 84px 20px 20px;
+          padding: 18px 84px 18px 18px;
           border: 0;
           background: transparent;
           color: inherit;
@@ -426,7 +437,7 @@ async function createProject(fromPrompt = true) {
           .projectInfo {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 4px;
             min-width: 0;
 
             .projectName, .projectPath {
@@ -435,9 +446,9 @@ async function createProject(fromPrompt = true) {
               white-space: nowrap;
             }
 
-            .projectName { font-weight: 600; }
-            .projectPath { font-size: 13px; color: var(--el-text-color-regular); }
-            .projectTime { font-size: 12px; color: var(--el-text-color-secondary); }
+            .projectName { font-weight: 600; font-size: 14px; letter-spacing: -0.01em; }
+            .projectPath { font-size: 12px; color: var(--el-text-color-secondary); }
+            .projectTime { font-size: 12px; color: var(--el-text-color-placeholder); }
           }
         }
       }
@@ -448,13 +459,15 @@ async function createProject(fromPrompt = true) {
         justify-content: space-between;
         flex-wrap: wrap;
         gap: 16px;
-        padding-bottom: 16px;
+        padding-bottom: 12px;
         border-bottom: 1px solid var(--el-border-color-lighter);
 
         h2 {
           margin: 0;
-          font-size: 18px;
+          font-size: 15px;
           font-weight: 600;
+          letter-spacing: 0;
+          color: var(--el-text-color-regular);
         }
       }
     }

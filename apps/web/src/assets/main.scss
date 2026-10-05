@@ -1,10 +1,12 @@
 html:root {
-  --ui-radius: 8px;
-  /* ACT: 深色品牌面板底色（快速开始右侧面板）。由品牌色推导的固定深色，
+  /* ACT: 圆角收紧（原 8px）。EPP 的"软"感主要来自大圆角 + ×1.5/×2.5 的派生放大，
+     默认 6px 且派生倍率下调后，控件边界更利落，但仍不是直角。 */
+  --ui-radius: 6px;
+  /* ACT: 深色品牌面板底色（快速开始右侧面板）。由品牌竹绿 #2E9E6B 压暗推导，
      与白字/白 Logo 对比度足够；深浅主题下都用它。 */
-  --brand-panel: #12544a;
+  --brand-panel: #14543c;
   --ui-radius-small: calc(var(--ui-radius) * 0.5);
-  --ui-radius-large: calc(var(--ui-radius) * 1.5);
+  --ui-radius-large: calc(var(--ui-radius) * 1.25);
   --el-border-radius-base: var(--ui-radius);
   --el-border-radius-small: var(--ui-radius-small);
   --td-radius-small: var(--ui-radius-small);
@@ -21,28 +23,96 @@ html:root {
   --td-brand-color-light-hover: var(--el-color-primary-light-8);
   --td-text-color-brand: var(--el-color-primary);
   --td-text-color-link: var(--el-color-primary);
+}
 
+/* ACT: 全局视觉重构 —— 用变量与少量覆盖统一按钮/输入/弹窗形态，
+   不逐个组件改样式。目标是摆脱 Element Plus 出厂观感，而不是换一套皮肤。 */
+html:root {
+  /* 卡片：浅底 + 一条细线，去掉默认描边与投影的叠加 */
   .el-card {
     --el-card-border-radius: var(--ui-radius-large);
+    --el-card-border-color: var(--el-border-color-lighter);
+    box-shadow: none !important;
+  }
+
+  .el-card.is-never-shadow {
+    border-color: var(--el-border-color-lighter);
+  }
+
+  /* 输入类控件：去掉大圆角，高度略增，聚焦用 1px 品牌色而不是外发光 */
+  .el-input__wrapper,
+  .el-textarea__inner,
+  .el-select__wrapper {
+    border-radius: var(--ui-radius);
+    box-shadow: 0 0 0 1px var(--el-border-color) inset;
+  }
+
+  .el-input__wrapper.is-focus,
+  .el-select__wrapper.is-focused {
+    box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+  }
+
+  /* 按钮：从"胶囊"改为方正的紧凑形态 */
+  .el-button {
+    --el-button-border-radius: var(--ui-radius);
+    font-weight: 500;
+  }
+
+  /* 弹窗与浮层：小圆角 + 细描边 + 轻投影，替代默认的重投影 */
+  .el-dialog {
+    --el-dialog-border-radius: var(--ui-radius-large);
+    box-shadow: var(--el-box-shadow-light);
   }
 
   .el-popper {
-    --el-popper-border-radius: var(--ui-radius-large);
-    --el-popover-border-radius: var(--ui-radius-large);
+    --el-popper-border-radius: var(--ui-radius);
+    --el-popover-border-radius: var(--ui-radius);
   }
 
   .el-dropdown__popper {
     > .el-scrollbar { border-radius: max(0px, calc(var(--el-popper-border-radius) - 1px)); }
   }
 
-  .el-dialog { --el-dialog-border-radius: var(--ui-radius-large); }
+  /* 标签与分段控件跟随收紧 */
   .el-tag { --el-tag-border-radius: var(--ui-radius-small); }
+
+  .el-segmented {
+    --el-border-radius-base: var(--ui-radius);
+  }
 }
 
 html,
 body,
 #app {
   margin: 0;
+}
+
+/* ACT: 排版基线。中文优先字体栈 —— 拉丁字形用系统 UI 字体，中文交给苹方/微软雅黑，
+   避免 EPP 默认那种"没有设计意图"的观感；数字用等宽字形，数值列（模型数、时长、
+   版本号、余额）在视觉上对齐，也是很容易被识别为"未雕琢"的细节。 */
+html {
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Source Han Sans SC", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* 数值与代码：等宽字形，避免跳动 */
+code,
+kbd,
+samp,
+pre,
+.el-tag,
+.el-button__text {
+  font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 * {

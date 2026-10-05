@@ -27,9 +27,10 @@ export const settingsStorage = {
 };
 
 // ACT: primaryColor 原为 Element Plus 出厂蓝 #409eff —— 那是"一眼就是默认皮肤"的主要来源。
-// 改为住凯AI视频的品牌深青绿。派生色阶（light-1..9 / dark-2）由 App.vue 用 color-mix 运行时生成，
+// 现用品牌竹绿 #2E9E6B：比早先的深青绿 #1F8A70 更饱和、更明确，主按钮与选中态能一眼看出是绿的，
+// 在浅色底上也不会糊成灰。派生色阶（light-1..9 / dark-2）由 App.vue 用 color-mix 运行时生成，
 // 所以改这一处即可全站生效，不需要手工维护色阶。
-export const defaultUiSettings = { theme: "light", language: "system", primaryColor: "#1F8A70", fontScale: 100, radius: 8 };
+export const defaultUiSettings = { theme: "light", language: "system", primaryColor: "#2E9E6B", fontScale: 100, radius: 6 };
 export const uiSettings = computed(() => {
   const raw = settings.value.ui;
   const ui = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
@@ -95,10 +96,24 @@ export async function loadSettings() {
   if (data.code !== 200 || !data.data || typeof data.data !== "object" || Array.isArray(data.data)) {
     throw new Error("读取设置失败");
   }
-  settings.value = data.data;
+  settings.value = migrate(data.data);
   // 等初始化引发的监听执行完，再允许自动保存。
   await nextTick();
   settingsReady = true;
+}
+
+// ACT: 一次性迁移被替换掉的主题色。旧版本的 primaryColor 会持久化在服务端配置里，
+// 优先级高于代码默认值 —— 不迁移的话，凡是装过旧版本的机器都会一直停留在旧配色上，
+// 代码里改默认色对它们完全无效。只迁移明确作废的旧值，不触碰用户自己选的颜色。
+// 统一转大写再比较，避免 hex 大小写差异导致漏迁移。
+const retiredPrimaryColors = new Set(["#409EFF", "#1F8A70"]);
+function migrate(value: Record<string, unknown>): Record<string, unknown> {
+  const ui = value.ui;
+  if (!ui || typeof ui !== "object" || Array.isArray(ui)) return value;
+  const primaryColor = (ui as Record<string, unknown>).primaryColor;
+  if (typeof primaryColor !== "string" || !retiredPrimaryColors.has(primaryColor.toUpperCase())) return value;
+  const { primaryColor: _retired, ...rest } = ui as Record<string, unknown>;
+  return { ...value, ui: rest };
 }
 
 export function saveSettings(update?: (current: Record<string, unknown>) => Record<string, unknown> | undefined) {

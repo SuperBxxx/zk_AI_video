@@ -48,20 +48,23 @@ const visible = defineModel<boolean>({ default: false });
 <style lang="scss" scoped>
 .settings {
   display: grid;
-  grid-template-columns: 160px minmax(0, 1fr);
+  grid-template-columns: 148px minmax(0, 1fr);
   height: min(72vh, calc(100dvh - 140px));
   overflow: hidden;
 
   .sidebar {
     min-height: 0;
     overflow-y: auto;
-    padding: 2px;
+    padding: 2px 10px 2px 2px;
+    /* ACT: 侧栏用一条细分割线界定，替代默认的留白分隔，信息层级更清楚。 */
+    border-right: 1px solid var(--el-border-color-lighter);
 
     .settingsGroupLabel {
-      margin: 14px 12px 6px;
-      color: var(--el-text-color-secondary);
-      font-size: 12px;
-      font-weight: 400;
+      margin: 14px 10px 6px;
+      color: var(--el-text-color-placeholder);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
       line-height: 1.5;
     }
 
@@ -70,13 +73,14 @@ const visible = defineModel<boolean>({ default: false });
       align-items: center;
       gap: 10px;
       width: 100%;
-      padding: 10px 12px;
-      margin-bottom: 4px;
+      padding: 9px 10px;
+      margin-bottom: 2px;
       border: 0;
-      border-radius: var(--el-border-radius-base);
+      border-radius: var(--ui-radius-small);
       background: transparent;
       color: var(--el-text-color-regular);
       font: inherit;
+      font-size: 13px;
       text-align: start;
       cursor: pointer;
 
@@ -91,9 +95,12 @@ const visible = defineModel<boolean>({ default: false });
         background: var(--el-fill-color-light);
       }
 
+      /* ACT: 选中态改为左侧色条 + 加粗，替代整块浅色背景（浅色块在浅色主题下几乎看不见）。 */
       &[aria-pressed="true"] {
-        background: var(--el-color-primary-light-9);
+        background: var(--el-fill-color-light);
         color: var(--el-color-primary);
+        font-weight: 500;
+        box-shadow: inset 2px 0 0 var(--el-color-primary);
       }
 
       &:focus-visible {
@@ -111,8 +118,9 @@ const visible = defineModel<boolean>({ default: false });
 
     .panelTitle {
       flex-shrink: 0;
-      margin: 0 0 20px;
-      font-size: 18px;
+      margin: 0 0 16px;
+      font-size: 16px;
+      font-weight: 600;
     }
 
     .panelContent {
