@@ -2,9 +2,12 @@
   <el-container class="home">
     <minimalBackground class="pageBackground" />
     <el-header class="pageHeader">
-      <el-badge isDot :hidden="!hasDesktopUpdate">
-        <el-button round size="large" :icon="IconSettings" :aria-label="hasDesktopUpdate ? '设置，有新版本可用' : '设置'" @click="settingsVisible = true">设置</el-button>
-      </el-badge>
+      <el-space wrap :size="12">
+        <el-button round size="large" :icon="IconFolders" aria-label="素材库" @click="assetsVisible = true">素材库</el-button>
+        <el-badge isDot :hidden="!hasDesktopUpdate">
+          <el-button round size="large" :icon="IconSettings" :aria-label="hasDesktopUpdate ? '设置，有新版本可用' : '设置'" @click="settingsVisible = true">设置</el-button>
+        </el-badge>
+      </el-space>
     </el-header>
     <el-main class="pageContent">
       <section class="creationPanel" aria-label="创建项目">
@@ -70,6 +73,12 @@
     </el-main>
     <modelSetupDialog ref="modelSetupDialogRef" @openSettings="settingsVisible = true" />
     <settings v-model="settingsVisible" />
+    <!-- 素材库数据是全局的（服务端以 {数据目录}/assets 为根），与是否打开项目无关，
+         因此首页也能直接管理：新建文件夹、上传、生成内容都可用。
+         canvas=false 关闭画布专属能力（拖拽到画布、保存节点输出）。 -->
+    <el-dialog v-model="assetsVisible" title="素材库" width="min(860px, 94vw)" alignCenter appendToBody destroyOnClose>
+      <assetLibrary :canvas="false" />
+    </el-dialog>
     <workspacePicker ref="relocationPicker" hideTrigger />
   </el-container>
 </template>
@@ -82,7 +91,7 @@ import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage, ElMessageBox, type InputInstance } from "element-plus";
 import {
-  IconSettings,
+  IconSettings, IconFolders,
   IconArrowUp, IconLayoutGrid,
   IconList, IconSortDescending,
   IconSortAscending, IconFolder, IconEdit,
@@ -99,11 +108,16 @@ import { hasDesktopUpdate } from "@/stores/desktopUpdate";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import settings from "@/components/settings/index.vue";
 import modelSetupDialog from "@/components/modelSetupDialog.vue";
+// 素材库组件位于画布目录下，但它操作的是全局 assets 目录，与画布无耦合。
+// 跨目录引用此处是有意的：先复用同一份实现，避免维护两套素材库。
+import assetLibrary from "@/pages/workspace/panels/canvas/components/assetLibrary.vue";
 import minimalBackground from "@/components/minimalBackground.vue";
 import workspacePicker from "./workspacePicker.vue";
 import { createModes } from "./createModes";
 
 const settingsVisible = ref(false);
+// 首页的素材库：素材库是全局的，不需要先打开项目就能管理素材。
+const assetsVisible = ref(false);
 const router = useRouter();
 const creating = ref(false);
 const opening = ref(false);
