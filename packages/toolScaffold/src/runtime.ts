@@ -173,6 +173,16 @@ export interface SkillContext {
   update(request: SkillLocation & { content: string }, signal?: AbortSignal): Promise<Omit<SkillDocument, "content">>;
 }
 
+/**
+ * 全局素材库的只读视图 + 一个受控的导入动作。
+ * path 均为素材库内相对路径；宿主负责越界校验，工具不要自行拼接绝对路径。
+ */
+export interface ToolAssets {
+  readdir(path?: string): Promise<{ name: string; path: string; type: "file" | "directory"; size?: number }[]>;
+  /** 把素材库中的文件复制进工作区，返回工作区相对路径（画布节点需要的是这个）。 */
+  importToWorkspace(path: string, targetDirectory?: string): Promise<string>;
+}
+
 export interface ToolFiles {
   readFile(path: string, readOnly?: boolean): Promise<Buffer>;
   access(path: string, readOnly?: boolean): Promise<void>;
@@ -192,6 +202,12 @@ export interface ToolContext {
   canvas?: CanvasContext;
   question?: QuestionContext;
   skills?: SkillContext;
+  /**
+   * 全局素材库（工作区之外的 {数据目录}/assets）。缺省表示当前环境没有素材库。
+   * ACT: 只给两个窄接口，不复用 ToolFiles —— 素材库的写操作由宿主代为完成
+   * （见 importToWorkspace），工具拿不到任意路径的写权限。
+   */
+  assets?: ToolAssets;
   cwd: string;
   config: Record<string, unknown>;
   files: ToolFiles;
