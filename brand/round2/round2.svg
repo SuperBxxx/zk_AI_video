@@ -1,0 +1,481 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1600" height="840" viewBox="0 0 1600 840"><defs><filter id="grey"><feColorMatrix type="saturate" values="0"/></filter></defs><rect width="1600" height="840" fill="#f7f7f4"/><text x="60" y="78" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="40" font-weight="700" fill="#161616">住凯AI视频 — 全新一轮候选</text><text x="60" y="116" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="20" fill="#6b6b6b">Concepts for review — pick a direction (or tell me what you like in each).</text><rect x="60" y="150" width="474.667" height="630" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="90" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c0-t">住凯AI视频 — 候选 1 · 时间轴</title>
+  <!--
+    候选 1 — 时间轴 (Timeline) · abstract gesture
+
+    Idea: 视频的本质是"沿时间排列的一帧帧"。用一条基线与三根不等宽竖条表达这段
+          序列；中间那根**单独抬升到基线之上**并更窄，读作**关键帧**。
+          这一笔是它与通用柱状图的唯一区别，也是整个符号的全部智慧所在。
+
+    刻意回避：
+      · 不用方框 —— 方框表示"有界"，而产品卖点是"无限画布"，语义相反
+      · 不用播放三角 —— 那属于播放器，不属于创作工具
+
+    构造:
+      基线 y=166..182（厚 16），x 32..224
+      三根竖条宽 32，间距 32，底部贴基线顶 166：
+        左  x44   y78..166   （高 88，最长 = 起点铺垫）
+        中  x108  y110..166  （高 56，最短）
+        右  x172  y62..166   （高 104，最长）
+      关键帧：把中条改为**悬浮在基线之上**，不贴基线：
+        中  x108  y100..146  （高 46，与基线留出 20 的间隙）
+      基线两端超出竖条范围（32 / 224 对 44 / 204），保留"时间在延续"的暗示。
+
+    尺寸全是 4 的倍数，16px 下不产生半像素毛边。
+  -->
+  <g fill="#000">
+    <!-- 基线 -->
+    <rect x="32" y="166" width="192" height="16" />
+    <!-- 左：铺垫 -->
+    <rect x="44" y="78" width="32" height="88" />
+    <!-- 中：关键帧（悬浮，不贴基线） -->
+    <rect x="108" y="100" width="32" height="46" />
+    <!-- 右：高潮 -->
+    <rect x="172" y="62" width="32" height="104" />
+  </g>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="90" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s064-t">住凯AI视频 — 候选 1 · 时间轴</title>
+  <!--
+    候选 1 — 时间轴 (Timeline) · abstract gesture
+
+    Idea: 视频的本质是"沿时间排列的一帧帧"。用一条基线与三根不等宽竖条表达这段
+          序列；中间那根**单独抬升到基线之上**并更窄，读作**关键帧**。
+          这一笔是它与通用柱状图的唯一区别，也是整个符号的全部智慧所在。
+
+    刻意回避：
+      · 不用方框 —— 方框表示"有界"，而产品卖点是"无限画布"，语义相反
+      · 不用播放三角 —— 那属于播放器，不属于创作工具
+
+    构造:
+      基线 y=166..182（厚 16），x 32..224
+      三根竖条宽 32，间距 32，底部贴基线顶 166：
+        左  x44   y78..166   （高 88，最长 = 起点铺垫）
+        中  x108  y110..166  （高 56，最短）
+        右  x172  y62..166   （高 104，最长）
+      关键帧：把中条改为**悬浮在基线之上**，不贴基线：
+        中  x108  y100..146  （高 46，与基线留出 20 的间隙）
+      基线两端超出竖条范围（32 / 224 对 44 / 204），保留"时间在延续"的暗示。
+
+    尺寸全是 4 的倍数，16px 下不产生半像素毛边。
+  -->
+  <g fill="#000">
+    <!-- 基线 -->
+    <rect x="32" y="166" width="192" height="16" />
+    <!-- 左：铺垫 -->
+    <rect x="44" y="78" width="32" height="88" />
+    <!-- 中：关键帧（悬浮，不贴基线） -->
+    <rect x="108" y="100" width="32" height="46" />
+    <!-- 右：高潮 -->
+    <rect x="172" y="62" width="32" height="104" />
+  </g>
+</svg>
+</g><text x="122" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="180" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s032-t">住凯AI视频 — 候选 1 · 时间轴</title>
+  <!--
+    候选 1 — 时间轴 (Timeline) · abstract gesture
+
+    Idea: 视频的本质是"沿时间排列的一帧帧"。用一条基线与三根不等宽竖条表达这段
+          序列；中间那根**单独抬升到基线之上**并更窄，读作**关键帧**。
+          这一笔是它与通用柱状图的唯一区别，也是整个符号的全部智慧所在。
+
+    刻意回避：
+      · 不用方框 —— 方框表示"有界"，而产品卖点是"无限画布"，语义相反
+      · 不用播放三角 —— 那属于播放器，不属于创作工具
+
+    构造:
+      基线 y=166..182（厚 16），x 32..224
+      三根竖条宽 32，间距 32，底部贴基线顶 166：
+        左  x44   y78..166   （高 88，最长 = 起点铺垫）
+        中  x108  y110..166  （高 56，最短）
+        右  x172  y62..166   （高 104，最长）
+      关键帧：把中条改为**悬浮在基线之上**，不贴基线：
+        中  x108  y100..146  （高 46，与基线留出 20 的间隙）
+      基线两端超出竖条范围（32 / 224 对 44 / 204），保留"时间在延续"的暗示。
+
+    尺寸全是 4 的倍数，16px 下不产生半像素毛边。
+  -->
+  <g fill="#000">
+    <!-- 基线 -->
+    <rect x="32" y="166" width="192" height="16" />
+    <!-- 左：铺垫 -->
+    <rect x="44" y="78" width="32" height="88" />
+    <!-- 中：关键帧（悬浮，不贴基线） -->
+    <rect x="108" y="100" width="32" height="46" />
+    <!-- 右：高潮 -->
+    <rect x="172" y="62" width="32" height="104" />
+  </g>
+</svg>
+</g><text x="196" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="238" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s016-t">住凯AI视频 — 候选 1 · 时间轴</title>
+  <!--
+    候选 1 — 时间轴 (Timeline) · abstract gesture
+
+    Idea: 视频的本质是"沿时间排列的一帧帧"。用一条基线与三根不等宽竖条表达这段
+          序列；中间那根**单独抬升到基线之上**并更窄，读作**关键帧**。
+          这一笔是它与通用柱状图的唯一区别，也是整个符号的全部智慧所在。
+
+    刻意回避：
+      · 不用方框 —— 方框表示"有界"，而产品卖点是"无限画布"，语义相反
+      · 不用播放三角 —— 那属于播放器，不属于创作工具
+
+    构造:
+      基线 y=166..182（厚 16），x 32..224
+      三根竖条宽 32，间距 32，底部贴基线顶 166：
+        左  x44   y78..166   （高 88，最长 = 起点铺垫）
+        中  x108  y110..166  （高 56，最短）
+        右  x172  y62..166   （高 104，最长）
+      关键帧：把中条改为**悬浮在基线之上**，不贴基线：
+        中  x108  y100..146  （高 46，与基线留出 20 的间隙）
+      基线两端超出竖条范围（32 / 224 对 44 / 204），保留"时间在延续"的暗示。
+
+    尺寸全是 4 的倍数，16px 下不产生半像素毛边。
+  -->
+  <g fill="#000">
+    <!-- 基线 -->
+    <rect x="32" y="166" width="192" height="16" />
+    <!-- 左：铺垫 -->
+    <rect x="44" y="78" width="32" height="88" />
+    <!-- 中：关键帧（悬浮，不贴基线） -->
+    <rect x="108" y="100" width="32" height="46" />
+    <!-- 右：高潮 -->
+    <rect x="172" y="62" width="32" height="104" />
+  </g>
+</svg>
+</g><text x="246" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="90.0" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">A · 时间轴</text><text x="90.0" y="670" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">基线上的帧序列，中间为关键帧。</text><rect x="562.667" y="150" width="474.667" height="630" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="592.667" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c1-t">住凯AI视频 — 候选 2 · 凯字标</title>
+  <!--
+    候选 2 — 凯字标 (Monogram 凯) · letterform-derived
+
+    Idea: 把「凯」压成纯几何块面。左「岂」保留「山」的三根立柱与一条底横；
+          右「几」保留竖笔与底部**钩**。钩是「凯」最具辨识的一笔，
+          整块面的性格由它决定。
+
+    为什么是「凯」而不是「住」：
+      · 「住」的骨架接近"亻 + 主线"，压平后与任意字标都容易撞
+      · 「凯」含「山」的叠层与「几」的钩，笔画关系更独特，独占比更高
+      · 「凯」是品牌名里更有力量感的那个字
+
+    构造:
+      笔画厚统一 24。外沿 x 44..212、y 40..216。
+      山：三根立柱自底横向上生长，高度不一 ——
+          左 x44  y104..184（高 80，最短）
+          中 x84  y56..184 （高 128，最高，形成"主峰"）
+          右 x124 y88..184 （高 96，中等）
+          底横 x44..156  y184..208
+      几：竖笔 x156..180  y40..184
+          钩：自竖笔底端向右再向下 —— 用直角折线，保持与整体的方正一致
+              x156..212  y184..208（右伸）
+              x188..212  y136..208（下探，形成钩的"钩尖"）
+      两部件在 x156..180 一带贴合，留 0 间隙，使其读作一个字而非两个符号。
+  -->
+  <g fill="#000">
+    <!-- 岂 · 山：三根立柱 -->
+    <rect x="44" y="104" width="24" height="80" />
+    <rect x="84" y="56" width="24" height="128" />
+    <rect x="124" y="88" width="24" height="96" />
+    <!-- 岂 · 山：底横 -->
+    <rect x="44" y="184" width="112" height="24" />
+    <!-- 几：竖笔 -->
+    <rect x="156" y="40" width="24" height="144" />
+    <!-- 几：底部横伸 -->
+    <rect x="156" y="184" width="56" height="24" />
+    <!-- 几：钩（下探的竖） -->
+    <rect x="188" y="136" width="24" height="72" />
+  </g>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="592.667" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s164-t">住凯AI视频 — 候选 2 · 凯字标</title>
+  <!--
+    候选 2 — 凯字标 (Monogram 凯) · letterform-derived
+
+    Idea: 把「凯」压成纯几何块面。左「岂」保留「山」的三根立柱与一条底横；
+          右「几」保留竖笔与底部**钩**。钩是「凯」最具辨识的一笔，
+          整块面的性格由它决定。
+
+    为什么是「凯」而不是「住」：
+      · 「住」的骨架接近"亻 + 主线"，压平后与任意字标都容易撞
+      · 「凯」含「山」的叠层与「几」的钩，笔画关系更独特，独占比更高
+      · 「凯」是品牌名里更有力量感的那个字
+
+    构造:
+      笔画厚统一 24。外沿 x 44..212、y 40..216。
+      山：三根立柱自底横向上生长，高度不一 ——
+          左 x44  y104..184（高 80，最短）
+          中 x84  y56..184 （高 128，最高，形成"主峰"）
+          右 x124 y88..184 （高 96，中等）
+          底横 x44..156  y184..208
+      几：竖笔 x156..180  y40..184
+          钩：自竖笔底端向右再向下 —— 用直角折线，保持与整体的方正一致
+              x156..212  y184..208（右伸）
+              x188..212  y136..208（下探，形成钩的"钩尖"）
+      两部件在 x156..180 一带贴合，留 0 间隙，使其读作一个字而非两个符号。
+  -->
+  <g fill="#000">
+    <!-- 岂 · 山：三根立柱 -->
+    <rect x="44" y="104" width="24" height="80" />
+    <rect x="84" y="56" width="24" height="128" />
+    <rect x="124" y="88" width="24" height="96" />
+    <!-- 岂 · 山：底横 -->
+    <rect x="44" y="184" width="112" height="24" />
+    <!-- 几：竖笔 -->
+    <rect x="156" y="40" width="24" height="144" />
+    <!-- 几：底部横伸 -->
+    <rect x="156" y="184" width="56" height="24" />
+    <!-- 几：钩（下探的竖） -->
+    <rect x="188" y="136" width="24" height="72" />
+  </g>
+</svg>
+</g><text x="624.667" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="682.667" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s132-t">住凯AI视频 — 候选 2 · 凯字标</title>
+  <!--
+    候选 2 — 凯字标 (Monogram 凯) · letterform-derived
+
+    Idea: 把「凯」压成纯几何块面。左「岂」保留「山」的三根立柱与一条底横；
+          右「几」保留竖笔与底部**钩**。钩是「凯」最具辨识的一笔，
+          整块面的性格由它决定。
+
+    为什么是「凯」而不是「住」：
+      · 「住」的骨架接近"亻 + 主线"，压平后与任意字标都容易撞
+      · 「凯」含「山」的叠层与「几」的钩，笔画关系更独特，独占比更高
+      · 「凯」是品牌名里更有力量感的那个字
+
+    构造:
+      笔画厚统一 24。外沿 x 44..212、y 40..216。
+      山：三根立柱自底横向上生长，高度不一 ——
+          左 x44  y104..184（高 80，最短）
+          中 x84  y56..184 （高 128，最高，形成"主峰"）
+          右 x124 y88..184 （高 96，中等）
+          底横 x44..156  y184..208
+      几：竖笔 x156..180  y40..184
+          钩：自竖笔底端向右再向下 —— 用直角折线，保持与整体的方正一致
+              x156..212  y184..208（右伸）
+              x188..212  y136..208（下探，形成钩的"钩尖"）
+      两部件在 x156..180 一带贴合，留 0 间隙，使其读作一个字而非两个符号。
+  -->
+  <g fill="#000">
+    <!-- 岂 · 山：三根立柱 -->
+    <rect x="44" y="104" width="24" height="80" />
+    <rect x="84" y="56" width="24" height="128" />
+    <rect x="124" y="88" width="24" height="96" />
+    <!-- 岂 · 山：底横 -->
+    <rect x="44" y="184" width="112" height="24" />
+    <!-- 几：竖笔 -->
+    <rect x="156" y="40" width="24" height="144" />
+    <!-- 几：底部横伸 -->
+    <rect x="156" y="184" width="56" height="24" />
+    <!-- 几：钩（下探的竖） -->
+    <rect x="188" y="136" width="24" height="72" />
+  </g>
+</svg>
+</g><text x="698.667" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="740.667" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s116-t">住凯AI视频 — 候选 2 · 凯字标</title>
+  <!--
+    候选 2 — 凯字标 (Monogram 凯) · letterform-derived
+
+    Idea: 把「凯」压成纯几何块面。左「岂」保留「山」的三根立柱与一条底横；
+          右「几」保留竖笔与底部**钩**。钩是「凯」最具辨识的一笔，
+          整块面的性格由它决定。
+
+    为什么是「凯」而不是「住」：
+      · 「住」的骨架接近"亻 + 主线"，压平后与任意字标都容易撞
+      · 「凯」含「山」的叠层与「几」的钩，笔画关系更独特，独占比更高
+      · 「凯」是品牌名里更有力量感的那个字
+
+    构造:
+      笔画厚统一 24。外沿 x 44..212、y 40..216。
+      山：三根立柱自底横向上生长，高度不一 ——
+          左 x44  y104..184（高 80，最短）
+          中 x84  y56..184 （高 128，最高，形成"主峰"）
+          右 x124 y88..184 （高 96，中等）
+          底横 x44..156  y184..208
+      几：竖笔 x156..180  y40..184
+          钩：自竖笔底端向右再向下 —— 用直角折线，保持与整体的方正一致
+              x156..212  y184..208（右伸）
+              x188..212  y136..208（下探，形成钩的"钩尖"）
+      两部件在 x156..180 一带贴合，留 0 间隙，使其读作一个字而非两个符号。
+  -->
+  <g fill="#000">
+    <!-- 岂 · 山：三根立柱 -->
+    <rect x="44" y="104" width="24" height="80" />
+    <rect x="84" y="56" width="24" height="128" />
+    <rect x="124" y="88" width="24" height="96" />
+    <!-- 岂 · 山：底横 -->
+    <rect x="44" y="184" width="112" height="24" />
+    <!-- 几：竖笔 -->
+    <rect x="156" y="40" width="24" height="144" />
+    <!-- 几：底部横伸 -->
+    <rect x="156" y="184" width="56" height="24" />
+    <!-- 几：钩（下探的竖） -->
+    <rect x="188" y="136" width="24" height="72" />
+  </g>
+</svg>
+</g><text x="748.667" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="592.6666666666667" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">B · 凯字标</text><text x="592.6666666666667" y="670" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">把「凯」压成几何块面。</text><rect x="1065.33" y="150" width="474.667" height="630" rx="18" fill="#fff" stroke="#161616" stroke-width="2"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="1095.33" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c2-t">住凯AI视频 — 候选 3 · 取景框</title>
+  <!--
+    候选 3 — 取景框 (Viewfinder) · geometric reduction
+
+    Idea: 四角直角 + 中心十字准星。四角只到该到的地方就停（边留缺口），
+          因此读作"正在框取一个比画面更大的东西" —— 这正好是无限画布。
+          十字准星把它从"裁切标记"拉向"取景器"：一眼看出是"看"和"框"。
+
+    构造:
+      四角直角：臂长 64、厚 24，各留 96 的缺口
+        左上 x32..96  y32..56 / x32..56  y56..96
+        右上 x160..224 y32..56 / x200..224 y56..96
+        左下 x32..96  y200..224 / x32..56 y160..200
+        右下 x160..224 y200..224 / x200..224 y160..200
+      中心准星：细十字 + 中心空环（负空间），厚 16、臂长 44
+        横 x84..172 y120..136，竖 x120..136 y84..172
+        中心以 24 为半径挖空 → 用 4 段矩形代替，保证仍是填充面
+      整体 192 见方，留白 32。
+
+    刻意回避：不做闭合画框（那表示"有界"），不做播放三角（属播放器）。
+  -->
+  <g fill="#000">
+    <!-- 左上角 -->
+    <rect x="32" y="32" width="64" height="24" />
+    <rect x="32" y="56" width="24" height="40" />
+    <!-- 右上角 -->
+    <rect x="160" y="32" width="64" height="24" />
+    <rect x="200" y="56" width="24" height="40" />
+    <!-- 左下角 -->
+    <rect x="32" y="200" width="64" height="24" />
+    <rect x="32" y="160" width="24" height="40" />
+    <!-- 右下角 -->
+    <rect x="160" y="200" width="64" height="24" />
+    <rect x="200" y="160" width="24" height="40" />
+    <!-- 中心准星：四段，中间留空环 -->
+    <rect x="84" y="120" width="30" height="16" />
+    <rect x="142" y="120" width="30" height="16" />
+    <rect x="120" y="84" width="16" height="30" />
+    <rect x="120" y="142" width="16" height="30" />
+  </g>
+</svg>
+</g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="1095.33" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s264-t">住凯AI视频 — 候选 3 · 取景框</title>
+  <!--
+    候选 3 — 取景框 (Viewfinder) · geometric reduction
+
+    Idea: 四角直角 + 中心十字准星。四角只到该到的地方就停（边留缺口），
+          因此读作"正在框取一个比画面更大的东西" —— 这正好是无限画布。
+          十字准星把它从"裁切标记"拉向"取景器"：一眼看出是"看"和"框"。
+
+    构造:
+      四角直角：臂长 64、厚 24，各留 96 的缺口
+        左上 x32..96  y32..56 / x32..56  y56..96
+        右上 x160..224 y32..56 / x200..224 y56..96
+        左下 x32..96  y200..224 / x32..56 y160..200
+        右下 x160..224 y200..224 / x200..224 y160..200
+      中心准星：细十字 + 中心空环（负空间），厚 16、臂长 44
+        横 x84..172 y120..136，竖 x120..136 y84..172
+        中心以 24 为半径挖空 → 用 4 段矩形代替，保证仍是填充面
+      整体 192 见方，留白 32。
+
+    刻意回避：不做闭合画框（那表示"有界"），不做播放三角（属播放器）。
+  -->
+  <g fill="#000">
+    <!-- 左上角 -->
+    <rect x="32" y="32" width="64" height="24" />
+    <rect x="32" y="56" width="24" height="40" />
+    <!-- 右上角 -->
+    <rect x="160" y="32" width="64" height="24" />
+    <rect x="200" y="56" width="24" height="40" />
+    <!-- 左下角 -->
+    <rect x="32" y="200" width="64" height="24" />
+    <rect x="32" y="160" width="24" height="40" />
+    <!-- 右下角 -->
+    <rect x="160" y="200" width="64" height="24" />
+    <rect x="200" y="160" width="24" height="40" />
+    <!-- 中心准星：四段，中间留空环 -->
+    <rect x="84" y="120" width="30" height="16" />
+    <rect x="142" y="120" width="30" height="16" />
+    <rect x="120" y="84" width="16" height="30" />
+    <rect x="120" y="142" width="16" height="30" />
+  </g>
+</svg>
+</g><text x="1127.33" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="1185.33" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s232-t">住凯AI视频 — 候选 3 · 取景框</title>
+  <!--
+    候选 3 — 取景框 (Viewfinder) · geometric reduction
+
+    Idea: 四角直角 + 中心十字准星。四角只到该到的地方就停（边留缺口），
+          因此读作"正在框取一个比画面更大的东西" —— 这正好是无限画布。
+          十字准星把它从"裁切标记"拉向"取景器"：一眼看出是"看"和"框"。
+
+    构造:
+      四角直角：臂长 64、厚 24，各留 96 的缺口
+        左上 x32..96  y32..56 / x32..56  y56..96
+        右上 x160..224 y32..56 / x200..224 y56..96
+        左下 x32..96  y200..224 / x32..56 y160..200
+        右下 x160..224 y200..224 / x200..224 y160..200
+      中心准星：细十字 + 中心空环（负空间），厚 16、臂长 44
+        横 x84..172 y120..136，竖 x120..136 y84..172
+        中心以 24 为半径挖空 → 用 4 段矩形代替，保证仍是填充面
+      整体 192 见方，留白 32。
+
+    刻意回避：不做闭合画框（那表示"有界"），不做播放三角（属播放器）。
+  -->
+  <g fill="#000">
+    <!-- 左上角 -->
+    <rect x="32" y="32" width="64" height="24" />
+    <rect x="32" y="56" width="24" height="40" />
+    <!-- 右上角 -->
+    <rect x="160" y="32" width="64" height="24" />
+    <rect x="200" y="56" width="24" height="40" />
+    <!-- 左下角 -->
+    <rect x="32" y="200" width="64" height="24" />
+    <rect x="32" y="160" width="24" height="40" />
+    <!-- 右下角 -->
+    <rect x="160" y="200" width="64" height="24" />
+    <rect x="200" y="160" width="24" height="40" />
+    <!-- 中心准星：四段，中间留空环 -->
+    <rect x="84" y="120" width="30" height="16" />
+    <rect x="142" y="120" width="30" height="16" />
+    <rect x="120" y="84" width="16" height="30" />
+    <rect x="120" y="142" width="16" height="30" />
+  </g>
+</svg>
+</g><text x="1201.33" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="t" viewBox="0 0 256 256" x="1243.33" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s216-t">住凯AI视频 — 候选 3 · 取景框</title>
+  <!--
+    候选 3 — 取景框 (Viewfinder) · geometric reduction
+
+    Idea: 四角直角 + 中心十字准星。四角只到该到的地方就停（边留缺口），
+          因此读作"正在框取一个比画面更大的东西" —— 这正好是无限画布。
+          十字准星把它从"裁切标记"拉向"取景器"：一眼看出是"看"和"框"。
+
+    构造:
+      四角直角：臂长 64、厚 24，各留 96 的缺口
+        左上 x32..96  y32..56 / x32..56  y56..96
+        右上 x160..224 y32..56 / x200..224 y56..96
+        左下 x32..96  y200..224 / x32..56 y160..200
+        右下 x160..224 y200..224 / x200..224 y160..200
+      中心准星：细十字 + 中心空环（负空间），厚 16、臂长 44
+        横 x84..172 y120..136，竖 x120..136 y84..172
+        中心以 24 为半径挖空 → 用 4 段矩形代替，保证仍是填充面
+      整体 192 见方，留白 32。
+
+    刻意回避：不做闭合画框（那表示"有界"），不做播放三角（属播放器）。
+  -->
+  <g fill="#000">
+    <!-- 左上角 -->
+    <rect x="32" y="32" width="64" height="24" />
+    <rect x="32" y="56" width="24" height="40" />
+    <!-- 右上角 -->
+    <rect x="160" y="32" width="64" height="24" />
+    <rect x="200" y="56" width="24" height="40" />
+    <!-- 左下角 -->
+    <rect x="32" y="200" width="64" height="24" />
+    <rect x="32" y="160" width="24" height="40" />
+    <!-- 右下角 -->
+    <rect x="160" y="200" width="64" height="24" />
+    <rect x="200" y="160" width="24" height="40" />
+    <!-- 中心准星：四段，中间留空环 -->
+    <rect x="84" y="120" width="30" height="16" />
+    <rect x="142" y="120" width="30" height="16" />
+    <rect x="120" y="84" width="16" height="30" />
+    <rect x="120" y="142" width="16" height="30" />
+  </g>
+</svg>
+</g><text x="1251.33" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="1095.3333333333335" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">C · 取景框</text><text x="1095.3333333333335" y="664" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" fill="#161616" letter-spacing="1.5">RECOMMENDED</text><text x="1095.3333333333335" y="698" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">四角直角 + 中心准星，读作框取与看见。</text></svg>
