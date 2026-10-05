@@ -28,6 +28,15 @@ const version = "2.0.0";
 // 请求 POST {baseUrl}/services/aigc/multimodal-generation/generation
 // 响应 output.audio.url 指向完整音频文件（有效期 24 小时），宿主会下载到工作区。
 const generatePath = "/services/aigc/multimodal-generation/generation";
+// 音色创建（声音复刻 / 声音设计）端点，与合成分开。
+const voicePath = "/services/audio/tts/customization";
+
+// 把 MediaInput 转成 Data URL，供需要 Base64 的接口使用。
+function dataUrl(input: MediaInput) {
+  if (input.type === "url") return input.url;
+  const data = input.type === "binary" ? Buffer.from(input.data).toString("base64") : input.data;
+  return data.startsWith("data:") ? data : `data:${input.mimeType};base64,${data}`;
+}
 
 // ACT: 系统音色只列文档可查的几个常用项；供应商模型上的 voices 会透传给前端
 // （apps/server/src/utils/media/generation.ts 仅对 type === "audio" 的模型带上 voices）。
@@ -97,5 +106,47 @@ export default {
     const url = data?.output?.audio?.url;
     if (!url) throw new Error(this.tool.errorMessage(data) || "供应商未返回音频地址");
     return [{ mediaType: "audio", type: "url", url }];
+  },
+  async createVoice(request: CreateVoiceRequest): Promise<VoiceResult> {
+    const apiKey = this.config.apiKey?.trim();
+    if (!apiKey) throw new Error("请填写 API Key");
+    const baseUrl = (this.config.baseUrl?.trim() || "https://dashscope.aliyuncs.com/api/v1").replace(/\/$/, "");
+    const name = request.name?.trim();
+    if (!name) throw new Error("请填写音色名称");
+
+    // ACT: 只实现 Qwen-TTS 的声音复刻（qwen-voice-enrollment）。
+    // 原因：Qwen-Audio-TTS / CosyVoice 的 voice-enrollment 要求样本是「公网可访问的 URL」，
+    // 而本产品的样本来自本地上传与现场录音，没有公网托管；Qwen-TTS 这条路支持
+    // Base64 Data URL，本地样本可直接提交。文档见
+    // https://help.aliyun.com/zh/model-studio/voice-clone-design-http-api
+    // 名字规则：preferred_name 最多 16 位，只允许字母数字下划线。
+    const preferredName = name.replace(/[^0-9A-Za-z_]/g, "_").slice(0, 16);
+    if (!preferredName) throw new Error("音色名称需包含字母、数字或下划线");
+
+    const input: Record<string, unknown> = { action: "create", preferred_name: preferredName };
+    if (request.description?.trim()) {
+      // 声音设计：用文字描述生成音色，不需要样本。
+      input.text = request.description.trim();
+    } else {
+      const sample = request.sample;
+      if (!sample) throw new Error("请提供用于复刻的音频样本");
+      input.audio = { data: dataUrl(sample) };
+    }
+    const targetModel = request.targetModel?.trim();
+    if (targetModel) input.target_model = targetModel;
+
+    const signal = AbortSignal.any([AbortSignal.timeout(5 * 60_000), ...(this.signal ? [this.signal] : [])]);
+    const response = await this.tool.fetch(`${baseUrl}${voicePath}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "qwen-voice-enrollment", input }),
+      signal,
+    });
+    const data = await response.json().catch(() => undefined) as
+      { output?: { voice?: string }; message?: string; code?: string } | undefined;
+    if (!response.ok) throw new Error(this.tool.errorMessage(data) || `音色创建失败：HTTP ${response.status}`);
+    const voice = data?.output?.voice;
+    if (!voice) throw new Error(this.tool.errorMessage(data) || "供应商未返回音色标识");
+    return { voice, label: preferredName };
   },
 } satisfies ProviderDefinition<typeof rules>;

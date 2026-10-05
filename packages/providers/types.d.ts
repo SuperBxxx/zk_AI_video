@@ -191,4 +191,31 @@ interface ProviderDefinition<TRules extends readonly ProviderFormRule[] = readon
   generateImage?: GenerateMedia<ImageRequest, ProviderConfig<TRules>>;
   generateVideo?: GenerateMedia<VideoRequest, ProviderConfig<TRules>>;
   generateAudio?: GenerateMedia<AudioRequest, ProviderConfig<TRules>>;
+  /**
+   * 创建音色（声音复刻 / 声音设计），返回可供后续合成使用的音色标识。
+   * 与 generate* 并列；未实现的供应商保持缺省，调用方据此判断能力是否可用。
+   * 样本以 MediaInput 传入：宿主没有读工作区文件的能力，样本字节由调用方准备。
+   */
+  createVoice?: (this: ProviderContext<ProviderConfig<TRules>>, request: CreateVoiceRequest) => Promise<VoiceResult>;
+}
+
+interface CreateVoiceRequest {
+  model: string;
+  /** 音色展示名；供应商按自己的命名规则映射（部分平台只允许字母数字且长度有限）。 */
+  name: string;
+  /** 声音复刻的样本音频。声音设计不需要样本。 */
+  sample?: MediaInput;
+  /** 声音设计的文字描述，例如「温暖的低音女声」。声音复刻不需要。 */
+  description?: string;
+  /** 后续用于合成的模型；部分平台要求与创建音色时声明的一致，否则合成失败。 */
+  targetModel?: string;
+  /** 仅放供应商专属参数。 */
+  other?: Record<string, unknown>;
+}
+
+interface VoiceResult {
+  /** 音色标识，用于后续合成的 voice 参数。 */
+  voice: string;
+  /** 供应商返回的展示名，可能与请求的 name 不同。 */
+  label?: string;
 }

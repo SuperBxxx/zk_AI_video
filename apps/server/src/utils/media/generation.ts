@@ -127,6 +127,26 @@ async function assetBytes(asset: MediaAsset, mediaType: "image" | "video" | "aud
   return { bytes, mimeType };
 }
 
+// ACT: 把「解析供应商 + 校验模型 + 校验 API Key」抽出来，供生成与音色创建共用。
+// 原先这段内联在 generateMedia 里，新增音色接口若复制一份就会有两处需要同步维护。
+export async function resolveMediaProvider(
+  providerId: string,
+  modelId: string,
+  modelType: "image" | "video" | "audio",
+  signal?: AbortSignal,
+  // 供应商源码在需要读工作区文件时用得上；音色创建不需要，故可选。
+  cwd?: string,
+) {
+  const providerInfo = await getMediaProvider(providerId);
+  const model = providerInfo.models.find(item => item.id === modelId && item.type === modelType);
+  if (!model) invalid("所选媒体模型不存在或类型不匹配，请重新选择");
+  const configurations = record(conf.get("settings", {}).mediaProviderConfigs);
+  const provider = await loadMediaProviderSource(providerInfo.source, record(configurations[providerInfo.id]), signal, undefined, cwd);
+  const rules = Array.isArray(provider.rules) ? provider.rules : [];
+  if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("请先在媒体模型设置中配置供应商 API Key");
+  return { provider, model };
+}
+
 export async function generateMedia(
   cwd: string,
   mediaType: "image" | "video" | "audio",
@@ -138,15 +158,9 @@ export async function generateMedia(
   const directory = await realpath(cwd);
   const outputDirectory = request.outputDirectory ?? "assets/generated";
   await resolveWorkspacePath(directory, outputDirectory, true);
-  const providerInfo = await getMediaProvider(request.providerId);
-  const model = providerInfo.models.find(model => model.id === request.modelId && model.type === mediaType);
-  if (!model) invalid("所选媒体模型不存在或类型不匹配，请重新选择");
-  const configurations = record(conf.get("settings", {}).mediaProviderConfigs);
-  const provider = await loadMediaProviderSource(providerInfo.source, record(configurations[providerInfo.id]), signal, undefined, directory);
+  const { provider } = await resolveMediaProvider(request.providerId, request.modelId, mediaType, signal, directory);
   const generate = mediaType === "image" ? provider.generateImage : mediaType === "video" ? provider.generateVideo : provider.generateAudio;
   if (typeof generate !== "function") invalid(t`此供应商不支持${translateMessage({ image: "图片", video: "视频", audio: "音频" }[mediaType])}生成`);
-  const rules = Array.isArray(provider.rules) ? provider.rules : [];
-  if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("请先在媒体模型设置中配置供应商 API Key");
   const references = async (items: MediaReference[] | undefined, type: string) => items ? Promise.all(items.map(item => readReference(directory, item, type, signal))) : undefined;
   const images = await references(request.images, "image");
   signal?.throwIfAborted();
@@ -192,4 +206,30 @@ export async function generateMedia(
     await Promise.all(written.map(path => unlink(path).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; })));
     throw err;
   }
+}
+
+// 创建音色（声音复刻 / 声音设计）。
+// ACT: 样本以 MediaInput 传入而不是工作区路径 —— ProviderTools 没有读取工作区文件的
+// 能力（只有 fetch / errorMessage / hash / image / audio.convert / ffmpeg），
+// 因此调用方需自行准备字节（本产品的做法是前端读素材后转 base64 提交）。
+export async function createMediaVoice(request: {
+  providerId: string;
+  modelId: string;
+  name: string;
+  sample?: MediaInput;
+  description?: string;
+  targetModel?: string;
+  signal?: AbortSignal;
+}): Promise<VoiceResult> {
+  const { provider } = await resolveMediaProvider(request.providerId, request.modelId, "audio", request.signal);
+  if (typeof provider.createVoice !== "function") invalid("此供应商不支持创建音色");
+  const result = await provider.createVoice({
+    model: request.modelId,
+    name: request.name,
+    sample: request.sample,
+    description: request.description,
+    targetModel: request.targetModel,
+  });
+  if (!result?.voice) invalid("供应商未返回音色标识");
+  return result;
 }
