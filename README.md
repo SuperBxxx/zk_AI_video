@@ -109,7 +109,38 @@ bun run dev
 
 ---
 
-## 5. 打包 Windows 安装包
+## 5. 安装 Windows 安装包
+
+双击 `zhukai-<版本>-Setup.exe` 即可，**安装程序会请求管理员权限（会弹 UAC，选「是」继续）。**
+
+> **必须允许提权，否则安装会失败。** 提权不是可选项：普通权限下 NSIS 引导层无法在
+> TEMP 创建并执行自身副本，安装会中止并弹出
+> `NSIS Error — Error writing temporary file. Make sure your temp folder is valid.`
+> 安装脚本已声明 `RequestExecutionLevel admin`，因此正常情况下会自动弹 UAC；
+> 若因策略被拒绝提权，请右键安装包选择「以管理员身份运行」。
+>
+> 曾误判为「TEMP 目录损坏」并去改 TEMP 路径 —— **那没用**，问题在完整性级别，不在路径。
+
+默认安装到 `%LOCALAPPDATA%\local.zhukai.desktop\stable`，可以在向导里改到其他目录
+（例如 `E:\zk_video`）。安装包**自带全部依赖**，不需要在目标机预先安装任何东西：
+
+| 依赖 | 是否已打包 |
+| --- | --- |
+| Bun 运行时 | ✓ 约 86 MB |
+| WebView2 检测程序与加载器 | ✓ |
+| 微软 WebView2 官方安装引导 | ✓ 缺 WebView2 时由它静默安装，版本过旧时请求一次提权 |
+
+安装后桌面会出现「住凯AI视频」快捷方式。
+
+> **开始菜单快捷方式当前不会被创建。** `installer.nsi` 只创建桌面快捷方式
+> （`CreateShortCut "$DESKTOP\..."`），`$SMPROGRAMS` 仅出现在卸载时的清理语句里。
+> 实测开始菜单没有条目，这是已知缺口，不是安装失败。
+
+卸载用安装目录下的 `UninstallNSIS.exe`（同样需要提权）。
+
+---
+
+## 6. 打包 Windows 安装包
 
 ```bash
 bun run build:desktop      # 构建桌面应用
@@ -135,9 +166,16 @@ bun run package:desktop    # 生成 NSIS 安装包
    $env:UPDATE_BASE_URL = 'https://你的域名/zhukai'
    ```
 
+6. **安装包保持 `RequestExecutionLevel admin`**。改成 `user` 会让普通双击安装失败，
+   报 `Error writing temporary file`（原因见上一节）。用户机上同时还装着安全软件时
+   更容易触发 —— 中完整性进程无法在 TEMP 落盘并执行自身副本。
+7. **`checkWebView2.exe` 必须先存在**，否则 NSIS 的 `File` 指令会**致命失败、不产出安装包**
+   （`Error in script ... aborting creation process`，退出码 1）。
+   它由 `packageWindows.ts` 用 `csc.exe` 编译产出；若被清理需重新运行打包脚本。
+
 ---
 
-## 6. 数据位置
+## 7. 数据位置
 
 | 内容 | 位置 |
 | --- | --- |
@@ -154,7 +192,7 @@ bun run package:desktop    # 生成 NSIS 安装包
 
 ---
 
-## 7. 许可证
+## 8. 许可证
 
 本项目采用 [MIT 许可证](./LICENSE)，遵循上游 Toonflow 的许可条款。
 Copyright (c) 2026 HBAI-Ltd。

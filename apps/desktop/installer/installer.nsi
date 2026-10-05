@@ -1,5 +1,9 @@
 Unicode true
-RequestExecutionLevel user
+; ACT: 必须是 admin，不能是 user。普通权限下 NSIS 引导层无法在 TEMP 创建/执行
+; 自身副本，安装会失败并弹出 "Error writing temporary file. Make sure your temp
+; folder is valid."；实测同一安装包右键以管理员身份运行即可成功。
+; 该机器同时装有安全软件，中完整性进程被限制在 TEMP 落盘，admin 可绕开。
+RequestExecutionLevel admin
 SetCompressor /SOLID lzma
 SetCompressorDictSize 32
 XPStyle on
