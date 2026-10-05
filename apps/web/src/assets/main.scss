@@ -52,10 +52,37 @@ html:root {
     box-shadow: 0 0 0 1px var(--el-color-primary) inset;
   }
 
-  /* 按钮：从"胶囊"改为方正的紧凑形态 */
+  /* 按钮：从"胶囊"改为方正的紧凑形态。
+     ACT: 只收敛形态与状态反馈，不改各 variant 的配色语义（primary/plain/text/danger 保持）。
+     带图标的按钮统一图标与文字的间距，避免各处 4/6/8px 混用。 */
   .el-button {
     --el-button-border-radius: var(--ui-radius);
     font-weight: 500;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+    > .el-icon + span,
+    > span + .el-icon {
+      margin-left: 5px;
+    }
+  }
+
+  /* 图标按钮与圆形按钮：保证是正方形且图标居中 */
+  .el-button.is-circle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  /* 纯文字按钮（表格行内、卡片角标那一类）去掉悬停底色，只变色 */
+  .el-button.is-text:not(.is-disabled):hover {
+    background: transparent;
+    color: var(--el-color-primary);
+  }
+
+  /* 小尺寸按钮的字重与行高，避免密集列表里显得吵 */
+  .el-button--small {
+    font-weight: 400;
   }
 
   /* 弹窗与浮层：小圆角 + 细描边 + 轻投影，替代默认的重投影 */
@@ -79,6 +106,17 @@ html:root {
   .el-segmented {
     --el-border-radius-base: var(--ui-radius);
   }
+}
+
+/* ACT: 图标统一收敛。@tabler/icons-vue 默认 stroke-width 为 2，且它是 svg 上的
+   呈现属性 —— CSS 规则优先于呈现属性，所以这一条能覆盖全部 60+ 个图标，
+   不需要逐个组件改。
+   把描边从 2 调到 1.75：界面上图标多在 14–18px，2 会显得偏重、发闷；1.75 更清透，
+   同时保持正视认读。若某处需要更重或更细，在组件内显式传 :stroke-width 即可覆盖。 */
+.tabler-icon {
+  stroke-width: 1.75;
+  flex-shrink: 0;
+  vertical-align: middle;
 }
 
 html,
@@ -123,16 +161,42 @@ h4 {
   z-index: var(--markdown-tooltip-z-index);
 }
 
+/* ACT: 滚动条重做。原来只有 6px 的 webkit 规则，滑块与轨道同色、几乎看不见，
+   在弹窗里滚动时容易让人以为"内容到底了/没滚动"。
+   改为：滑块比轨道深、悬停再加深、轨道留出内间距，并补上 Firefox 的
+   scrollbar-width / scrollbar-color（Element Plus 与 TDesign 都不管这两项）。 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--el-border-color-darker) transparent;
+}
+
 *::-webkit-scrollbar {
-  width: 6px;
+  width: 10px;
+  height: 10px;
 }
-*::-webkit-scrollbar-thumb {
-  background-color: var(--el-border-color);
-  border-radius: 4px;
-  &:hover {
-    background-color: var(--el-border-color-darker);
-  }
-}
+
 *::-webkit-scrollbar-track {
   background-color: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  /* 用背景裁剪做出"滑块比轨道窄"的效果，避免滑块贴边显得笨重 */
+  background-color: var(--el-border-color-darker);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 8px;
+
+  &:hover {
+    background-color: var(--el-text-color-placeholder);
+  }
+}
+
+*::-webkit-scrollbar-corner {
+  background-color: transparent;
+}
+
+/* 弹窗内的滚动区域：为滚动条预留空间，避免出现滚动条时内容左右跳动 */
+.el-dialog__body,
+.el-scrollbar__wrap {
+  scrollbar-gutter: stable;
 }
