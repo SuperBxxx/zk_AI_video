@@ -50,9 +50,12 @@
    本产品无法提供公网托管，故**只走后者**（详见 §1.6 与 §3 P2 的设计影响 2）。
    `target_model` 必须与后续合成模型一致；音色 json 需记录它。
 6. **录音**：按 D11 不选设备（系统默认麦克风）、限 30 秒。
-   浏览器 `MediaRecorder` 默认多为 webm/opus，而百炼该路径要 `audio/wav|mpeg|mp4`，
-   因此录完需转码：可用 `ProviderTools.audio.convert`（仅接受 WAV 内存字节）
-   或既有 ffmpeg 工具。**实施前需实测转换链路**。
+   ✅ **格式问题已解决**（`8558cf0`）：浏览器 `MediaRecorder` 默认输出 webm/opus，
+   而百炼要 `audio/wav|mpeg|mp4`；服务端的 `convertAudio` 只吃 WAV 输入
+   （`audioProcessor.ts` 明确不解码压缩格式），帮不上忙。
+   已改为**在浏览器端转码**：`apps/web/src/lib/audioWav.ts` 用
+   `AudioContext.decodeAudioData` 解码后手工封装 16 位 PCM WAV，不依赖 ffmpeg、不引新依赖。
+   录音流程因此为：录制 → 转 WAV → 存入素材库 → 克隆时读出转 base64 提交。
 7. **音色落库**：按 D3 在素材库建「声音」文件夹，存
    `{ 名称, voiceId, targetModel, 来源(克隆/设计), 创建时间 }` 的 json。
    写入复用 `PUT /api/assets/save`（注意 exclusive 不覆盖，需避让重名）。
