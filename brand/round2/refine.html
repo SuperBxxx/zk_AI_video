@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>取景框方向 — 精炼候选与小尺寸测试</title>
+<style>
+  /* 这一页只做两件事：
+     1) 展示中心元素的 4 个正当选项（它们不改变四角，只改中心）
+     2) 把候选放进一个真彩色的、带抗锯齿的小尺寸阶梯里 —— 这是唯一能判断
+        极小尺寸下会不会糊的方法。前面失败的变体都栽在"纸面推理"上。 */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { overflow: hidden; }
+  body {
+    width: 1800px; height: 1180px;
+    background: #0e1110; color: #f2f4f2;
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 48px 56px;
+  }
+  h1 { font-size: 34px; font-weight: 650; letter-spacing: -0.01em; }
+  .lede { font-size: 19px; color: #7d8783; margin: 10px 0 34px; line-height: 1.6; }
+
+  .secHead {
+    display: flex; align-items: baseline; gap: 16px;
+    padding-bottom: 12px; margin-bottom: 20px; border-bottom: 1px solid #242b28;
+  }
+  .secHead h2 { font-size: 22px; font-weight: 600; }
+  .secHead em { font-style: normal; font-size: 17px; color: #4a5450; }
+
+  .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  .card {
+    background: #151a18; border: 1px solid #242b28; border-radius: 12px;
+    padding: 24px; display: flex; flex-direction: column; gap: 14px; align-items: center;
+  }
+  .card .idx { align-self: flex-start; font-size: 16px; color: #4a5450; letter-spacing: 0.08em; }
+  .card .stage { height: 150px; display: grid; place-items: center; }
+  .card .note { font-size: 16px; color: #7d8783; line-height: 1.5; text-align: center; }
+  .card .note b { color: #f2f4f2; }
+
+  /* 小尺寸阶梯：真彩色 + 真实抗锯齿，逐级看出崩坏点 */
+  .ladder { display: flex; align-items: flex-end; gap: 30px; margin-top: 8px; }
+  .step { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .step span { font-size: 14px; color: #4a5450; font-variant-numeric: tabular-nums; }
+  .tile { display: grid; place-items: center; border-radius: 6px; }
+  .tile.dark { background: #0e1110; border: 1px solid #242b28; }
+  .tile.light { background: #f2f4f2; }
+  .tile.brand { background: #2e9e6b; }
+</style>
+</head>
+<body>
+
+<h1>取景框方向 — 精炼候选</h1>
+<p class="lede">
+  上一步试的三个变体（加厚 / 明暗对角 / 斜切扩张）全部失败：加厚使中心读成省略号，
+  明暗对角读成不一致，斜切产生意外缺口。原因是它们都在给一个已经克制的符号加技巧。
+  所以这里只做正当精炼：<b>四角不动，只改中心元素</b>；并补上极小尺寸的鲁棒性测试。
+</p>
+
+<section>
+  <div class="secHead"><h2>中心元素的四个选项</h2><em>四角恒定：臂 64 / 厚 24 / 留白 32 / 缺口 96</em></div>
+  <div class="row">
+
+    <div class="card">
+      <span class="idx">C1 · 十字准星（原版）</span>
+      <div class="stage">
+        <svg width="128" height="128" viewBox="0 0 256 256" fill="#f2f4f2" aria-label="十字准星">
+          <rect x="32" y="32" width="64" height="24" /><rect x="32" y="56" width="24" height="40" />
+          <rect x="160" y="32" width="64" height="24" /><rect x="200" y="56" width="24" height="40" />
+          <rect x="32" y="200" width="64" height="24" /><rect x="32" y="160" width="24" height="40" />
+          <rect x="160" y="200" width="64" height="24" /><rect x="200" y="160" width="24" height="40" />
+          <rect x="84" y="120" width="30" height="16" /><rect x="142" y="120" width="30" height="16" />
+          <rect x="120" y="84" width="16" height="30" /><rect x="120" y="142" width="16" height="30" />
+        </svg>
+      </div>
+      <p class="note">信息最强：一眼是<b>取景器</b>。<b>风险</b> 十字可能被读成枪械瞄准。</p>
+    </div>
+
+    <div class="card">
+      <span class="idx">C2 · 中心实心方点</span>
+      <div class="stage">
+        <svg width="128" height="128" viewBox="0 0 256 256" fill="#f2f4f2" aria-label="中心方点">
+          <rect x="32" y="32" width="64" height="24" /><rect x="32" y="56" width="24" height="40" />
+          <rect x="160" y="32" width="64" height="24" /><rect x="200" y="56" width="24" height="40" />
+          <rect x="32" y="200" width="64" height="24" /><rect x="32" y="160" width="24" height="40" />
+          <rect x="160" y="200" width="64" height="24" /><rect x="200" y="160" width="24" height="40" />
+          <rect x="112" y="112" width="32" height="32" />
+        </svg>
+      </div>
+      <p class="note">最干净、最不会误读。<b>风险</b> 少了"框取"的指向性，更像<b>选中框</b>。</p>
+    </div>
+
+    <div class="card">
+      <span class="idx">C3 · 开口方环</span>
+      <div class="stage">
+        <svg width="128" height="128" viewBox="0 0 256 256" fill="none" stroke="#f2f4f2" stroke-width="16" aria-label="开口方环">
+          <g fill="#f2f4f2" stroke="none">
+            <rect x="32" y="32" width="64" height="24" /><rect x="32" y="56" width="24" height="40" />
+            <rect x="160" y="32" width="64" height="24" /><rect x="200" y="56" width="24" height="40" />
+            <rect x="32" y="200" width="64" height="24" /><rect x="32" y="160" width="24" height="40" />
+            <rect x="160" y="200" width="64" height="24" /><rect x="200" y="160" width="24" height="40" />
+          </g>
+          <rect x="104" y="104" width="48" height="48" />
+        </svg>
+      </div>
+      <p class="note">方环与四角的直角语言一致，负空间更大。<b>风险</b> 小尺寸下环心会糊实。</p>
+    </div>
+
+    <div class="card">
+      <span class="idx">C4 · 极小中心点</span>
+      <div class="stage">
+        <svg width="128" height="128" viewBox="0 0 256 256" fill="#f2f4f2" aria-label="极小中心点">
+          <rect x="32" y="32" width="64" height="24" /><rect x="32" y="56" width="24" height="40" />
+          <rect x="160" y="32" width="64" height="24" /><rect x="200" y="56" width="24" height="40" />
+          <rect x="32" y="200" width="64" height="24" /><rect x="32" y="160" width="24" height="40" />
+          <rect x="160" y="200" width="64" height="24" /><rect x="200" y="160" width="24" height="40" />
+          <rect x="120" y="120" width="16" height="16" />
+        </svg>
+      </div>
+      <p class="note">最克制，四角承担全部识别。<b>风险</b> 中心点太小，16px 下会消失。</p>
+    </div>
+
+  </div>
+</section>
+
+<section style="margin-top:34px">
+  <div class="secHead"><h2>小尺寸鲁棒性测试</h2><em>真彩色 · 真实抗锯齿 · 逐级找崩坏点</em></div>
+  <div class="ladder">
+    <div class="step"><div class="tile dark" style="width:96px;height:96px"><svg width="52" height="52" viewBox="0 0 256 256" fill="#f2f4f2"><rect x="32" y="32" width="64" height="24"/><rect x="32" y="56" width="24" height="40"/><rect x="160" y="32" width="64" height="24"/><rect x="200" y="56" width="24" height="40"/><rect x="32" y="200" width="64" height="24"/><rect x="32" y="160" width="24" height="40"/><rect x="160" y="200" width="64" height="24"/><rect x="200" y="160" width="24" height="40"/><rect x="84" y="120" width="30" height="16"/><rect x="142" y="120" width="30" height="16"/><rect x="120" y="84" width="16" height="30"/><rect x="120" y="142" width="16" height="30"/></svg></div><span>96 · C1</span></div>
+    <div class="step"><div class="tile dark" style="width:64px;height:64px"><svg width="34" height="34" viewBox="0 0 256 256" fill="#f2f4f2"><rect x="32" y="32" width="64" height="24"/><rect x="32" y="56" width="24" height="40"/><rect x="160" y="32" width="64" height="24"/><rect x="200" y="56" width="24" height="40"/><rect x="32" y="200" width="64" height="24"/><rect x="32" y="160" width="24" height="40"/><rect x="160" y="200" width="64" height="24"/><rect x="200" y="160" width="24" height="40"/><rect x="84" y="120" width="30" height="16"/><rect x="142" y="120" width="30" height="16"/><rect x="120" y="84" width="16" height="30"/><rect x="120" y="142" width="16" height="30"/></svg></div><span>64 · C1</span></div>
+    <div class="step"><div class="tile dark" style="width:48px;height:48px"><svg width="26" height="26" viewBox="0 0 256 256" fill="#f2f4f2"><rect x="32" y="32" width="64" height="24"/><rect x="32" y="56" width="24" height="40"/><rect x="160" y="32" width="64" height="24"/><rect x="200" y="56" width="24" height="40"/><rect x="32" y="200" width="64" height="24"/><rect x="32" y="160" width="24" height="40"/><rect x="160" y="200" width="64" height="24"/><rect x="200" y="160" width="24" height="40"/><rect x="84" y="120" width="30" height="16"/><rect x="142" y="120" width="30" height="16"/><rect x="120" y="84" width="16" height="30"/><rect x="120" y="142" width="16" height="30"/></svg></div><span>48 · C1</span></div>
+    <div class="step"><div class="tile dark" style="width:32px;height:32px"><svg width="18" height="18" viewBox="0 0 256 256" fill="#f2f4f2"><rect x="32" y="32" width="64" height="24"/><rect x="32" y="56" width="24" height="40"/><rect x="160" y="32" width="64" height="24"/><rect x="200" y="56" width="24" height="40"/><rect x="32" y="200" width="64" height="24"/><rect x="32" y="160" width="24" height="40"/><rect x="160" y="200" width="64" height="24"/><rect x="200" y="160" width="24" height="40"/><rect x="84" y="120" width="30" height="16"/><rect x="142" y="120" width="30" height="16"/><rect x="120" y="84" width="16" height="30"/><rect x="120" y="142" width="16" height="30"/></svg></div><span>32 · C1</span></div>
+    <div class="step"><div class="tile dark" style="width:16px;height:16px"><svg width="10" height="10" viewBox="0 0 256 256" fill="#f2f4f2"><rect x="32" y="32" width="64" height="24"/><rect x="32" y="56" width="24" height="40"/><rect x="160" y="32" width="64" height="24"/><rect x="200" y="56" width="24" height="40"/><rect x="32" y="200" width="64" height="24"/><rect x="32" y="160" width="24" height="40"/><rect x="160" y="200" width="64" height="24"/><rect x="200" y="160" width="24" height="40"/><rect x="84" y="120" width="30" height="16"/><rect x="142" y="120" width="30" height="16"/><rect x="120" y="84" width="16" height="30"/><rect x="120" y="142" width="16" height="30"/></svg></div><span>16 · C1</span></div>
+
+    <div class="step" style="margin-left:26px"><div class="tile light" style="width:32px;height:32px"><svg width="18" height="18" viewBox="0 0 256 256" fill="#0e1110"><rect x="32" y="32" width="64" height="24"/><rect x="32" y="56" width="24" height="40"/><rect x="160" y="32" width="64" height="24"/><rect x="200" y="56" width="24" height="40"/><rect x="32" y="200" width="64" height="24"/><rect x="32" y="160" width="24" height="40"/><rect x="160" y="200" width="64" height="24"/><rect x="200" y="160" width="24" height="40"/><rect x="84" y="120" width="30" height="16"/><rect x="142" y="120" width="30" height="16"/><rect x="120" y="84" width="16" height="30"/><rect x="120" y="142" width="16" height="30"/></svg></div><span>32 · 浅底</span></div>
+    <div class="step"><div class="tile brand" style="width:32px;height:32px"><svg width="18" height="18" viewBox="0 0 256 256" fill="#0e1110"><rect x="32" y="32" width="64" height="24"/><rect x="32" y="56" width="24" height="40"/><rect x="160" y="32" width="64" height="24"/><rect x="200" y="56" width="24" height="40"/><rect x="32" y="200" width="64" height="24"/><rect x="32" y="160" width="24" height="40"/><rect x="160" y="200" width="64" height="24"/><rect x="200" y="160" width="24" height="40"/><rect x="84" y="120" width="30" height="16"/><rect x="142" y="120" width="30" height="16"/><rect x="120" y="84" width="16" height="30"/><rect x="120" y="142" width="16" height="30"/></svg></div><span>32 · 品牌绿</span></div>
+  </div>
+</section>
+
+</body>
+</html>
