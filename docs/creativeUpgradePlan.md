@@ -1,6 +1,6 @@
 # 创作能力升级 · 实施计划
 
-> 状态：**计划的 P0~P6 已全部落地**（12 项完成并逐项验证）。仅两项按判断未做，理由见实施进度表末三行。
+> 状态：**计划的 P0~P6 已全部落地**（13 项完成并逐项验证）。仅配方卡扩容按需进行。
 >
 > 来源：对 `E:\ai_video\video-shotcraft-main`（Apache-2.0）与
 > `E:\ai_video\video-talkcraft-main`（PolyForm Noncommercial）的系统阅读。
@@ -23,7 +23,7 @@
 | agent 工具接入 | ✅ 完成 | 新增 `packages/postProduction`（纯逻辑）+ `packages/tools/postProduction`（工具「后期制作」，3 个操作）；脚本改为薄封装 |
 | P6 预览面板 | ✅ 完成 | 工作区「画布 / 文档 / **预览**」，列出并播放工作区的视频与音频（真机浏览器验证） |
 | P6 可编辑交付导出 | ✅ 完成 | `exportDelivery` 工具操作：切段表 CSV + 标准 EDL（仅单源）+ SRT；导出前对账重叠/缝隙（真机 ffmpeg 端到端验证，误差 0.0ms） |
-| P6 剪映内部工程格式 | ⛔ 不做（地基缺失） | 格式知识在 pyJianYingDraft 库里、本机无剪映可读基准、网络取不到权威格式；猜测生成只会给出打不开的坏文件。补法见下 |
+| P6 剪映草稿导出 | ✅ 完成 | 格式取自 pyJianYingDraft 0.3.0（PyPI sdist）的序列化器与模板；`exportDelivery` 传 `jianying` 即产出两个草稿文件；143 项字段与不变量常驻对账（含故意破坏验证）。**「剪映能打开」未真机验证**，首次须冒烟 |
 | P6 配方卡机制 + 首批卡 | ✅ 完成 | `useCard` 工具操作：按素材类型/语义检索、取卡（滤镜链/参数区间/已知坑/落位自检）；首批 6 张卡由 `scripts/checkCards.mjs` 实跑验证（含语义效果），已接入 preflight |
 | P6 配方卡扩容 | ⏳ 按需 | 机制已完整，加卡即可：给出具体效果名 → 做成卡 + 真跑验证。`useCard` 无匹配时会如实报缺口，不硬凑 |
 
