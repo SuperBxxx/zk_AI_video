@@ -1,6 +1,6 @@
 # 创作能力升级 · 实施计划
 
-> 状态：**计划中，尚未实施**。本文只描述打算怎么做。
+> 状态：**实施中**。P0~P4 已完成并逐项验证，P5~P6 待做（见下方实施进度）。
 >
 > 来源：对 `E:\ai_video\video-shotcraft-main`（Apache-2.0）与
 > `E:\ai_video\video-talkcraft-main`（PolyForm Noncommercial）的系统阅读。
@@ -17,7 +17,7 @@
 | P2 语义标注 | ✅ 完成 | `scripts/semanticAnnotate.mjs`（26 词封闭词表 + main/sub） |
 | P3a 机器闸 | ✅ 完成 | `scripts/qaGate.mjs`（帧率 / 音画时长 / 静止 / 镜头落点） |
 | P3b 独立评审材料 | ✅ 完成 | `scripts/reviewKit.mjs`（四类抽帧 + 自足派发包） |
-| P4 视觉规范 | ⏳ 待做 | 写进技能 reference 的反 PPT / 排版规范 |
+| P4 视觉规范 | ✅ 完成 | `references/cinematography.md` + `references/layout.md`（挂进 workflow 路由，技能 2.8.0→2.9.0） |
 | P5 声音设计 | ⏳ 待做 | 最大能力空白 |
 | P6 资产与交付 | ⏳ 待做 | 配方卡库 / 预览面板 / 剪映导出 |
 
@@ -343,7 +343,7 @@ Headers: Authorization: Bearer <key>、Content-Type: application/json、X-DashSc
 
 ---
 
-### P4 · 视觉规范（反 PPT + 排版）⏳ **待做**
+### P4 · 视觉规范（反 PPT + 排版）✅ **已完成**（`packages/skills/workflow/references/` 下的 cinematography.md 与 layout.md）
 
 **产出文件**
 
