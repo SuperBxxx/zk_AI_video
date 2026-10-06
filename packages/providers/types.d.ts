@@ -197,6 +197,51 @@ interface ProviderDefinition<TRules extends readonly ProviderFormRule[] = readon
    * 样本以 MediaInput 传入：宿主没有读工作区文件的能力，样本字节由调用方准备。
    */
   createVoice?: (this: ProviderContext<ProviderConfig<TRules>>, request: CreateVoiceRequest) => Promise<VoiceResult>;
+  /**
+   * 语音转写并返回带时间戳的词表，用于生成对齐字幕。
+   * 与 generate* 并列；未实现的供应商保持缺省。
+   *
+   * ACT: 不挂 models 条目、由供应商内定模型 —— 同一平台的不同 ASR 模型对时间戳的
+   * 支持并不一致（实测：某平台的 qwen3-asr-flash 只返回纯文本，
+   * qwen-audio-3.0-asr-flash 才返回词级时间戳）。把选择交给调用方会很容易选错。
+   * 样本以 MediaInput 传入，理由同 createVoice。
+   */
+  transcribe?: (this: ProviderContext<ProviderConfig<TRules>>, request: TranscribeRequest) => Promise<TranscriptResult>;
+}
+
+interface TranscribeRequest {
+  /** 音频样本；建议先转成 wav（部分平台只接受特定容器）。 */
+  audio: MediaInput;
+  /** 语言提示，例如 ["zh", "en"]。 */
+  languageHints?: string[];
+  /** 覆盖供应商内定的模型。 */
+  model?: string;
+  /** 仅放供应商专属参数。 */
+  other?: Record<string, unknown>;
+}
+
+/** 词级时间戳，单位毫秒（与多数平台的原始返回一致，避免来回换算丢精度）。 */
+interface TranscriptWord {
+  text: string;
+  beginMs: number;
+  endMs: number;
+  /** 该词后紧跟的标点，用于切句；无则为空串。 */
+  punctuation?: string;
+}
+
+interface TranscriptSentence {
+  text: string;
+  beginMs: number;
+  endMs: number;
+  words: TranscriptWord[];
+  /** 整段音频的时长（毫秒），供调用方换算。 */
+  totalMs?: number;
+}
+
+interface TranscriptResult {
+  sentences: TranscriptSentence[];
+  /** 供应商返回的原始文本，便于与原稿比对。 */
+  text: string;
 }
 
 interface CreateVoiceRequest {
