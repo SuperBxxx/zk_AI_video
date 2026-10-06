@@ -133,44 +133,89 @@
 
 **为什么**：**没有时间戳就做不出网感字幕**；这是"能出片"到"像样"的分界。
 
-#### P1a · 先探"便宜路径"
+#### P1a · 先探"便宜路径" → ✅ 已完成，路径成立
 
-调一次百炼 / APIMart 的 TTS，**看响应是否已含字级或句级时间**。
+**实测结论（2026-10-06，真实 API Key）**
 
-- 有 → 直接用，**跳过 P1b**
-- 无 → 进 P1b
+| 探测 | 结果 |
+| --- | --- |
+| `qwen3-tts-flash`（TTS） | ❌ 只返回音频 URL，**无时间戳** |
+| `qwen3-asr-flash` 系列（同步 ASR，`audio` 写法） | ❌ 只有纯文本，**无时间戳** |
+| 换 5 组参数（`enable_timestamp` / `enable_words` / `result_format` / `timestamp_granularities` / `timestamp`） | ❌ 全部 200 但只有纯文本 |
+| `qwen3-tts-flash-realtime`（WebSocket） | ❌ 事件里无任何时间/对齐事件 |
+| **`qwen-audio-3.0-asr-flash`（同步 ASR，`input_audio` 写法）** | ✅ **返回字级时间戳** |
 
-**前置**：需要真实 API Key。**无 Key 则本阶段停在纸面。**
+**可用调用形态**（已跑通两次）
 
-#### P1b · 无 Python 的强制对齐
+```
+POST {baseUrl}/services/aigc/multimodal-generation/generation
+Headers: Authorization: Bearer <key>、Content-Type: application/json、X-DashScope-SSE: disable
 
-**能力实现**（算法可直接借鉴，与运行时无关）：
+{ "model": "qwen-audio-3.0-asr-flash",
+  "input": { "messages": [ { "role": "user", "content": [
+      { "type": "input_audio", "input_audio": { "data": "data:audio/wav;base64,..." } } ] } ] },
+  "parameters": { "format": "wav", "sample_rate": "24000" } }
+```
+
+**返回**（毫秒，字/词组级）
+
+```json
+{ "sentence": { "begin_time": 160, "end_time": 10480, "text": "…",
+    "words": [ { "begin_time": 160, "end_time": 560, "text": "去年", "punctuation": "" },
+               { "begin_time": 1680, "end_time": 2160, "text": "3000", "punctuation": "" } ] },
+  "text": "…", "request_id": "…" }
+```
+
+**四个关键判定**
+
+| 判定 | 结论 |
+| --- | --- |
+| 需要公网托管吗 | ✅ **不需要** —— base64 Data URL 直传（解决了最大落地障碍） |
+| 时间戳粒度 | ✅ **毫秒级、成词切分**（实测「我们的」「关键点」，非逐字） |
+| 需要新依赖 / 本地模型吗 | ✅ **不需要** —— 纯 HTTP，无 Python、无 whisper.cpp |
+| 成本 | 一次请求；`usage` 返回 `seconds` / `audio_tokens` |
+
+**三个必须处理的坑（实测暴露）**
+
+1. **ASR 输出与口播稿不一致**：`三千`→`3000`、`十九万`→`19万`。
+   → **这正是参考实现用「数字转中文读法」当匹配键的原因**，我们做对齐时必须同样归一化。
+2. **不自动按标点分句**：返回**单个 `sentence` 对象**，`words[]` 里带 `punctuation` 字段。
+   → 分句要自己按 `punctuation` 与词间空隙切（空隙 > 0.3s 即气口）。
+3. **碎片化**：`19万` 被切成 `1` + `9` + `万` 三个 token → 需合并短 token。
+
+#### P1b · 对齐与清洗（工作量大幅缩小）
+
+**原计划的重型后端选型问题被消解** —— 不需要 `whisper.cpp`、不需要 WASM/ONNX、
+不需要按需下载重能力。`qwen-audio-3.0-asr-flash` 已给出词级时间表，
+我们只需实现**把词表对齐到口播稿**的纯算法。
 
 | 环节 | 做法 |
 | --- | --- |
-| ASR 出带时间词表 | 选型见下方决策点 |
-| 匹配键 | **繁简归一 + 数字转中文读法 + 无声调拼音**（同音字不算错） |
-| 对齐 | 字符级序列对齐；拉丁词与未匹配字符**在相邻锚点间线性插值** |
-| 清理 | 零时长 token 丢弃；偏离左右锚点预期 >0.8s 的离群锚降级为插值 |
+| 归一化 | 数字 → 中文读法；繁简归一；**无声调拼音**（同音字不算错） |
+| 对齐 | 字符级序列对齐，把 ASR 词表映射到口播稿 |
+| 合并 / 分句 | 合并碎片 token；按 `punctuation` 与空隙切句 |
+| 清理 | 零时长 token 丢弃；偏离相邻锚点预期 >0.8s 的离群锚降级为插值 |
 | 质检 | 每句 `match = CJK 锚点覆盖率`，**< 0.90 标 ok=false** 供人工听核 |
-| 长音频 | 按静音切 ≤75s 段再加回偏移（长段会让 onnxruntime 崩、内存平方涨） |
 
-**产出 schema**（与参考实现同构，便于将来替换后端）：
+**产出 schema**（与参考实现同构）
 
 ```json
-{ "sr": 48000, "total": 113.4,
+{ "sr": 24000, "total": 10.48,
   "sentences": [
-    { "i": 0, "text": "…", "start": 0.0, "end": 3.2, "match": 0.97, "ok": true,
-      "words": [{ "text": "你", "start": 0.12, "end": 0.28 }] } ] }
+    { "i": 0, "text": "去年我们的用户只有三千人", "start": 0.16, "end": 2.28,
+      "match": 0.97, "ok": true,
+      "words": [ { "text": "去年", "start": 0.16, "end": 0.56 } ] } ] }
 ```
 
 **产出文件**
 
 | 文件 | 动作 |
 | --- | --- |
-| `scripts/alignTimestamps.mjs`（名称待定） | 新增；对齐主逻辑 |
-| `apps/server/src/routes/ai/align/*.ts` | 新增；供前端调用 |
-| `packages/tools/audioAlign/`（若走工具形态） | 新增；给 agent 调 |
+| `packages/providers/src/media/bailian.ts` | 扩展：加 `qwen-audio-3.0-asr-flash` 模型 + 转录方法 |
+| `apps/server/src/routes/ai/asr/*.ts` | 新增；读工作区音频 → base64 → 返回时间表 |
+| `scripts/alignTimestamps.mjs` | 新增；归一化 + 对齐 + 清洗 |
+
+
 
 #### P1b′ · 口播稿预剪（容易漏、但很关键）
 
@@ -399,14 +444,16 @@ P6（卡库/预览）      ── 卡库依赖 P2 + P4；预览独立
 
 | 项 | 状态 | 说明 |
 | --- | --- | --- |
-| **无 API Key 则 P1 无法开始** | 🔴 **前置阻塞** | P1a 必须真实调 TTS |
-| P1b 后端选型未定 | ⚠️ | whisper.cpp / WASM / 供应商能力，见 §6 Q2 |
+| ~~无 API Key~~ | ✅ **已解决** | 已用真实 Key 完成 P1a 探测 |
+| ~~P1b 后端选型~~ | ✅ **已解决** | `qwen-audio-3.0-asr-flash` 直接给词级时间戳，无需本地模型 |
 | 无 Python | ✅ 已知 | 所有闸需 TS 或 ffmpeg 实现 |
 | 无 opencv | ⚠️ | 人脸安全区闸暂缓或另选轻量方案 |
 | 无 librosa | ⚠️ | BGM 卡点需 TS 方案或降级 |
 | 我们还**没有配方卡** | ✅ 已知 | 选卡功能依赖 P6 先建卡库 |
 | 我们**没有成片合成节点** | ✅ 已知 | 字幕烧录可走 `ffmpeg` 工具，但"成片"目前是拼接结果 |
 | 参考值不可跨管线搬运 | ⚠️ | AAC priming 常数必须自测 |
+| ASR 数字规范化与稿子不一致 | ⚠️ **需实现** | `三千`→`3000`，必须做数字转中文读法归一化 |
+| ASR 不按标点分句 | ⚠️ **需实现** | 返回单个 sentence 对象，需自行按 punctuation + 空隙切句 |
 
 ---
 
@@ -415,8 +462,8 @@ P6（卡库/预览）      ── 卡库依赖 P2 + P4；预览独立
 | # | 问题 | 选项 |
 | --- | --- | --- |
 | Q1 | **范围** | 只 P0 / P0+P1 / P0–P3 / 全做 |
-| Q2 | **P1b 后端** | A 复用供应商（最省）→ B `whisper.cpp` 按需下载（复用 FFmpeg 多镜像范式）→ C WASM/ONNX |
-| Q3 | **是否接受新增按需下载的重能力** | 是 / 否（否则只能句级字幕） |
+| ~~Q2~~ | ~~P1b 后端~~ | ✅ **已消解**：`qwen-audio-3.0-asr-flash` 同步接口返回词级时间戳，走供应商即可 |
+| ~~Q3~~ | ~~是否接受新增按需下载的重能力~~ | ✅ **不需要**（无 whisper.cpp / WASM / 本地模型） |
 | Q4 | **是否要声音设计（P5）** | 我们最大空白，但也是最大工作量 |
 | Q5 | **BGM 卡点** | 上（需引入 TS 节拍分析）/ 降级（只做淡入淡出） |
 | Q6 | **配方卡库（P6）** | 现在建 / 等 P1–P4 落地后再建 |
