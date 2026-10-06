@@ -8,6 +8,23 @@
 
 ---
 
+## 实施进度
+
+| 阶段 | 状态 | 产出 |
+| --- | --- | --- |
+| P0 开工断言 | ✅ 完成 | `scripts/preflight.mjs`（六项断言，含故意违例验证） |
+| P1 字级时间戳 → 字幕 | ✅ 完成 | 供应商 `transcribe` + `scripts/alignTiming.mjs` + `scripts/makeSubtitles.mjs` |
+| P2 语义标注 | ✅ 完成 | `scripts/semanticAnnotate.mjs`（26 词封闭词表 + main/sub） |
+| P3a 机器闸 | ✅ 完成 | `scripts/qaGate.mjs`（帧率 / 音画时长 / 静止 / 镜头落点） |
+| P3b 独立评审材料 | ✅ 完成 | `scripts/reviewKit.mjs`（四类抽帧 + 自足派发包） |
+| P4 视觉规范 | ⏳ 待做 | 写进技能 reference 的反 PPT / 排版规范 |
+| P5 声音设计 | ⏳ 待做 | 最大能力空白 |
+| P6 资产与交付 | ⏳ 待做 | 配方卡库 / 预览面板 / 剪映导出 |
+
+顺手修掉：canvas 技能里 6 处指向不存在 `script` 技能的死链（preflight 抓出的）。
+
+---
+
 ## 0. 目标与一个前置澄清
 
 ### 0.1 目标
@@ -101,7 +118,7 @@
 
 ---
 
-### P0 · 开工断言（最小成本、防已踩的坑）
+### P0 · 开工断言 ✅ **已完成**（`scripts/preflight.mjs`，175 行）
 
 **为什么排第一**：参考实现的原话是
 「答案在文档里，但没人强制在正确的时刻去查 —— 所以不补文档，把它们做成开工前必跑的断言」。
@@ -129,7 +146,7 @@
 
 ---
 
-### P1 · 字级时间戳 → 字幕（能力分水岭）
+### P1 · 字级时间戳 → 字幕 ✅ **已完成**（`scripts/alignTiming.mjs` + `scripts/makeSubtitles.mjs`，供应商新增 `transcribe`）
 
 **为什么**：**没有时间戳就做不出网感字幕**；这是"能出片"到"像样"的分界。
 
@@ -249,7 +266,7 @@ Headers: Authorization: Bearer <key>、Content-Type: application/json、X-DashSc
 
 ---
 
-### P2 · 语义标注 → 选卡（"该摆的东西在不在"）
+### P2 · 语义标注 ✅ **已完成**（`scripts/semanticAnnotate.mjs`，230 行；选卡依赖 P6 卡库）
 
 **为什么**：参考实现用一支片换来的教训——
 评审 rubric 只核"摆上去的东西对不对"，**不核"该摆的东西在不在"**，
@@ -285,7 +302,7 @@ Headers: Authorization: Bearer <key>、Content-Type: application/json、X-DashSc
 
 ---
 
-### P3 · 机器闸 + 独立评审
+### P3 · 机器闸 + 独立评审 ✅ **已完成**（`scripts/qaGate.mjs` 146 行 + `scripts/reviewKit.mjs` 217 行）
 
 #### P3a · 机器闸（优先可 ffmpeg 实现的）
 
@@ -326,7 +343,7 @@ Headers: Authorization: Bearer <key>、Content-Type: application/json、X-DashSc
 
 ---
 
-### P4 · 视觉规范（反 PPT + 排版）
+### P4 · 视觉规范（反 PPT + 排版）⏳ **待做**
 
 **产出文件**
 
@@ -353,7 +370,7 @@ Headers: Authorization: Bearer <key>、Content-Type: application/json、X-DashSc
 
 ---
 
-### P5 · 声音设计（我们最大的空白）
+### P5 · 声音设计（我们最大的空白）⏳ **待做**
 
 **产出文件**
 
@@ -409,7 +426,7 @@ Sequence.from = 目标峰值帧 − 音源峰值滞后帧 − 输出音轨偏移
 
 ---
 
-### P6 · 资产与交付（长期，可选）
+### P6 · 资产与交付（长期，可选）⏳ **待做**
 
 | 项 | 内容 | 参考 |
 | --- | --- | --- |
