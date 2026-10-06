@@ -2,7 +2,7 @@
 name: workflow
 description: 在住凯AI视频当前画布中把创意、小说或定稿剧本制作成可查看的文本、图片资产和视频片段，支持复用素材、续作与局部修改。用于实际制作或继续已有项目；明确只要对话文字时不操作画布，讨论或编辑技能本身时不启动制作。
 metadata:
-  version: "3.4.0"
+  version: "3.5.0"
   displayName: 视频制作工作流
   author: 住凯AI视频
   github: https://github.com/HBAI-Ltd/Toonflow-app
@@ -1412,6 +1412,7 @@ A12 只允许：
 | 交付可编辑的切段表与 SRT 字幕 | `postProduction.exportDelivery` | 产出 CSV（剪段表）+ EDL（仅单源）+ SRT；导出前会对账重叠/缝隙 |
 | 交付剪映工程（用户点名要剪映时） | `postProduction.exportDelivery` 传 `jianying` | 产出 draft_content.json + draft_meta_info.json；底片必须是无字幕无音效的干净成片 |
 | 查有没有现成的画面效果卡 | `postProduction.useCard` | 按素材类型与语义检索；取卡时给出滤镜链、已知坑、落位自检 |
+| 上游效果能不能直接用 | 先查卡库，没有就用滤镜自己写 | 上游的卡是 Remotion/React 逐帧组件，FFmpeg 表达不了；只有少数能用滤镜链等价表达（`flashCut` 是已移植的例子） |
 | 取帧做人工复核 | `ffmpeg` 工具 | 用 `-ss` 抽指定时刻的帧 |
 | 读工作区文件、查素材库 | `workspace`、`assetLibrary` | — |
 
