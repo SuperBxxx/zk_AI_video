@@ -1,6 +1,6 @@
 # 创作能力升级 · 实施计划
 
-> 状态：**实施中**。P0~P5 已完成并逐项验证，P6（卡库/预览面板/剪映导出）待做。
+> 状态：**实施中**。P0~P5、应用内集成、agent 工具接入、预览面板已完成并逐项验证；仅剩配方卡库与剪映导出。
 >
 > 来源：对 `E:\ai_video\video-shotcraft-main`（Apache-2.0）与
 > `E:\ai_video\video-talkcraft-main`（PolyForm Noncommercial）的系统阅读。
@@ -21,7 +21,8 @@
 | P5 声音设计 | ✅ 完成 | `scripts/soundCue.mjs`（钉帧+偏移补偿的实测与验证）+ `references/soundDesign.md` + `references/beatSync.md` |
 | 应用内集成（P1c/P3） | ✅ 完成 | ASR 接入服务端 `transcribeAudio` + `POST /api/ai/media/transcript`；preflight 新增「供应商字面量」断言 |
 | agent 工具接入 | ✅ 完成 | 新增 `packages/postProduction`（纯逻辑）+ `packages/tools/postProduction`（工具「后期制作」，3 个操作）；脚本改为薄封装 |
-| P6 资产与交付 | ⏳ 待做 | 配方卡库 / 预览面板 / 剪映导出 |
+| P6 预览面板 | ✅ 完成 | 工作区「画布 / 文档 / **预览**」，列出并播放工作区的视频与音频（真机浏览器验证） |
+| P6 配方卡库 / 剪映导出 | ⏳ 待做 | 卡 = 参数化 FFmpeg 滤镜链 + 提示词模板 + 预览图；剪映草稿导出 |
 
 顺手修掉：canvas 技能里 6 处指向不存在 `script` 技能的死链（preflight 抓出的）。
 另修掉一个**此前未发现的真实缺陷**：bailian 供应商的模型写了标识符简写（`voices,`），而宿主只接受字面量 —— 该供应商一直加载不了，意味着语音合成/声音复刻/转写端到端从未跑过。已内联为字面量，并把它变成 preflight 的第 7 项断言。
