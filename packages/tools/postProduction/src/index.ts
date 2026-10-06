@@ -4,6 +4,7 @@ import {
   alignTiming,
   buildAss,
   buildEditList,
+  buildJianyingDraft,
   buildSrt,
   builtInCards,
   cardSummaries,
@@ -74,6 +75,12 @@ const deliverySchema = z.strictObject({
   })).min(1).max(2000).describe("镜头表（秒）"),
   source: z.string().trim().max(512).optional().describe("统一源素材；给了就不必每段写 source"),
   timestamps: z.string().trim().max(512).optional().describe("timestamps.json；给了就一并导出 SRT 字幕"),
+  jianying: z.object({
+    plate: z.string().min(1).max(512).describe("底片素材路径（绝对路径；无字幕无音效的干净成片）"),
+    name: z.string().min(1).max(64).describe("草稿名（剪映列表里显示的名字）"),
+    width: z.number().int().min(16).max(8192).optional().describe("画布宽，默认 1920"),
+    height: z.number().int().min(16).max(8192).optional().describe("画布高，默认 1080"),
+  }).strict().optional().describe("给了就额外导出剪映草稿（draft_content.json + draft_meta_info.json）"),
   outputDirectory: z.string().trim().max(512).optional().describe("输出目录，默认 assets/delivery"),
   name: z.string().trim().max(64).optional().describe("交付物文件名前缀，默认 delivery"),
 }).strict();
@@ -161,6 +168,42 @@ const plugin: ToolPlugin = {
       return JSON.parse(buffer.toString("utf8").replace(/^\uFEFF/, "")) as T;
     }
 
+    /**
+     * 探测媒体信息。
+     *
+     * ACT: 抽出来共用 —— checkVideo 与剪映草稿导出（要底片真实时长）都要它。
+     * 注意 fluent 的 ffprobe 第一个参数是**要探测的文件名**而不是选项，
+     * 所以用 `.input()` 配好输入后不再传参数（踩过：传选项数组会探测不到任何流）。
+     */
+    async function probeMedia(path: string, signal?: AbortSignal): Promise<Record<string, unknown>> {
+      const ffmpeg = await context.ffmpeg(signal);
+      let probe: Record<string, unknown> = {};
+      await executeRemoteFfmpeg(ffmpeg, {
+        directory: context.cwd,
+        requestId: crypto.randomUUID(),
+        options: {},
+        calls: [{ method: "input", args: [path] }] as never,
+        operation: { method: "ffprobe", args: [] } as never,
+      }, event => {
+        if (event.event === "result") {
+          const payload = event.args[0];
+          if (typeof payload === "object" && payload !== null) probe = payload as Record<string, unknown>;
+        }
+      }, signal ?? new AbortController().signal);
+      return probe;
+    }
+
+    /** 取媒体时长（微秒）。剪映的素材登记用微秒。 */
+    async function probeDurationUs(path: string, signal?: AbortSignal): Promise<number> {
+      const probe = await probeMedia(path, signal);
+      const format = (probe.format ?? {}) as { duration?: string | number };
+      const seconds = Number(format.duration);
+      if (!Number.isFinite(seconds) || seconds <= 0) {
+        throw new Error(`读不到 ${path} 的时长，无法登记进剪映草稿`);
+      }
+      return Math.round(seconds * 1_000_000);
+    }
+
     const tools: ToolDefinition[] = [
       {
         name: "checkVideo",
@@ -180,27 +223,13 @@ const plugin: ToolPlugin = {
           const failures: { name: string; detail: string }[] = [];
           const warnings: { name: string; detail: string }[] = [];
 
-          // 一次 ffprobe 同时取视频与音频流。
-          // 注意：fluent 的 ffprobe([file, options, callback]) 第一个参数是**要探测的文件名**，
-          // 不是选项 —— 传选项数组会被当成文件名，于是探测不到任何流（踩过）。
-          // 用 .input() 配好输入后不传参数，fluent 会探测已配置的输入。
-          const ffmpeg = await context.ffmpeg(signal);
+          // 一次 ffprobe 同时取视频与音频流（探测细节见 probeMedia）。
           let probe: Record<string, unknown> = {};
-          await executeRemoteFfmpeg(ffmpeg, {
-            directory: context.cwd,
-            requestId: crypto.randomUUID(),
-            options: {},
-            calls: [{ method: "input", args: [video] }] as never,
-            operation: { method: "ffprobe", args: [] } as never,
-          }, event => {
-            if (event.event === "result") {
-              const payload = event.args[0];
-              if (typeof payload === "object" && payload !== null) probe = payload as Record<string, unknown>;
-            } else if (event.event === "error") {
-              const failure = event.args[0] as { message?: string } | undefined;
-              probe = { __error: failure?.message ?? "探测失败" };
-            }
-          }, signal ?? new AbortController().signal);
+          try {
+            probe = await probeMedia(video, signal);
+          } catch (error) {
+            probe = { __error: error instanceof Error ? error.message : "探测失败" };
+          }
 
           const streams = (Array.isArray(probe.streams) ? probe.streams : []) as {
             codec_type?: string; r_frame_rate?: string; avg_frame_rate?: string; duration?: string; width?: number; height?: number;
@@ -368,7 +397,8 @@ const plugin: ToolPlugin = {
         promptGuidelines: [
           "导出前会先对账切段表：重叠或缝隙会直接失败——剪辑软件对同轨重叠是报错的，缝隙则会让播放闪一下。",
           "标准 EDL 只能表达单一源素材；多源时工具会拒绝导出 EDL 并让你改用 CSV，不要硬塞。",
-          "这只是可编辑的交付数据，不是某个剪辑软件的内部工程文件——那些格式是私有的、会随版本变，照猜生成只会给出打不开的坏文件。",
+          "剪映草稿是**例外而非通用做法**：它的格式来自 pyJianYingDraft 的实测序列化器（不是猜的），但「能被剪映打开」在本机无法验证 —— 首次使用必须先按 readme 的冒烟步骤验一个最小草稿，不要直接拿正式片去试。",
+          "剪映草稿的底片（plate）必须是**无字幕无音效的干净成片**：字幕与音效在草稿里是可编辑的独立轨，重复烘焙会导致剪映里字幕叠两层。",
         ],
         parameters: z.toJSONSchema(deliverySchema, { io: "input", target: "draft-07" }),
         executionMode: "sequential",
@@ -416,12 +446,52 @@ const plugin: ToolPlugin = {
           }
 
           let srtNote = "";
+          let sentences: { text: string; beginMs: number; endMs: number }[] = [];
           if (request.timestamps) {
             const timestamps = await readJson<{ sentences?: { text: string; beginMs: number; endMs: number }[] }>(request.timestamps);
+            sentences = timestamps.sentences ?? [];
             const srtPath = `${directory}/${prefix}.srt`;
-            await context.files.writeFile(srtPath, buildSrt(timestamps.sentences ?? []));
+            await context.files.writeFile(srtPath, buildSrt(sentences));
             written.push(srtPath);
-            srtNote = `\n字幕 ${(timestamps.sentences ?? []).length} 条 → ${srtPath}（SRT 不带样式，便于在别的软件里改）`;
+            srtNote = `\n字幕 ${sentences.length} 条 → ${srtPath}（SRT 不带样式，便于在别的软件里改）`;
+          }
+
+          // ── 剪映草稿：两个文件写在 outputDirectory/<草稿名>/ 下 ──
+          let jianyingNote = "";
+          if (request.jianying) {
+            const plateDurationUs = await probeDurationUs(request.jianying.plate);
+            const draft = buildJianyingDraft({
+              width: request.jianying.width ?? 1920,
+              height: request.jianying.height ?? 1080,
+              fps: config.targetFps,
+              name: request.jianying.name,
+              platePath: request.jianying.plate,
+              plateDurationUs,
+              // 镜头表是秒 → 转帧。切段表已经用同一套取整算过，这里必须用同样的换算，
+              // 否则剪映里的切点会与 CSV 差一两帧。
+              shots: request.shots.map(shot => ({
+                id: shot.id,
+                startFrame: Math.round(shot.start * config.targetFps),
+                endFrame: Math.round(shot.end * config.targetFps),
+              })),
+              subtitles: sentences.map(sentence => ({
+                text: sentence.text,
+                beginMs: sentence.beginMs,
+                endMs: sentence.endMs,
+                size: 6.0,
+                color: [1, 1, 1] as [number, number, number],
+                // 剪映的 transform_y 按半高归一：屏幕 y = 540 × (1 − t)，底部字幕区 t ≈ −0.8
+                y: -0.8,
+              })),
+            });
+            const draftDirectory = `${directory}/${request.jianying.name}`;
+            await context.files.mkdir(draftDirectory, true).catch(() => undefined);
+            await context.files.writeFile(`${draftDirectory}/draft_content.json`, draft.content);
+            await context.files.writeFile(`${draftDirectory}/draft_meta_info.json`, draft.meta);
+            written.push(`${draftDirectory}/draft_content.json`, `${draftDirectory}/draft_meta_info.json`);
+            jianyingNote = `\n剪映草稿 → ${draftDirectory}/（draft_content.json + draft_meta_info.json）`
+              + "\n  首次使用请先按 readme 的冒烟步骤验一个最小草稿："
+              + "本机没有剪映，「能被剪映打开」这一步未经真机验证。";
           }
 
           const detail = {
@@ -437,7 +507,7 @@ const plugin: ToolPlugin = {
             written,
           };
           const summary = `已导出 ${written.length} 个交付物（${segments.length} 段，总时长 ${detail.totalSeconds}s）`
-            + `\n${written.map(path => "  " + path).join("\n")}${edlNote}${srtNote}`;
+            + `\n${written.map(path => "  " + path).join("\n")}${edlNote}${srtNote}${jianyingNote}`;
           return { content: [{ type: "text", text: `${summary}\n${JSON.stringify(detail)}` }], details: detail };
         },
       },

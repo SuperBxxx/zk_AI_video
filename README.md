@@ -125,12 +125,24 @@ Agent 侧走「后期制作」工具（`checkVideo` / `makeSubtitle` / `resolveC
 | `bun scripts/soundCue.mjs <cues.json> --shots <shots.json>` | 音效钉帧校验与绝对时刻换算 |
 | `bun scripts/semanticAnnotate.mjs --init --script <稿> --out <semantics.json>` | 逐句语义标注（选卡与覆盖闸的依据） |
 | `bun scripts/reviewKit.mjs <视频> --out <dir>` | 生成独立评审材料包与派发包 |
+| `bun scripts/checkCards.mjs` | 逐张真跑配方卡的滤镜链并核语义效果 |
+| `bun scripts/checkJianying.mjs` | 剪映草稿的字段结构与不变量对账 |
 
 **可编辑交付**：Agent 用 `exportDelivery` 产出镜头切段表（CSV）、标准 EDL（仅单源）与 SRT 字幕，
 用户可在自己的剪辑软件里继续变速、重排、改字幕。导出前会对切段表对账（重叠 / 缝隙 / 零长段 / 总时长）。
 
 > 不做剪映、Premiere 的内部工程文件：那些格式是私有的、随版本变，没有真机草稿做基准时照猜生成，
 > 只会给出打不开的坏文件。本地装了剪映的话，可以用它自己写的草稿做基准再补这一层。
+
+**剪映草稿导出**：`exportDelivery` 传 `jianying` 参数即额外产出 `draft_content.json` +
+`draft_meta_info.json`（底片切成可单独变速/重排的段，字幕与音效各成独立可编辑轨）。
+字段结构来自 [pyJianYingDraft](https://pypi.org/project/pyJianYingDraft/) 0.3.0 的序列化器与
+模板资源 —— **不是猜的**；`scripts/checkJianying.mjs` 对 143 个字段与结构不变量做常驻对账（已接入 preflight）。
+
+> ⚠️ **未验证**：「能被剪映打开」这一步**没有真机验证过**（开发机没装剪映）。
+> 剪映对缺字段的反应是「内容已损坏」，所以**首次使用请先用一个最小草稿做冒烟**
+> （只放一个底片段），确认能打开再做正式片。导出物只写在工作区，**不自动装进剪映草稿库** ——
+> 装库涉及移动目录与用户改动，那一步留给用户。
 
 **画面配方卡**：Agent 用 `useCard` 按素材类型与语义检索效果卡，取卡时拿到参数化的 FFmpeg
 滤镜链、参数区间、已知坑与落位自检。首批 6 张（极缓推进 / 首尾淡入淡出 / 交叉淡化 /

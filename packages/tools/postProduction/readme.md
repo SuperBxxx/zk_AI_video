@@ -58,6 +58,39 @@
 时间量一律用**微秒**，且相邻段边界遵守「起点与终点各自取整后再相减」——
 起点与时长分别取整会产生 1µs 级缝隙或重叠，而剪辑软件对同轨重叠是直接报错的。
 
+传 `jianying` 参数时额外产出剪映草稿（与 CSV/SRT 并列，不是替代）：
+
+```
+assets/delivery/<草稿名>/draft_content.json
+assets/delivery/<草稿名>/draft_meta_info.json
+```
+
+- **底片（plate）必须是无字幕、无音效的干净成片** —— 字幕与音效在草稿里是可编辑的独立轨，
+  重复烘焙会变成剪映里叠两层字幕。
+- 底片按镜头切成多段（`source_timerange` = `target_timerange`），所以每段可在剪映里
+  单独变速、重排、删减。
+- 实测：底片素材时长由 ffprobe 真实读出后登记；底片轨各段首尾**严格相接**（微秒边界铁律）。
+
+**格式来源**：字段结构逐项对照 [pyJianYingDraft](https://pypi.org/project/pyJianYingDraft/)
+0.3.0 的序列化器（`local_materials.py` / `segment.py` / `video_segment.py` /
+`audio_segment.py` / `text_segment.py` / `track.py` / `script_file.py`）与它的两个模板资源。
+其中几个反直觉但必须照抄的点：
+
+| 点 | 说明 |
+|---|---|
+| 入口文件名 | Windows 是 `draft_content.json`（Mac 是 `draft_info.json`） |
+| 片段 `render_index` | 等于**轨道序号**，不是 0；`track_render_index` 一律 0 |
+| `texts[].content` | 是**序列化后的字符串**，不是嵌套对象 |
+| 素材登记 | 音视频素材必须同时进 `draft_meta_info.draft_materials[type 0]`，漏了剪映弹「媒体丢失」 |
+| `materials` 的键 | 44 个键一个都不能少（缺键可能被判定为损坏） |
+| 时间单位 | 全部微秒 |
+
+> ⚠️ **未验证**：「剪映能打开这份草稿」在开发机上无法验证（没装剪映）。
+> 字段结构、素材引用、轨道不重叠、时长一致性都由 `scripts/checkJianying.mjs`
+> 做常驻对账（143 个字段 + 结构不变量，已接入 `preflight`），但**缺字段的实际后果
+> 只有剪映知道**。首次使用请先做最小草稿冒烟。
+
+
 ## useCard — 画面配方卡
 
 把「画面效果」变成可复用、可校验的词汇。两种用法：

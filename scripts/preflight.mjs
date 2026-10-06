@@ -242,6 +242,24 @@ function checkCards() {
   else console.log("  ✓ 配方卡              滤镜链验证通过");
 }
 
+// ── 8. 剪映草稿的字段结构与不变量 ────────────────────────────────────
+// 字段清单来自 pyJianYingDraft 0.3.0 的序列化器与模板资源。剪映对缺字段的
+// 反应是「内容已损坏」，而这类错误在本地看不出来 —— 所以必须常驻对账。
+// **这一关验不了「剪映能打开」**，那只能靠真机冒烟。
+function checkJianying() {
+  const script = join(root, "scripts", "checkJianying.mjs");
+  if (!existsSync(script)) return;
+  const result = Bun.spawnSync({ cmd: [process.execPath, script, "--quiet"], cwd: root, stdout: "pipe", stderr: "pipe" });
+  const output = result.stdout.toString() + result.stderr.toString();
+  if (result.exitCode !== 0) {
+    const lines = output.split("\n").filter(line => line.includes("✗")).slice(0, 10);
+    fail("剪映草稿", `字段结构校验失败：\n      ${lines.join("\n      ") || output.slice(0, 500)}`);
+    return;
+  }
+  const count = output.match(/字段 (\d+) 项/)?.[1];
+  console.log(`  ✓ 剪映草稿            ${count ? count + " 个字段与" : ""}结构不变量全部通过`);
+}
+
 // ── 执行 ───────────────────────────────────────────────────────────
 console.log("开工断言 preflight\n");
 checkModes();
@@ -252,6 +270,7 @@ checkAudioFormats();
 checkDocLinks();
 checkProviderLiterals();
 checkCards();
+checkJianying();
 
 console.log("");
 if (warnings.length) {

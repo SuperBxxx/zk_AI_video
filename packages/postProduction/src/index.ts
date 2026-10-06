@@ -71,3 +71,8 @@ export {
   type CardSemantic,
   type RecipeCard,
 } from "./cardLibrary";
+
+export {
+  buildJianyingDraft,
+  type JianyingOptions,
+} from "./jianying";
