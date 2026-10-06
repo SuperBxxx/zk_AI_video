@@ -1,0 +1,299 @@
+import { z } from "zod";
+import { executeRemoteFfmpeg } from "@toonflow/ffmpeg/remote";
+import {
+  alignTiming,
+  buildAss,
+  checkAvDuration,
+  checkFrameRate,
+  checkFreeze,
+  checkShotTail,
+  parseFreezeSpans,
+  resolveSoundCues,
+  type AlignWord,
+} from "@toonflow/post-production";
+import type { ToolContext, ToolDefinition, ToolPlugin } from "@toonflow/tools-scaffold/runtime";
+
+const configSchema = z.object({
+  targetFps: z.number().min(1).max(240).default(30),
+  freezeDuration: z.number().min(0.1).max(10).default(0.8),
+  shotTail: z.number().min(0).max(5).default(0.5),
+  audioOffsetMs: z.number().min(0).max(500).default(0),
+}).strict();
+
+const checkSchema = z.strictObject({
+  video: z.string().trim().min(1).max(512).describe("工作区内的成片路径"),
+  shots: z.string().trim().max(512).optional().describe("分镜表 JSON（[{id,start,end}]，秒）；给了才核镜头落点"),
+  skipFreeze: z.boolean().optional().describe("跳过静止段检测（默认不跳过）"),
+}).strict();
+
+const subtitleSchema = z.strictObject({
+  script: z.string().trim().min(1).max(512).describe("口播稿：一行一句的文本，或含 sentences 的 JSON"),
+  asr: z.string().trim().min(1).max(512).describe("语音识别结果 JSON（含 sentences[0].words 的词级时间戳）"),
+  output: z.string().trim().max(512).optional().describe("输出的 ASS 路径，默认 assets/subtitles/caption.ass"),
+  fontName: z.string().trim().max(128).optional().describe("字体名，默认微软雅黑"),
+  fontSize: z.number().int().min(12).max(200).optional().describe("字号，默认帧高的 5.6%"),
+  karaoke: z.boolean().optional().describe("逐字高亮，默认开"),
+}).strict();
+
+const cueSchema = z.strictObject({
+  cues: z.array(z.object({
+    shot: z.string().max(64).optional().describe("镜头 id；与 absolute 二选一"),
+    offset: z.number().optional().describe("相对镜头起点的秒数"),
+    absolute: z.boolean().optional().describe("该 cue 用绝对时间（片头/全片级音效）"),
+    anchor: z.number().optional().describe("absolute 时的绝对秒数"),
+    src: z.string().min(1).max(256).describe("音效文件"),
+    volume: z.number().min(0).max(8).optional().describe("乘法系数，不是目标音量"),
+    what: z.string().max(256).optional().describe("对应的画面动作"),
+  })).max(2000),
+  shots: z.array(z.object({ id: z.string(), start: z.number(), end: z.number() })).max(500).describe("分镜表（秒）"),
+  offsetMs: z.number().min(0).max(500).optional().describe("输出音轨偏移；不给则用配置值"),
+}).strict();
+
+interface RemoteResult {
+  stdout?: string;
+  stderr?: string;
+  [key: string]: unknown;
+}
+
+/** 跑一次远端 ffmpeg 调用，拿到 stdout / stderr。 */
+async function run(context: ToolContext, steps: unknown[], operation: unknown, signal?: AbortSignal): Promise<RemoteResult> {
+  const ffmpeg = await context.ffmpeg(signal);
+  let result: RemoteResult = {};
+  let error: Error | undefined;
+  await executeRemoteFfmpeg(ffmpeg, {
+    directory: context.cwd,
+    requestId: crypto.randomUUID(),
+    options: {},
+    calls: steps as never,
+    operation: operation as never,
+  }, event => {
+    if (event.event === "error") {
+      const failure = event.args[0] as { message?: string };
+      error = Object.assign(new Error(failure.message ?? "FFmpeg 执行失败"), failure);
+    } else if (event.event === "result") {
+      const payload = event.args[0];
+      result = typeof payload === "object" && payload !== null ? { ...(payload as RemoteResult) } : {};
+    } else if (event.event === "end") {
+      result = { ...result, stdout: String(event.args[0] ?? ""), stderr: String(event.args[1] ?? "") };
+    }
+  }, signal ?? new AbortController().signal);
+  if (error) throw error;
+  return result;
+}
+
+const plugin: ToolPlugin = {
+  validateConfig: config => configSchema.parse(config),
+  createTools(context) {
+    const config = configSchema.parse(context.config);
+
+    async function readJson<T>(path: string): Promise<T> {
+      const buffer = await context.files.readFile(path);
+      // 容忍工具写入的 UTF-8 BOM（PowerShell 等会让 JSON.parse 直接抛错）
+      return JSON.parse(buffer.toString("utf8").replace(/^\uFEFF/, "")) as T;
+    }
+
+    const tools: ToolDefinition[] = [
+      {
+        name: "checkVideo",
+        label: "成片质量闸",
+        description: "对成片跑交付前质检：帧率一致性、音画时长差、任意 0.8s 全静止段，以及（给了分镜表时）镜头落点保护带。返回逐项结论与可复核的具体数值。",
+        promptSnippet: "交付成片前必须跑 checkVideo；失败项要真去修，不要只报告。",
+        promptGuidelines: [
+          "静止段失败的处置不是豁免：让画面里还有极缓的持续运动（例如相机微推），而不是把这一关关掉。",
+          "帧率不一致多半是混入了不同帧率的素材，要回到源头统一帧率。",
+        ],
+        parameters: z.toJSONSchema(checkSchema, { io: "input", target: "draft-07" }),
+        executionMode: "sequential",
+        async execute(_id, params, signal) {
+          signal?.throwIfAborted();
+          const { video, shots: shotsPath, skipFreeze } = checkSchema.parse(params);
+          const passes: { name: string; detail: string }[] = [];
+          const failures: { name: string; detail: string }[] = [];
+          const warnings: { name: string; detail: string }[] = [];
+
+          // 一次 ffprobe 同时取视频与音频流。
+          // 注意：fluent 的 ffprobe([file, options, callback]) 第一个参数是**要探测的文件名**，
+          // 不是选项 —— 传选项数组会被当成文件名，于是探测不到任何流（踩过）。
+          // 用 .input() 配好输入后不传参数，fluent 会探测已配置的输入。
+          const ffmpeg = await context.ffmpeg(signal);
+          let probe: Record<string, unknown> = {};
+          await executeRemoteFfmpeg(ffmpeg, {
+            directory: context.cwd,
+            requestId: crypto.randomUUID(),
+            options: {},
+            calls: [{ method: "input", args: [video] }] as never,
+            operation: { method: "ffprobe", args: [] } as never,
+          }, event => {
+            if (event.event === "result") {
+              const payload = event.args[0];
+              if (typeof payload === "object" && payload !== null) probe = payload as Record<string, unknown>;
+            } else if (event.event === "error") {
+              const failure = event.args[0] as { message?: string } | undefined;
+              probe = { __error: failure?.message ?? "探测失败" };
+            }
+          }, signal ?? new AbortController().signal);
+
+          const streams = (Array.isArray(probe.streams) ? probe.streams : []) as {
+            codec_type?: string; r_frame_rate?: string; avg_frame_rate?: string; duration?: string; width?: number; height?: number;
+          }[];
+          if (!streams.length) {
+            failures.push({ name: "探测", detail: `读不到 ${video} 的流信息，质检无法进行${typeof probe.__error === "string" ? `：${probe.__error}` : ""}` });
+          } else {
+            const videoStream = streams.find(item => item.codec_type === "video");
+            const audioStream = streams.find(item => item.codec_type === "audio");
+            if (!videoStream) failures.push({ name: "帧率", detail: "没有视频流" });
+            else {
+              const frameFailures = checkFrameRate({
+                rFrameRate: videoStream.r_frame_rate,
+                avgFrameRate: videoStream.avg_frame_rate,
+                width: videoStream.width,
+                height: videoStream.height,
+              }, config.targetFps);
+              if (frameFailures.length) failures.push(...frameFailures);
+              else passes.push({ name: "帧率", detail: `${config.targetFps}fps（与目标一致、恒定）${videoStream.width}×${videoStream.height}` });
+            }
+            if (videoStream && audioStream) {
+              const avFailures = checkAvDuration(videoStream.duration, audioStream.duration, config.targetFps);
+              if (avFailures.length) failures.push(...avFailures);
+              else passes.push({ name: "音画时长", detail: `视频 ${Number(videoStream.duration).toFixed(3)}s / 音频 ${Number(audioStream.duration).toFixed(3)}s` });
+            } else {
+              warnings.push({ name: "音画时长", detail: "没有音频流，跳过" });
+            }
+          }
+
+          if (!skipFreeze) {
+            const freeze = await run(context, [
+              { method: "input", args: [video] },
+              { method: "videoFilters", args: [`freezedetect=n=0.003:d=${config.freezeDuration}`] },
+              { method: "noAudio" },
+              { method: "outputOptions", args: ["-f", "null"] },
+              { method: "output", args: ["-"] },
+            ], { method: "run", args: [] });
+            const spans = parseFreezeSpans(freeze.stderr ?? "");
+            const freezeFailures = checkFreeze(spans, config.freezeDuration);
+            if (freezeFailures.length) failures.push(...freezeFailures);
+            else passes.push({ name: "静止", detail: `没有 ≥ ${config.freezeDuration}s 的全静止段` });
+          }
+
+          if (shotsPath) {
+            const shots = await readJson<{ id: string; start: number; end: number }[]>(shotsPath);
+            const tailFailures = checkShotTail(shots, config.shotTail);
+            if (tailFailures.length) failures.push(...tailFailures);
+            else passes.push({ name: "镜头落点", detail: `${shots.length} 个镜头都 ≥ ${config.shotTail}s 保护带` });
+          }
+
+          const summary = failures.length
+            ? `质检未通过：${failures.length} 项失败`
+            : "质检通过";
+          return {
+            content: [{ type: "text", text: `${summary}\n${JSON.stringify({ passes, warnings, failures })}` }],
+            details: { passes, warnings, failures },
+          };
+        },
+      },
+      {
+        name: "makeSubtitle",
+        label: "配音对齐出字幕",
+        description: "把语音识别结果对齐到口播稿并生成 ASS 字幕（含逐字高亮）。返回每句的时间与 match 覆盖率，覆盖率低于 0.90 的句子需要人工听核。",
+        promptSnippet: "makeSubtitle 产出的 ASS 用 ffmpeg 工具的 subtitles 滤镜烧录；match < 0.90 的句子要人工听核。",
+        promptGuidelines: [
+          "稿子是句子的权威：不要把语音识别的分句当成字幕分句。",
+          "识别结果里数字可能被写成阿拉伯数字（三千→3000），工具会归一化，不需要先改稿。",
+        ],
+        parameters: z.toJSONSchema(subtitleSchema, { io: "input", target: "draft-07" }),
+        executionMode: "sequential",
+        async execute(_id, params, signal) {
+          signal?.throwIfAborted();
+          const request = subtitleSchema.parse(params);
+
+          // 稿子：一行一句，或含 sentences 的 JSON
+          const scriptRaw = (await context.files.readFile(request.script)).toString("utf8").replace(/^\uFEFF/, "");
+          let scriptSentences: string[];
+          if (request.script.endsWith(".json") && scriptRaw.trim().startsWith("{")) {
+            const parsed = JSON.parse(scriptRaw) as { sentences?: unknown[]; text?: string };
+            scriptSentences = Array.isArray(parsed.sentences)
+              ? parsed.sentences.map(item => String((item as { text?: string })?.text ?? item))
+              : [String(parsed.text ?? "")];
+          } else {
+            scriptSentences = scriptRaw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+          }
+          if (!scriptSentences.length) throw new Error("口播稿里没有可用句子");
+
+          // 语音识别结果：本项目约定 beginMs/endMs，兼容 start/end（秒）
+          const asr = await readJson<{ sentences?: { words?: Record<string, unknown>[] }[]; words?: Record<string, unknown>[] }>(request.asr);
+          const rawWords = asr?.sentences?.[0]?.words ?? asr?.words ?? [];
+          if (!rawWords.length) throw new Error("语音识别结果里没有词级时间戳");
+          const words: AlignWord[] = rawWords.map(word => ({
+            text: String(word.text ?? ""),
+            beginMs: Number.isFinite(word.beginMs) ? Number(word.beginMs) : Math.round(Number(word.start ?? 0) * 1000),
+            endMs: Number.isFinite(word.endMs) ? Number(word.endMs) : Math.round(Number(word.end ?? 0) * 1000),
+            punctuation: typeof word.punctuation === "string" ? word.punctuation : "",
+          }));
+
+          const result = alignTiming(scriptSentences, words);
+          const output = request.output ?? "assets/subtitles/caption.ass";
+          const ass = buildAss(result.sentences, {
+            fontName: request.fontName,
+            fontSize: request.fontSize,
+            karaoke: request.karaoke,
+          });
+          await context.files.mkdir(output.split("/").slice(0, -1).join("/") || ".", true).catch(() => undefined);
+          await context.files.writeFile(output, ass);
+
+          const weak = result.sentences.filter(sentence => !sentence.ok);
+          const report = {
+            output,
+            totalMs: result.totalMs,
+            sentences: result.sentences.map(sentence => ({
+              index: sentence.index,
+              text: sentence.text,
+              beginMs: sentence.beginMs,
+              endMs: sentence.endMs,
+              match: sentence.match,
+              ok: sentence.ok,
+            })),
+            needsReview: weak.map(sentence => ({ index: sentence.index, match: sentence.match, text: sentence.text })),
+          };
+          const summary = `字幕已生成：${output}（${result.sentences.length} 句，总时长 ${(result.totalMs / 1000).toFixed(2)}s）`
+            + (weak.length ? `\n${weak.length} 句覆盖率 < 0.90，建议人工听核。` : "");
+          return { content: [{ type: "text", text: `${summary}\n${JSON.stringify(report)}` }], details: report };
+        },
+      },
+      {
+        name: "resolveCues",
+        label: "音效钉帧校验",
+        description: "校验音效 cue 表并换算成音频轨上的绝对时刻，检查镜头越界、镜尾保护带、音量系数、片头补偿边界。钉帧必须先相对镜头起点。",
+        promptSnippet: "音效钉帧一律用 {shot, offset} 相对镜头起点，不要写绝对时间。",
+        promptGuidelines: [
+          "音量是乘法系数不是目标音量：素材本身录得轻时优先换素材或预归一化。",
+          "输出音轨偏移必须按自己的渲染管线实测后传入 offsetMs，不要照抄别家的常数。",
+        ],
+        parameters: z.toJSONSchema(cueSchema, { io: "input", target: "draft-07" }),
+        executionMode: "sequential",
+        async execute(_id, params, signal) {
+          signal?.throwIfAborted();
+          const request = cueSchema.parse(params);
+          const offsetMs = request.offsetMs ?? config.audioOffsetMs;
+          const result = resolveSoundCues(request.cues, request.shots, {
+            fps: config.targetFps,
+            tail: config.shotTail,
+            offsetMs,
+          });
+          const note = offsetMs
+            ? ""
+            : "\n未做输出音轨偏移补偿：AAC 编码器的 priming 会让整条音轨滞后（内置 aac 约 21ms @48kHz）。这个常数必须按自己的管线实测（抽音轨后做归一化交叉相关，残差 ≤0.5 帧为合格），再用 offsetMs 传入。";
+          const summary = result.problems.length
+            ? `钉帧校验未通过：${result.problems.length} 项问题`
+            : `钉帧校验通过：${result.cues.length} 条 cue 可用`;
+          return {
+            content: [{ type: "text", text: `${summary}${note}\n${JSON.stringify({ cues: result.cues, warnings: result.warnings, problems: result.problems })}` }],
+            details: { cues: result.cues, warnings: result.warnings, problems: result.problems },
+          };
+        },
+      },
+    ];
+    return tools;
+  },
+};
+
+export default plugin;

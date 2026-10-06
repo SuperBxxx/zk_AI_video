@@ -1,0 +1,17 @@
+{
+  "name": "@toonflow/tool-post-production",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build.ts",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@toonflow/post-production": "workspace:*",
+    "zod": "^4.6.2"
+  },
+  "devDependencies": {
+    "@toonflow/tools-scaffold": "workspace:*"
+  }
+}
