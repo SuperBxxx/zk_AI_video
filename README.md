@@ -115,7 +115,7 @@ bun run dev
 
 ### 后期制作脚本
 
-Agent 侧走「后期制作」工具（`checkVideo` / `makeSubtitle` / `resolveCues` / `exportDelivery`）；同一批算法也有命令行入口，便于单独跑与排查：
+Agent 侧走「后期制作」工具（`checkVideo` / `makeSubtitle` / `resolveCues` / `exportDelivery` / `useCard`）；同一批算法也有命令行入口，便于单独跑与排查：
 
 | 命令 | 作用 |
 | --- | --- |
@@ -131,6 +131,15 @@ Agent 侧走「后期制作」工具（`checkVideo` / `makeSubtitle` / `resolveC
 
 > 不做剪映、Premiere 的内部工程文件：那些格式是私有的、随版本变，没有真机草稿做基准时照猜生成，
 > 只会给出打不开的坏文件。本地装了剪映的话，可以用它自己写的草稿做基准再补这一层。
+
+**画面配方卡**：Agent 用 `useCard` 按素材类型与语义检索效果卡，取卡时拿到参数化的 FFmpeg
+滤镜链、参数区间、已知坑与落位自检。首批 6 张（极缓推进 / 首尾淡入淡出 / 交叉淡化 /
+降饱和底床 / 暗角收拢视线 / 冻结末帧留白），每张都由 `scripts/checkCards.mjs` 真跑验证
+并核语义效果，已接入 `preflight`。
+
+```bash
+bun scripts/checkCards.mjs     # 逐张跑滤镜链并核效果（preflight 会调它）
+```
 
 > 新增 workspace 包后需先 `bun install` 建立链接，否则 `@toonflow/*` 解析不到。
 

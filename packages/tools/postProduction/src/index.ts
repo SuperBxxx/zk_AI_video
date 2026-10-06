@@ -5,6 +5,8 @@ import {
   buildAss,
   buildEditList,
   buildSrt,
+  builtInCards,
+  cardSummaries,
   checkAvDuration,
   checkEditList,
   checkFrameRate,
@@ -12,10 +14,17 @@ import {
   checkShotTail,
   editListToCsv,
   editListToEdl,
+  findCard,
+  instantiateCard,
+  matchCards,
   parseFreezeSpans,
   resolveSoundCues,
   usToTimecode,
   type AlignWord,
+  type CardEnergy,
+  type CardInput,
+  type CardPosition,
+  type CardSemantic,
 } from "@toonflow/post-production";
 import type { ToolContext, ToolDefinition, ToolPlugin } from "@toonflow/tools-scaffold/runtime";
 
@@ -68,6 +77,46 @@ const deliverySchema = z.strictObject({
   outputDirectory: z.string().trim().max(512).optional().describe("输出目录，默认 assets/delivery"),
   name: z.string().trim().max(64).optional().describe("交付物文件名前缀，默认 delivery"),
 }).strict();
+
+const cardQuerySchema = z.strictObject({
+  inputs: z.array(z.enum(["人", "V", "图", "截图", "文", "界", "场"])).max(7).optional()
+    .describe("这一镜有哪些素材：人=口播人物在场 · V=B-roll 视频 · 图=图片 · 截图=网页界面 · 文=纯文字 · 界=界面自演 · 场=作用于前后两镜的转场"),
+  semantics: z.array(z.string().min(1).max(16)).max(8).optional()
+    .describe("这一句在做什么（用 semanticAnnotate 的词表：数据/对比/列举/强调/转场/金句…）"),
+  position: z.enum(["开场", "中段", "收尾", "任意"]).optional(),
+  energy: z.enum(["低", "中", "高"]).optional(),
+  slug: z.string().trim().max(64).optional().describe("直接取某一张卡的完整内容（滤镜与已知坑）"),
+  parameters: z.record(z.string(), z.number()).optional().describe("给某张卡传参数；越界或未知参数会被拒"),
+}).strict();
+
+// ACT: 这一份 JSON Schema 是**手写的字面量**，不调 z.toJSONSchema。
+// 踩过的坑：工具产物会被构建压缩，zod 的内部标记（`schema._zod.def`）在产物里
+// 被抹掉（实测产物中 `_zod` 出现 0 次），于是 z.toJSONSchema 在工具加载时就抛
+// `undefined is not an object`，整个工具起不来。手写字面量不依赖 zod 内部结构。
+// 代价：与上面的 cardQuerySchema 有两处需要同步维护 —— 改字段时两边都要动；
+// 参数真正生效的校验仍走 cardQuerySchema.parse。
+const cardQueryParameters = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    inputs: {
+      type: "array",
+      maxItems: 7,
+      items: { type: "string", enum: ["人", "V", "图", "截图", "文", "界", "场"] },
+      description: "这一镜有哪些素材：人=口播人物在场 · V=B-roll 视频 · 图=图片 · 截图=网页界面 · 文=纯文字 · 界=界面自演 · 场=作用于前后两镜的转场",
+    },
+    semantics: {
+      type: "array",
+      maxItems: 8,
+      items: { type: "string", minLength: 1, maxLength: 16 },
+      description: "这一句在做什么（用 semanticAnnotate 的词表：数据/对比/列举/强调/转场/金句…）",
+    },
+    position: { type: "string", enum: ["开场", "中段", "收尾", "任意"] },
+    energy: { type: "string", enum: ["低", "中", "高"] },
+    slug: { type: "string", maxLength: 64, description: "直接取某一张卡的完整内容（滤镜与已知坑）" },
+    parameters: { type: "object", additionalProperties: { type: "number" }, description: "给某张卡传参数；越界或未知参数会被拒" },
+  },
+};
 
 interface RemoteResult {
   stdout?: string;
@@ -390,6 +439,93 @@ const plugin: ToolPlugin = {
           const summary = `已导出 ${written.length} 个交付物（${segments.length} 段，总时长 ${detail.totalSeconds}s）`
             + `\n${written.map(path => "  " + path).join("\n")}${edlNote}${srtNote}`;
           return { content: [{ type: "text", text: `${summary}\n${JSON.stringify(detail)}` }], details: detail };
+        },
+      },
+      {
+        name: "useCard",
+        label: "查/用画面配方卡",
+        description: "查询内置的画面效果卡（按素材类型与语义检索），或取某一张卡的完整内容（FFmpeg 滤镜链、已知坑、落位自检）。取卡时可传参数，工具会校验范围并把滤镜链实例化好。",
+        promptSnippet: "做镜头效果前先 useCard 查有没有现成的卡；不要每次临场写滤镜。",
+        promptGuidelines: [
+          "先按素材类型与语义检索（inputs + semantics），再取具体卡 —— 卡是词汇表，不是关键词垃圾桶。",
+          "卡上的「已知坑」必须逐条核，那些都是实际返工换来的；卡上的 checks 是做完要自检的项。",
+          "实例化出的 filters 交给 ffmpeg 工具执行（按顺序接在 -vf 或 filter_complex 里）。参数越界会被拒，不要绕过校验自己拼字符串。",
+          "没有合适的卡时可以自己写滤镜，但要说清楚「库里没有对应卡」而不是假装用了卡。",
+        ],
+        parameters: cardQueryParameters,
+        executionMode: "sequential",
+        async execute(_id, params, signal) {
+          signal?.throwIfAborted();
+          const request = cardQuerySchema.parse(params);
+
+          // 取某一张卡：给完整内容（含滤镜实例化与坑）
+          if (request.slug) {
+            let card;
+            try {
+              card = findCard(builtInCards, request.slug);
+            } catch (error) {
+              return {
+                content: [{ type: "text", text: `没有这张卡：${request.slug}\n现有：${builtInCards.map(item => item.slug).join("、")}` }],
+                details: { available: builtInCards.map(item => item.slug) },
+              };
+            }
+            let filters: string[] = [];
+            let applied: Record<string, number> = {};
+            try {
+              const result = instantiateCard(card, request.parameters ?? {});
+              filters = result.filters;
+              applied = result.applied;
+            } catch (error) {
+              return {
+                content: [{ type: "text", text: `参数不合法，未实例化：${error instanceof Error ? error.message : "未知错误"}\n卡声明的参数：${card.parameters.map(p => `${p.name}(${p.min}~${p.max}，默认 ${p.value})`).join("、")}` }],
+                details: { slug: card.slug, parameters: card.parameters },
+              };
+            }
+            const payload = {
+              slug: card.slug,
+              title: card.title,
+              category: card.category,
+              oneliner: card.oneliner,
+              durationHint: card.durationHint,
+              inputs: card.inputs,
+              semantics: card.semantics,
+              parameters: applied,
+              filters,
+              pitfalls: card.pitfalls,
+              checks: card.checks,
+            };
+            return {
+              content: [{ type: "text", text: `${card.title}：${card.oneliner}\n滤镜链：${filters.join(" , ")}\n已知坑：\n${card.pitfalls.map(p => "  · " + p).join("\n")}\n落位自检：\n${card.checks.map(c => "  · " + c).join("\n")}` }],
+              details: payload,
+            };
+          }
+
+          // 检索：给候选与排序理由，由 agent 决策（不替它选）
+          const matched = matchCards(builtInCards, {
+            ...(request.inputs ? { inputs: request.inputs as CardInput[] } : {}),
+            ...(request.semantics ? { semantics: request.semantics as CardSemantic[] } : {}),
+            ...(request.position ? { position: request.position as CardPosition } : {}),
+            ...(request.energy ? { energy: request.energy as CardEnergy } : {}),
+          });
+          if (!matched.length) {
+            const all = cardSummaries(builtInCards);
+            return {
+              content: [{ type: "text", text: `没有匹配的卡（库共 ${all.length} 张）。这是真实缺口，不要假装用了卡——可以自己写滤镜，或列出可用卡让用户决定。\n可用：${all.map(c => c.slug).join("、")}` }],
+              details: { candidates: [], available: all.map(c => c.slug) },
+            };
+          }
+          const candidates = matched.map(item => ({
+            slug: item.card.slug,
+            title: item.card.title,
+            oneliner: item.card.oneliner,
+            score: item.score,
+            reasons: item.reasons,
+            parameters: item.card.parameters.map(p => `${p.name}(${p.min}~${p.max}，默认 ${p.value})`),
+          }));
+          return {
+            content: [{ type: "text", text: `${candidates.length} 张候选（按分排序，理由已给）：\n${candidates.map(c => `  ${c.slug} [${c.score}] ${c.title} — ${c.reasons.join("；")}`).join("\n")}\n选定后用 slug 取卡的完整内容与滤镜链。` }],
+            details: { candidates },
+          };
         },
       },
     ];

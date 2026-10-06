@@ -223,6 +223,25 @@ function checkProviderLiterals() {
   else console.log("  ✓ 供应商字面量        models 内取值均为字面量");
 }
 
+// ── 7. 配方卡的滤镜链必须真能跑 ──────────────────────────────────────
+// 卡的机制再好，滤镜链跑不通就是废的；而卡的坑几乎都是「语法看着对、FFmpeg 不认」
+// 这一类（踩过：`st=5-0.4` 的算术不会被求值；`setpts` 写裸秒会塌时间轴）。
+// 交给 scripts/checkCards.mjs 做真跑验证，这里只负责把它变成必需项。
+function checkCards() {
+  const script = join(root, "scripts", "checkCards.mjs");
+  if (!existsSync(script)) return;
+  const result = Bun.spawnSync({ cmd: [process.execPath, script, "--quiet"], cwd: root, stdout: "pipe", stderr: "pipe" });
+  const output = result.stdout.toString() + result.stderr.toString();
+  if (result.exitCode !== 0) {
+    const lines = output.split("\n").filter(line => line.includes("✗")).slice(0, 10);
+    fail("配方卡", `卡的滤镜链验证失败：\n      ${lines.join("\n      ") || output.slice(0, 500)}`);
+    return;
+  }
+  const count = output.match(/卡库验证通过（(\d+) 张卡）/)?.[1];
+  if (count) console.log(`  ✓ 配方卡              ${count} 张卡的滤镜链与效果都已实跑验证`);
+  else console.log("  ✓ 配方卡              滤镜链验证通过");
+}
+
 // ── 执行 ───────────────────────────────────────────────────────────
 console.log("开工断言 preflight\n");
 checkModes();
@@ -232,6 +251,7 @@ checkLocales();
 checkAudioFormats();
 checkDocLinks();
 checkProviderLiterals();
+checkCards();
 
 console.log("");
 if (warnings.length) {
