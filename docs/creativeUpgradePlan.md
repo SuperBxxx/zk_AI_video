@@ -20,6 +20,7 @@
 | P4 视觉规范 | ✅ 完成 | `references/cinematography.md` + `references/layout.md`（挂进 workflow 路由，技能 2.8.0→2.9.0） |
 | P5 声音设计 | ✅ 完成 | `scripts/soundCue.mjs`（钉帧+偏移补偿的实测与验证）+ `references/soundDesign.md` + `references/beatSync.md` |
 | 应用内集成（P1c/P3） | ✅ 完成 | ASR 接入服务端 `transcribeAudio` + `POST /api/ai/media/transcript`；preflight 新增「供应商字面量」断言 |
+| agent 工具接入 | ✅ 完成 | 新增 `packages/postProduction`（纯逻辑）+ `packages/tools/postProduction`（工具「后期制作」，3 个操作）；脚本改为薄封装 |
 | P6 资产与交付 | ⏳ 待做 | 配方卡库 / 预览面板 / 剪映导出 |
 
 顺手修掉：canvas 技能里 6 处指向不存在 `script` 技能的死链（preflight 抓出的）。
