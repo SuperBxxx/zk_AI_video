@@ -2,7 +2,7 @@
 name: workflow
 description: 在住凯AI视频当前画布中把创意、小说或定稿剧本制作成可查看的文本、图片资产和视频片段，支持复用素材、续作与局部修改。用于实际制作或继续已有项目；明确只要对话文字时不操作画布，讨论或编辑技能本身时不启动制作。
 metadata:
-  version: "2.8.0"
+  version: "2.9.0"
   displayName: 视频制作工作流
   author: 住凯AI视频
   github: https://github.com/HBAI-Ltd/Toonflow-app
@@ -1394,6 +1394,8 @@ A12 只允许：
 | 风格、材质本色、受光与调色 | [色彩与用光](references/methods/colorAndLight.md) | 共享视觉依据、场景光线和片段约束 |
 | 非定稿阶段的剧情创作/改编 | 仅使用上面的故事开发与剧本改编方法 | 形成可确认的剧本；一旦定稿并进入 Seedance，立即停止使用这些方法 |
 | Seedance 成品提示词之后的媒体执行与验收 | [画布执行](references/canvasExecution.md)、[状态与交付](references/stateAndDelivery.md) | 只执行已定稿 prompt、连接真实参考、核验真实结果；不得另写提示词规则 |
+| 成片像「播放幻灯片」、画面呆板、段落硬切 | [反 PPT 规范](references/cinematography.md) | 四病根自检、相机层、让位、转场处置、排版预算 |
+| 画面凌乱、元素堆积、字号忽大忽小、贴边裁切 | [排版规范](references/layout.md) | 安全区与字幕带、12 栏栅格、间距令牌、字阶、校验九项 |
 
 这些方法的结论只进入**Seedance 之前**的剧本/资产设计成果；进入 Seedance 提示词硬隔离后，任何方法结论都不能直接写入或改写最终 prompt，必须由 PART A 从已确认输入重新处理。方法示例、类型节奏和风格候选不能自动变成本项目事实。
 
