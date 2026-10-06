@@ -72,6 +72,8 @@ declare module 'vue' {
     IconExternalLink: typeof import('@tabler/icons-vue')['IconExternalLink']
     IconFolders: typeof import('@tabler/icons-vue')['IconFolders']
     IconMovie: typeof import('@tabler/icons-vue')['IconMovie']
+    IconMusic: typeof import('@tabler/icons-vue')['IconMusic']
+    IconRefresh: typeof import('@tabler/icons-vue')['IconRefresh']
     IconSitemap: typeof import('@tabler/icons-vue')['IconSitemap']
     IconX: typeof import('@tabler/icons-vue')['IconX']
     KeyInput: typeof import('./../components/settings/panels/general/keyInput.vue')['default']

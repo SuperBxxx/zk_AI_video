@@ -17,6 +17,10 @@
         :readNode="readDocumentNode"
         :saveNode="saveDocumentNode" />
     </keep-alive>
+    <previewPanel
+      v-if="activePanel === 'preview'"
+      :key="workspaceStore.project?.directory"
+      :active="activePanel === 'preview'" />
     <workspaceMenu class="workspaceMenu" @openSettings="settingsVisible = true" />
     <el-segmented :modelValue="activePanel" class="panelSwitcher" :options="panelOptions" size="small" aria-label="切换面板" @change="switchPanel">
       <template #default="{ item }">
@@ -44,7 +48,7 @@
 import { defineAsyncComponent, nextTick, onMounted, onScopeDispose, provide, ref } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
 import axios from "axios";
-import { IconLayoutDashboard, IconFileText } from "@tabler/icons-vue";
+import { IconLayoutDashboard, IconFileText, IconPlayerPlay } from "@tabler/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import settings from "@/components/settings/index.vue";
 import { useWorkspaceStore } from "@/stores/workspace";
@@ -54,12 +58,14 @@ import workspaceMenu from "./components/workspaceMenu.vue";
 import floatingAgent from "./components/floatingAgent.vue";
 
 const documentPanel = defineAsyncComponent(() => import("./panels/document/index.vue"));
+const previewPanel = defineAsyncComponent(() => import("./panels/preview/index.vue"));
 
-const activePanel = ref<"canvas" | "document">("canvas");
+const activePanel = ref<"canvas" | "document" | "preview">("canvas");
 const workspaceStore = useWorkspaceStore();
 const panelOptions = [
   { label: "画布", value: "canvas", icon: IconLayoutDashboard },
   { label: "文档", value: "document", icon: IconFileText },
+  { label: "预览", value: "preview", icon: IconPlayerPlay },
 ];
 const agentVisible = ref(true);
 const agentWidth = ref(0);
@@ -152,7 +158,7 @@ onBeforeRouteLeave(async () => {
 });
 
 async function switchPanel(value: string | number | boolean) {
-  if (value !== "canvas" && value !== "document") return false;
+  if (value !== "canvas" && value !== "document" && value !== "preview") return false;
   try {
     if (activePanel.value === "document") await documentPanelRef.value?.flushSave();
     activePanel.value = value;

@@ -36,6 +36,11 @@
 | 🤖 **开放 Agent** | 开放提示词、工具与 A2A，支持自定义 Agent 行为及外部协作。 |
 | 🔧 **自由接入模型** | 自行配置供应商 API，也可接入本地 ComfyUI 与 LLM。 |
 | 🌐 **多语言支持** | 支持 21 种界面语言。 |
+| 🎙️ **配音与声音** | 语音合成、声音复刻与声音设计；音色存进素材库复用。 |
+| 💬 **对齐字幕** | 把配音的**实际念法**对齐到口播稿，产出带逐字高亮的 ASS 字幕。 |
+| ✅ **交付前质检** | 机器闸：帧率一致性、音画时长、全静止段、镜头落点保护带。 |
+| 🎚️ **声音设计** | 音效钉帧（相对镜头起点）、输出音轨偏移补偿、BGM 卡点口径。 |
+| 📐 **画面规范** | 反 PPT 方法论与排版规范（12 栏栅格、字阶、校验九项）。 |
 
 ---
 
@@ -106,6 +111,22 @@ bun run dev
 | `bun run build:nodes` / `build:tools` | 构建内置节点 / 工具 |
 | `bun run --cwd apps/server routes` | 新增路由文件后重新生成路由表 |
 | `bun run typecheck` | 类型检查 |
+| `bun run preflight` | 开工断言：预置画布端口、插件同步、i18n key、音频格式、文档链接、供应商字面量 |
+
+### 后期制作脚本
+
+Agent 侧走「后期制作」工具（`checkVideo` / `makeSubtitle` / `resolveCues`）；同一批算法也有命令行入口，便于单独跑与排查：
+
+| 命令 | 作用 |
+| --- | --- |
+| `bun scripts/alignTiming.mjs <asr.json> <稿> <timestamps.json>` | 配音对齐到口播稿，报告每句覆盖率 |
+| `bun scripts/makeSubtitles.mjs <timestamps.json> <out.ass>` | 生成 ASS 字幕（含逐字高亮） |
+| `bun scripts/qaGate.mjs <视频>` | 成片机器闸 |
+| `bun scripts/soundCue.mjs <cues.json> --shots <shots.json>` | 音效钉帧校验与绝对时刻换算 |
+| `bun scripts/semanticAnnotate.mjs --init --script <稿> --out <semantics.json>` | 逐句语义标注（选卡与覆盖闸的依据） |
+| `bun scripts/reviewKit.mjs <视频> --out <dir>` | 生成独立评审材料包与派发包 |
+
+> 新增 workspace 包后需先 `bun install` 建立链接，否则 `@toonflow/*` 解析不到。
 
 ---
 
