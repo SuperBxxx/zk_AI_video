@@ -6,8 +6,9 @@
 //     浏览器能力的复杂效果，由无头 Chromium 逐帧渲染后交给 ffmpeg 合成
 import { digitRoll } from "./digitRoll";
 import { counterConfetti } from "./counterConfetti";
+import { numberSlabPop } from "./numberSlabPop";
 
-export const htmlCards = [digitRoll, counterConfetti];
+export const htmlCards = [digitRoll, counterConfetti, numberSlabPop];
 
 export function findHtmlCard(slug: string) {
   const card = htmlCards.find(item => item.meta.slug === slug);
