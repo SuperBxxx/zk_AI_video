@@ -1,6 +1,6 @@
 # 创作能力升级 · 实施计划
 
-> 状态：**实施中**。P0~P4 已完成并逐项验证，P5~P6 待做（见下方实施进度）。
+> 状态：**实施中**。P0~P5 已完成并逐项验证，P6（卡库/预览面板/剪映导出）待做。
 >
 > 来源：对 `E:\ai_video\video-shotcraft-main`（Apache-2.0）与
 > `E:\ai_video\video-talkcraft-main`（PolyForm Noncommercial）的系统阅读。
@@ -18,7 +18,7 @@
 | P3a 机器闸 | ✅ 完成 | `scripts/qaGate.mjs`（帧率 / 音画时长 / 静止 / 镜头落点） |
 | P3b 独立评审材料 | ✅ 完成 | `scripts/reviewKit.mjs`（四类抽帧 + 自足派发包） |
 | P4 视觉规范 | ✅ 完成 | `references/cinematography.md` + `references/layout.md`（挂进 workflow 路由，技能 2.8.0→2.9.0） |
-| P5 声音设计 | ⏳ 待做 | 最大能力空白 |
+| P5 声音设计 | ✅ 完成 | `scripts/soundCue.mjs`（钉帧+偏移补偿的实测与验证）+ `references/soundDesign.md` + `references/beatSync.md` |
 | P6 资产与交付 | ⏳ 待做 | 配方卡库 / 预览面板 / 剪映导出 |
 
 顺手修掉：canvas 技能里 6 处指向不存在 `script` 技能的死链（preflight 抓出的）。
@@ -370,7 +370,7 @@ Headers: Authorization: Bearer <key>、Content-Type: application/json、X-DashSc
 
 ---
 
-### P5 · 声音设计（我们最大的空白）⏳ **待做**
+### P5 · 声音设计 ✅ **已完成**（`scripts/soundCue.mjs` + `references/soundDesign.md` + `references/beatSync.md`）
 
 **产出文件**
 
