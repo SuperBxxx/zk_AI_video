@@ -102,9 +102,15 @@ assets/delivery/<草稿名>/draft_meta_info.json
 
 卡吃哪种素材（`inputs`）：`人`/`V`/`图`/`截图`/`文`/`界`/`场`（`场` 是作用于前后两镜的转场）。
 
-首批 6 张卡都是**本机 ffmpeg 实跑验证过**的：`slowPushIn`（极缓推进）、
+首批 7 张卡都是**本机 ffmpeg 实跑验证过**的：`slowPushIn`（极缓推进）、
 `fadeEdges`（首尾淡入淡出）、`crossFade`（交叉淡化）、`desaturateBed`（降饱和底床）、
-`vignetteFocus`（暗角收拢视线）、`holdLastFrame`（冻结末帧留白）。
+`vignetteFocus`（暗角收拢视线）、`holdLastFrame`（冻结末帧留白）、
+`flashCut`（硬切闪白 —— 从上游 video-shotcraft 的 `FlashCut.tsx` 移植的第一个效果）。
+
+**关于上游的卡**：上游那 221 个是 **Remotion/React 组件**（`AbsoluteFill` + `useCurrentFrame`
++ `interpolate`），逐帧执行 JavaScript 渲染，FFmpeg 无法表达。其中**只有少数能用纯滤镜链
+等价表达**（`flashCut` 就是其一）；其余需要按「生成模型出画面 + FFmpeg 组装」的形态重做，
+不能直接抄。
 
 **与参考实现的差异**：参考实现的卡是可直接渲染的组件（tsx）。
 我们的画面由生成模型产出、由 FFmpeg 组装，所以这里的卡是

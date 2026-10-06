@@ -127,6 +127,7 @@ Agent 侧走「后期制作」工具（`checkVideo` / `makeSubtitle` / `resolveC
 | `bun scripts/reviewKit.mjs <视频> --out <dir>` | 生成独立评审材料包与派发包 |
 | `bun scripts/checkCards.mjs` | 逐张真跑配方卡的滤镜链并核语义效果 |
 | `bun scripts/checkJianying.mjs` | 剪映草稿的字段结构与不变量对账 |
+| `bun scripts/syncPlugins.mjs` | 把 build/ 产物与技能源码同步到 data/（插件只首次铺入，改完不会自动生效） |
 
 **可编辑交付**：Agent 用 `exportDelivery` 产出镜头切段表（CSV）、标准 EDL（仅单源）与 SRT 字幕，
 用户可在自己的剪辑软件里继续变速、重排、改字幕。导出前会对切段表对账（重叠 / 缝隙 / 零长段 / 总时长）。
@@ -145,8 +146,8 @@ Agent 侧走「后期制作」工具（`checkVideo` / `makeSubtitle` / `resolveC
 > 装库涉及移动目录与用户改动，那一步留给用户。
 
 **画面配方卡**：Agent 用 `useCard` 按素材类型与语义检索效果卡，取卡时拿到参数化的 FFmpeg
-滤镜链、参数区间、已知坑与落位自检。首批 6 张（极缓推进 / 首尾淡入淡出 / 交叉淡化 /
-降饱和底床 / 暗角收拢视线 / 冻结末帧留白），每张都由 `scripts/checkCards.mjs` 真跑验证
+滤镜链、参数区间、已知坑与落位自检。首批 7 张（极缓推进 / 首尾淡入淡出 / 交叉淡化 /
+降饱和底床 / 暗角收拢视线 / 冻结末帧留白 / 硬切闪白），每张都由 `scripts/checkCards.mjs` 真跑验证
 并核语义效果，已接入 `preflight`。
 
 ```bash

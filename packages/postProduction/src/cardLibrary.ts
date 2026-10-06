@@ -57,6 +57,15 @@ export interface RecipeCard {
    * 这样卡不会把路径拼错，也不会把绝对路径写进卡里。
    */
   filters: string[];
+  /**
+   * 需要第二路输入时，这一路的**构造方式**（`lavfi` 的源描述）。
+   *
+   * 多数卡只需一路输入，用 `filters` 接 `-vf` 即可；但有些效果（闪光、辉光、
+   * 色卡叠加）本质是「再加一层」，必须走 `filter_complex` 把两路叠起来。
+   * 给了这一项时，`filters` 会被当作 filter_complex 的整段（含标签），
+   * 第二路的标签固定是 `[1:v]`。
+   */
+  secondInput?: string;
   /** 已知坑：写清楚什么情况下这张卡会翻车。 */
   pitfalls: string[];
   /** 落位自检：做完了该核什么。 */
@@ -303,6 +312,44 @@ export const builtInCards: RecipeCard[] = [
       "冻结的那一帧是动作落定态（不是入场中间态）",
       "定格时长够观众读完（信息卡的参考值是满 1s）",
       "定格段是否与相机微推叠用（否则质检会失败）",
+    ],
+  },
+  {
+    slug: "flashCut",
+    title: "硬切闪白",
+    category: "转场",
+    oneliner: "在硬切处闪一层暖白，把两个镜头「焊」在一起。上游项目里叫 FlashCut，这是从它的组件移植过来的第一张卡。",
+    inputs: ["场"],
+    semantics: ["转场", "强调", "章节"],
+    position: "任意",
+    energy: "高",
+    priority: "P1",
+    durationHint: "0.4~1.0s（闪的进与出合计）",
+    parameters: [
+      { name: "peak", description: "峰值不透明度（1.0 = 纯白）", min: 0.1, max: 1, value: 1.0 },
+      { name: "inDuration", description: "升到峰值用时（秒）", min: 0.05, max: 3, value: 0.4 },
+      { name: "outDuration", description: "从峰值落回用时（秒）", min: 0.05, max: 3, value: 0.6 },
+    ],
+    // ACT: 用「白色源 + fade 做 alpha + overlay」而不是在 overlay 的 alpha 里写表达式。
+    // 踩过的坑：`overlay=alpha='if(between(t,0,0.4),t/0.4*0.85,if(...))'` 直接报
+    // `Undefined constant or missing '('` —— 表达式里嵌套 if 的**逗号被当成滤镜链
+    // 分隔符**，句子从逗号处被切断。改用普通滤镜（format/fade/overlay）就不必与
+    // ffmpeg 的转义规则搏斗，而且 fade 的 alpha 曲线正是我们要的形状。
+    secondInput: "color=c=white:s=1920x1080:r=30",
+    filters: [
+      "[1:v]format=yuva420p,fade=t=in:st=0:d={{inDuration}}:alpha=1,fade=t=out:st={{inDuration}}:d={{outDuration}}:alpha=1,colorchannelmixer=aa={{peak}}[flash]",
+      "[0:v][flash]overlay=format=auto",
+    ],
+    pitfalls: [
+      "**滤镜表达式里不要写嵌套 if**：逗号会被当成滤镜链分隔符，报 `Undefined constant or missing '('`。要用条件分支就用普通滤镜表达，或给逗号转义。",
+      "`secondInput` 的分辨率写死成 1920x1080（与底片同尺寸，overlay 才不会错位）；换画幅要一起改。",
+      "闪光只该出现在**切点**上：它的时间轴是相对这一段的，所以本卡要作用在切点附近的短片段上，不是整镜。",
+      "闪白是「焊接硬切」的手段，不能用来掩盖对不上的动作 —— 动作不连贯该重做，不该靠闪一下糊过去。",
+    ],
+    checks: [
+      "峰值那一帧确实接近全白（不是淡淡的灰）",
+      "首末帧回到原画面（没有把整段都提亮）",
+      "切点两侧的动作是连贯的（闪白只做焊接）",
     ],
   },
 ];

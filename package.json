@@ -27,6 +27,7 @@
   "scripts": {
     "dev": "bun scripts/dev.mjs",
     "preflight": "bun scripts/preflight.mjs",
+    "syncPlugins": "bun scripts/syncPlugins.mjs",
     "dev:web": "bun run --filter '@toonflow/web' dev",
     "dev:server": "bun run --filter '@toonflow/server' dev",
     "dev:desktop": "bun run --filter '@toonflow/desktop' dev",

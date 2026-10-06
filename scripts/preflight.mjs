@@ -72,13 +72,17 @@ function checkPluginSync() {
 }
 
 // ── 3. 技能版本：源码与已安装副本必须同版本 ──────────────────────────
-// 踩过的坑：技能只在首次安装时铺一次（设计如此，保护用户改动），
+// 踩过的坑一：技能只在首次安装时铺一次（设计如此，保护用户改动），
 // 于是源码升级了、用户那份还是旧的，且没人会发现。
+// 踩过的坑二：这里原先硬编码了**安装版**的数据目录（形如 E:\...\data\skills），
+// 于是开发期重建工作区的 data/ 之后，断言仍在验安装版那份 —— 报的版本
+// 根本不是运行时用的那份，这条断言等于没在工作。默认改为工作区自己的 data/，
+// 要验安装版时用 ZK_INSTALLED_DATA 显式指定。
 function checkSkillVersions() {
   const source = join(root, "packages", "skills");
   const installed = process.env.ZK_INSTALLED_DATA
     ? join(process.env.ZK_INSTALLED_DATA, "skills")
-    : "E:\\zk_video\\data\\skills";
+    : join(root, "data", "skills");
   if (!existsSync(source)) return;
   const names = readdirSync(source).filter(name => statSync(join(source, name)).isDirectory());
   const readVersion = path => {

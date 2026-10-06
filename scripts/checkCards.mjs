@@ -107,6 +107,18 @@ function semanticCheck(card, output) {
     }
     return "";
   }
+  if (card.slug === "flashCut") {
+    // 闪白 = 中灰起 → 峰值接近白 → 落回中灰。必须量亮度：
+    // 「闪了但只到淡灰」在视觉上完全不是这个效果，而滤镜链并不报错。
+    const base = luma(join(work, "gray.mp4"), 0);
+    if (base === undefined) return "取不到底片亮度";
+    const peak = luma(output, 12);   // inDuration 0.4s @30fps
+    const tail = luma(output, 45);
+    if (peak === undefined || tail === undefined) return "取不到亮度";
+    if (peak < base + 40) return `峰值 ${peak} 相对底片 ${base} 提亮不足（闪白没闪起来）`;
+    if (tail > base + 12) return `尾帧 ${tail} 没有落回底片 ${base}（整段被提亮了）`;
+    return "";
+  }
   return "";
 }
 
@@ -117,6 +129,9 @@ try {
     ["a.mp4", "testsrc=s=1280x720:d=5:r=30"],
     ["b.mp4", "testsrc2=s=1280x720:d=5:r=30"],
     ["hd.mp4", "testsrc=s=1920x1080:d=5:r=30"],
+    // 均匀中灰：用来量「闪白有没有真的把画面顶到白」——
+    // testsrc 的花纹会把整体亮度抬得很高，量不出闪光（踩过）。
+    ["gray.mp4", "color=c=0x808080:s=1920x1080:d=5:r=30"],
   ];
   for (const [name, source] of fixtures) {
     const result = ffmpeg(["-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", source,
@@ -134,18 +149,29 @@ try {
       failures.push({ slug: card.slug, detail: `默认参数无法实例化：${error.message}` });
       continue;
     }
-    // 「场」类卡是作用于前后两镜的转场，需要两路输入
-    const isTransition = card.inputs.includes("场");
-    const input = card.slug === "slowPushIn" ? "hd.mp4" : "a.mp4";
+    // 三种输入形态：
+    //   ① 自带第二路（secondInput，如闪白）→ 自己就是完整的 filter_complex，第二路标签固定 [1:v]
+    //   ② 「场」类转场 → 两路各给一个视频，用 [0:v][1:v] 接起来
+    //   ③ 普通单路 → 接 -vf
     const output = join(work, `${card.slug}.mp4`);
-    const result = isTransition
-      ? ffmpeg(["-y", "-hide_banner", "-loglevel", "error",
+    let result;
+    if (card.secondInput) {
+      result = ffmpeg(["-y", "-hide_banner", "-loglevel", "error",
+        "-i", join(work, card.slug === "flashCut" ? "gray.mp4" : "a.mp4"),
+        "-f", "lavfi", "-i", card.secondInput,
+        "-filter_complex", filters.join(";"), "-an", "-t", "2",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", output]);
+    } else if (card.inputs.includes("场")) {
+      result = ffmpeg(["-y", "-hide_banner", "-loglevel", "error",
         "-i", join(work, "a.mp4"), "-i", join(work, "b.mp4"),
         "-filter_complex", `[0:v][1:v]${filters.join(",")}[v]`, "-map", "[v]", "-an", "-t", "5",
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", output])
-      : ffmpeg(["-y", "-hide_banner", "-loglevel", "error",
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", output]);
+    } else {
+      const input = card.slug === "slowPushIn" ? "hd.mp4" : "a.mp4";
+      result = ffmpeg(["-y", "-hide_banner", "-loglevel", "error",
         "-i", join(work, input), "-vf", filters.join(","), "-an",
         "-c:v", "libx264", "-pix_fmt", "yuv420p", output]);
+    }
     if (result.status !== 0) {
       const tail = (result.stderr ?? "").split("\n").filter(Boolean).slice(-3).join(" / ");
       failures.push({ slug: card.slug, detail: `滤镜链跑不通：${tail}` });
@@ -158,7 +184,7 @@ try {
       log(`  ✗ ${card.slug}  ${semantic}`);
       continue;
     }
-    log(`  ✓ ${card.slug}  ${filters.join(",")}`);
+    log(`  ✓ ${card.slug}  ${filters.join(" ; ")}`);
   }
 } finally {
   rmSync(work, { recursive: true, force: true });
