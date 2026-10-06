@@ -38,15 +38,11 @@ function dataUrl(input: MediaInput) {
   return data.startsWith("data:") ? data : `data:${input.mimeType};base64,${data}`;
 }
 
-// ACT: 系统音色只列文档可查的几个常用项；供应商模型上的 voices 会透传给前端
-// （apps/server/src/utils/media/generation.ts 仅对 type === "audio" 的模型带上 voices）。
-// 完整音色表见文档，用户也可在供应商配置里直接改「默认音色」。
-const voices = [
-  { title: "Cherry（芊悦·女声）", voice: "Cherry" },
-  { title: "Serena（苏瑶·女声）", voice: "Serena" },
-  { title: "Ethan（晨煦·男声）", voice: "Ethan" },
-  { title: "Chelsie（千雪·女声）", voice: "Chelsie" },
-];
+// ACT: 模型的 voices 必须是**内联字面量**，不能引用常量。
+// 踩过的坑：原先写成 `voices,`（引用一个顶层 const），而宿主解析供应商元数据时
+// 只接受 JSON 字面量、不接受标识符引用，于是整个供应商加载失败并报
+// 「models 仅支持 JSON 字面量」—— 表现为这个供应商在设置里根本装不上。
+// 音色表见文档；用户也可在供应商配置里直接改「默认音色」。
 
 export default {
   id: "bailian",
@@ -73,13 +69,23 @@ export default {
       id: "qwen-audio-3.0-tts-plus",
       label: "Qwen-Audio-TTS-Plus",
       type: "audio",
-      voices,
+      voices: [
+        { title: "Cherry（芊悦·女声）", voice: "Cherry" },
+        { title: "Serena（苏瑶·女声）", voice: "Serena" },
+        { title: "Ethan（晨煦·男声）", voice: "Ethan" },
+        { title: "Chelsie（千雪·女声）", voice: "Chelsie" },
+      ],
     },
     {
       id: "qwen3-tts-flash",
       label: "Qwen3-TTS-Flash",
       type: "audio",
-      voices,
+      voices: [
+        { title: "Cherry（芊悦·女声）", voice: "Cherry" },
+        { title: "Serena（苏瑶·女声）", voice: "Serena" },
+        { title: "Ethan（晨煦·男声）", voice: "Ethan" },
+        { title: "Chelsie（千雪·女声）", voice: "Chelsie" },
+      ],
     },
   ] satisfies ProviderModel[],
   async generateAudio(request: AudioRequest): Promise<MediaAsset[]> {

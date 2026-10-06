@@ -2,7 +2,7 @@ import { t, translateMessage } from "@/lib/i18n";
 import { mkdir, readFile, realpath, stat, unlink } from "@toonflow/file";
 import { join, relative } from "node:path";
 import { mediaProviders, type Provider } from "@toonflow/providers";
-import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference } from "@toonflow/tools-scaffold/runtime";
+import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference, TranscriptResult } from "@toonflow/tools-scaffold/runtime";
 import conf from "@/utils/conf";
 import { getMediaProvider, listMediaProviders, loadMediaProviderSource } from "@/utils/media/provider";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
@@ -127,6 +127,18 @@ async function assetBytes(asset: MediaAsset, mediaType: "image" | "video" | "aud
   return { bytes, mimeType };
 }
 
+// ACT: 把「加载供应商 + 校验 API Key」抽出来，供生成、音色创建与转写共用。
+// 与下面 resolveMediaProvider 的关系：转写不需要 modelId（转写的模型由供应商内定，
+// 因为同平台不同 ASR 模型对时间戳的支持并不一致），所以它只用这一层。
+async function loadConfiguredProvider(providerId: string, signal?: AbortSignal, cwd?: string) {
+  const providerInfo = await getMediaProvider(providerId);
+  const configurations = record(conf.get("settings", {}).mediaProviderConfigs);
+  const provider = await loadMediaProviderSource(providerInfo.source, record(configurations[providerInfo.id]), signal, undefined, cwd);
+  const rules = Array.isArray(provider.rules) ? provider.rules : [];
+  if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("请先在媒体模型设置中配置供应商 API Key");
+  return { provider, providerInfo };
+}
+
 // ACT: 把「解析供应商 + 校验模型 + 校验 API Key」抽出来，供生成与音色创建共用。
 // 原先这段内联在 generateMedia 里，新增音色接口若复制一份就会有两处需要同步维护。
 export async function resolveMediaProvider(
@@ -140,10 +152,7 @@ export async function resolveMediaProvider(
   const providerInfo = await getMediaProvider(providerId);
   const model = providerInfo.models.find(item => item.id === modelId && item.type === modelType);
   if (!model) invalid("所选媒体模型不存在或类型不匹配，请重新选择");
-  const configurations = record(conf.get("settings", {}).mediaProviderConfigs);
-  const provider = await loadMediaProviderSource(providerInfo.source, record(configurations[providerInfo.id]), signal, undefined, cwd);
-  const rules = Array.isArray(provider.rules) ? provider.rules : [];
-  if (rules.some(rule => rule.field === "apiKey") && (typeof provider.config.apiKey !== "string" || !provider.config.apiKey.trim())) invalid("请先在媒体模型设置中配置供应商 API Key");
+  const { provider } = await loadConfiguredProvider(providerId, signal, cwd);
   return { provider, model };
 }
 
@@ -231,5 +240,44 @@ export async function createMediaVoice(request: {
     targetModel: request.targetModel,
   });
   if (!result?.voice) invalid("供应商未返回音色标识");
+  return result;
+}
+
+/**
+ * 音频转写：把工作区里的音频送去转写，拿回带词级时间戳的结果。
+ *
+ * 为什么由服务端读文件：转写要提交音频字节，而字节可能到几十 MB，
+ * 不适合让前端读出再随请求上传（音色创建那样做是因为样本限 30 秒）。
+ * 这里直接用工作区内路径，路径校验与 realpath 交给 resolveWorkspacePath。
+ *
+ * ACT: 不传 modelId —— 转写的模型由供应商内定。同一平台的不同 ASR 模型对时间戳的
+ * 支持并不一致（实测 qwen3-asr-flash 只返回纯文本、qwen-audio-3.0-asr-flash 才返回
+ * 词级时间戳），把选择交给调用方会很容易选错。见 docs/creativeUpgradePlan.md P1a。
+ */
+export async function transcribeAudio(request: {
+  providerId: string;
+  directory: string;
+  path: string;
+  languageHints?: string[];
+  signal?: AbortSignal;
+}): Promise<TranscriptResult> {
+  const { provider } = await loadConfiguredProvider(request.providerId, request.signal, request.directory);
+  if (typeof provider.transcribe !== "function") invalid("此供应商不支持语音转写");
+
+  const { path } = await resolveWorkspacePath(await realpath(request.directory), request.path);
+  const info = await stat(path).catch(() => null);
+  if (!info?.isFile()) invalid("找不到要转写的音频文件");
+  if (info.size > maxMediaSize) invalid("音频超过 100 MB，请先裁剪或压缩");
+  const bytes = await readFile(path);
+  if (!bytes.length) invalid("音频文件为空");
+
+  const mimeType = detectMimeType(bytes, "");
+  if (!mimeType.startsWith("audio/")) invalid("转写只接受音频文件");
+
+  const result = await provider.transcribe({
+    audio: { type: "binary", data: bytes, mimeType },
+    languageHints: request.languageHints,
+  });
+  if (!result?.sentences?.length) invalid("供应商未返回可用的时间戳");
   return result;
 }

@@ -165,6 +165,50 @@ function checkDocLinks() {
   }
 }
 
+// ── 7. 供应商元数据必须是字面量 ──────────────────────────────────────
+// 踩过的坑：bailian 的模型写成 `voices,`（引用顶层 const），而宿主解析供应商元数据时
+// 只接受 JSON 字面量、不接受标识符引用 —— 整个供应商加载失败并报
+// 「models 仅支持 JSON 字面量」，表现为它在设置里根本装不上，且构建与类型检查都不报错。
+// 这里按同一套规则静态检查：models 数组内不允许裸标识符取值。
+function checkProviderLiterals() {
+  const dir = join(root, "packages", "providers", "src", "media");
+  if (!existsSync(dir)) return;
+  const problems = [];
+  for (const name of readdirSync(dir).filter(item => item.endsWith(".ts"))) {
+    const source = readFileSync(join(dir, name), "utf8");
+    // 只检查 models 数组这一段：从 `models: [` 到它闭合的 `],`
+    const start = source.indexOf("models: [");
+    if (start < 0) continue;
+    let depth = 0;
+    let end = start;
+    for (let index = source.indexOf("[", start); index < source.length; index++) {
+      if (source[index] === "[") depth++;
+      else if (source[index] === "]") { depth--; if (depth === 0) { end = index; break; } }
+    }
+    const block = source.slice(start, end + 1);
+    // ACT: 只查宿主认可的模型属性名，不做通用语法分析 ——
+    // 通用规则会把 `voices: [ { title: … } ]` 里的对象属性误判成标识符取值。
+    // 这里抓的是「模型属性被写成裸标识符或标识符引用」这一种真实故障形态。
+    const modelKeys = ["voices", "imageSizes", "imageRatios", "durationResolutionMap", "audio", "mode"];
+    for (const key of modelKeys) {
+      // 属性简写：`      voices,`
+      const shorthand = new RegExp(`^\\s{4,}${key}\\s*,\\s*$`, "gm");
+      if (shorthand.test(block)) {
+        problems.push(`${name}: models 里「${key}」是标识符简写，宿主只接受字面量（会导致整个供应商加载失败）`);
+        continue;
+      }
+      // 标识符引用：`      voices: someConst,`
+      // 注意排除 true / false / null —— 它们是合法 JSON 字面量，不是标识符引用
+      // （踩过：apiMart 的 `audio: true` 被这条误报）。
+      const reference = new RegExp(`^\\s{4,}${key}\\s*:\\s*(?!true\\b|false\\b|null\\b)([a-zA-Z_$][\\w$]*)\\s*,\\s*$`, "gm");
+      const hit = reference.exec(block);
+      if (hit) problems.push(`${name}: models 里「${key}」的值是标识符「${hit[1]}」，宿主只接受字面量`);
+    }
+  }
+  if (problems.length) fail("供应商字面量", problems.join("\n      "));
+  else console.log("  ✓ 供应商字面量        models 内取值均为字面量");
+}
+
 // ── 执行 ───────────────────────────────────────────────────────────
 console.log("开工断言 preflight\n");
 checkModes();
@@ -173,6 +217,7 @@ checkSkillVersions();
 checkLocales();
 checkAudioFormats();
 checkDocLinks();
+checkProviderLiterals();
 
 console.log("");
 if (warnings.length) {

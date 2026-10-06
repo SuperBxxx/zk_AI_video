@@ -6,6 +6,34 @@ import { z } from "zod";
 
 export type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 export type { FfmpegFactory, FfmpegCommand, FfprobeData } from "@toonflow/ffmpeg/types";
+// 转写结果的形状由 @toonflow/providers 的全局声明文件定义。types.d.ts 不是模块，
+// 不能 from 导入、也不能在这里重新导出（它只是环境声明），
+// 所以用三斜线引用把它带进本模块的类型空间，下面直接按同一份定义书写。
+/// <reference path="../../providers/types.d.ts" />
+
+/** 词级时间戳；单位毫秒，与多数平台的原始返回一致，避免来回换算丢精度。 */
+export interface TranscriptWord {
+  text: string;
+  beginMs: number;
+  endMs: number;
+  /** 该词后紧跟的标点，用于切句；无则为空串。 */
+  punctuation?: string;
+}
+
+export interface TranscriptSentence {
+  text: string;
+  beginMs: number;
+  endMs: number;
+  words: TranscriptWord[];
+  /** 整段音频的时长（毫秒）。 */
+  totalMs?: number;
+}
+
+export interface TranscriptResult {
+  sentences: TranscriptSentence[];
+  /** 供应商返回的原始文本，便于与原稿比对。 */
+  text: string;
+}
 
 export const toolNameSchema = z.string().max(96).regex(/^[a-z][a-zA-Z0-9]*$/);
 export const toolMetadataSchema = z.object({
