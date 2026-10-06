@@ -5,8 +5,9 @@
 //   · HTML 卡（这里）：需要 SVG 路径动画 / 渐变遮罩 / CSS 滤镜 / clipPath 等
 //     浏览器能力的复杂效果，由无头 Chromium 逐帧渲染后交给 ffmpeg 合成
 import { digitRoll } from "./digitRoll";
+import { counterConfetti } from "./counterConfetti";
 
-export const htmlCards = [digitRoll];
+export const htmlCards = [digitRoll, counterConfetti];
 
 export function findHtmlCard(slug: string) {
   const card = htmlCards.find(item => item.meta.slug === slug);

@@ -111,19 +111,30 @@ export function buildCardPage(
   // ACT: render 里引用的**辅助函数**必须显式声明在卡的 helpers 上。
   // 早先是「从 render 源码里扫出被调用的名字，再在卡对象上找同名方法」——
   // 那是隐式契约：类型检查看不到那些名字（TS2304），而运行时却依赖文本扫描。
-  // 现在改成显式读取 helpers；顺带保留了「对象方法简写要补 function 关键字」的处理。
+  // 现在改成显式读取 helpers；同时保留一个兜底：render 里调用、helpers 未声明、
+  // 但卡对象上恰好有同名函数的名字，也一并内联（向后兼容自定义写法）。
   const declaredHelpers = (card.helpers ?? {}) as Record<string, (...args: never[]) => unknown>;
   const helperNames = new Set(Object.keys(declaredHelpers));
-  // 兼容：render 里调用但 helpers 没声明的名字，若卡对象上恰好有同名函数则一并内联
+  const isNative = (fn: (...args: never[]) => unknown) => /\{\s*\[native code\]\s*\}/.test(Function.prototype.toString.call(fn));
   const builtins = new Set(["Math", "Number", "String", "JSON", "Object", "Array", "Boolean", "Set", "Map", "parseInt", "parseFloat", "isNaN", "if", "for", "while", "switch", "catch", "function", "return", "typeof", "new", "render"]);
   for (const match of renderSource.match(/\b([A-Za-z_$][\w$]*)\s*\(/g) ?? []) {
     const name = match.replace(/\s*\($/, "");
     if (builtins.has(name) || helperNames.has(name)) continue;
     const candidate = (card as unknown as Record<string, unknown>)[name];
-    if (typeof candidate === "function") helperNames.add(name);
+    if (typeof candidate !== "function") continue;
+    // ACT: **不要内联原型上的原生方法**。踩过：卡里写了 `value.toLocaleString("en-US")`，
+    // 抽取器把 `toLocaleString` 当成卡的辅助函数，而它的 toString() 是
+    // `function toLocaleString() { [native code] }` —— 塞进页面就是语法错误，
+    // 表现为页面静默加载失败。判据用 `[native code]`，比枚举名单可靠：
+    // 名单会一直漏（toLocaleString / toFixed / toString …），而原生标记不会。
+    if (isNative(candidate as (...args: never[]) => unknown)) continue;
+    helperNames.add(name);
   }
   const helperSource = [...helperNames].map(name => {
     const fn = declaredHelpers[name] ?? ((card as unknown as Record<string, unknown>)[name] as (...args: never[]) => unknown);
+    if (isNative(fn)) {
+      throw new Error(`卡 ${card.meta.slug} 的 helpers 里含有原生函数 ${name}，无法内联；请把它从 helpers 里去掉（原生方法在页面里本来就有）`);
+    }
     const source = fn.toString().trim();
     // 处理「对象方法简写」：补回 function 关键字
     return source.startsWith("function") ? source : `function ${name}${source.replace(/^[^(]*/, "")}`;
