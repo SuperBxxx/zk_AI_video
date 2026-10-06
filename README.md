@@ -115,7 +115,7 @@ bun run dev
 
 ### 后期制作脚本
 
-Agent 侧走「后期制作」工具（`checkVideo` / `makeSubtitle` / `resolveCues`）；同一批算法也有命令行入口，便于单独跑与排查：
+Agent 侧走「后期制作」工具（`checkVideo` / `makeSubtitle` / `resolveCues` / `exportDelivery`）；同一批算法也有命令行入口，便于单独跑与排查：
 
 | 命令 | 作用 |
 | --- | --- |
@@ -125,6 +125,12 @@ Agent 侧走「后期制作」工具（`checkVideo` / `makeSubtitle` / `resolveC
 | `bun scripts/soundCue.mjs <cues.json> --shots <shots.json>` | 音效钉帧校验与绝对时刻换算 |
 | `bun scripts/semanticAnnotate.mjs --init --script <稿> --out <semantics.json>` | 逐句语义标注（选卡与覆盖闸的依据） |
 | `bun scripts/reviewKit.mjs <视频> --out <dir>` | 生成独立评审材料包与派发包 |
+
+**可编辑交付**：Agent 用 `exportDelivery` 产出镜头切段表（CSV）、标准 EDL（仅单源）与 SRT 字幕，
+用户可在自己的剪辑软件里继续变速、重排、改字幕。导出前会对切段表对账（重叠 / 缝隙 / 零长段 / 总时长）。
+
+> 不做剪映、Premiere 的内部工程文件：那些格式是私有的、随版本变，没有真机草稿做基准时照猜生成，
+> 只会给出打不开的坏文件。本地装了剪映的话，可以用它自己写的草稿做基准再补这一层。
 
 > 新增 workspace 包后需先 `bun install` 建立链接，否则 `@toonflow/*` 解析不到。
 

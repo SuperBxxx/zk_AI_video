@@ -33,9 +33,11 @@ function checkModes() {
   console.log(`  ✓ 预置画布端口        ${summary} 个模式通过`);
 }
 
-// ── 2. 插件同步：build/** 的产物必须都在 data/** ──────────────────────
-// 踩过的坑：新增工具包后 build/tools 有产物、data/tools 没有、接口也列不出来，
-// 原因是 initializePlugins 的 marker 判定让同步被永久跳过。这里直接对账文件。
+// ── 2. 插件同步：data/** 必须与 build/** 同名**且同内容** ─────────────
+// 踩过的坑一：新增工具包后 build/tools 有产物、data/tools 没有、接口也列不出来，
+// 原因是 initializePlugins 的 marker 判定让同步被永久跳过。
+// 踩过的坑二：只比对文件名时，重建工具后 data/ 里仍是**旧内容**的副本，
+// 断言报「一致」而 agent 跑的是旧代码 —— 所以这里同时比字节数。
 function checkPluginSync() {
   const pairs = [
     ["build/tools", "data/tools", /^[a-z][a-zA-Z0-9]*\.tool\.js$/],
@@ -49,10 +51,22 @@ function checkPluginSync() {
     const sourceFiles = readdirSync(source).filter(name => pattern.test(name));
     const targetFiles = new Set(readdirSync(target));
     const missing = sourceFiles.filter(name => !targetFiles.has(name));
+    // ACT: 比字节数而不是哈希 —— 这一步的目的是抓「忘了同步」，
+    // 不是检测任何字节级差异（真的逐字节比要让 preflight 读几十 MB）。
+    // 字节数相同但内容不同的情况仍会漏过，属于可接受的取舍。
+    const stale = sourceFiles
+      .filter(name => targetFiles.has(name))
+      .filter(name => statSync(join(source, name)).size !== statSync(join(target, name)).size);
     if (missing.length) {
-      fail("插件同步", `${targetPart} 缺少 ${missing.length} 个由 ${sourcePart} 构建出的文件：\n      ${missing.slice(0, 8).join("\n      ")}\n      处置：删掉 ${targetPart}/initialized 后重启服务端重新同步`);
+      fail("插件同步", `${targetPart} 缺少 ${missing.length} 个由 ${sourcePart} 构建出的文件：\n      ${missing.slice(0, 8).join("\n      ")}\n      处置：删掉 ${targetPart} 下对应文件与 ${targetPart}/initialized，再重启服务端重新同步`);
+    } else if (stale.length) {
+      // ACT: 内容不一致记为警告而不是失败 —— 它对 agent 的影响是「可能跑到旧实现」，
+      // 但不必然坏（多数重建只是无关紧要的字节差异）。定为失败会让每次重建工具后
+      // preflight 都红，久了就没人看；定为警告能提示重同步又不吵。
+      // 真会坏的是「文件缺失」（下面那条），那个才是失败。
+      warn("插件同步", `${targetPart} 有 ${stale.length} 个文件与 ${sourcePart} 的大小不一致：\n      ${stale.slice(0, 8).map(name => `${name}：${statSync(join(target, name)).size} ≠ ${statSync(join(source, name)).size}`).join("\n      ")}\n      处置：插件只在首次铺入时写入，重建后不会自动覆盖 ——\n      删掉 ${targetPart} 下这些文件与 ${targetPart}/initialized，再重启服务端重新同步`);
     } else {
-      console.log(`  ✓ 插件同步            ${targetPart} 与 ${sourcePart} 一致（${sourceFiles.length} 个文件）`);
+      console.log(`  ✓ 插件同步            ${targetPart} 与 ${sourcePart} 一致（${sourceFiles.length} 个文件，含大小）`);
     }
   }
 }

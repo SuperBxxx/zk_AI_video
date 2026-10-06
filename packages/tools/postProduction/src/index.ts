@@ -3,12 +3,18 @@ import { executeRemoteFfmpeg } from "@toonflow/ffmpeg/remote";
 import {
   alignTiming,
   buildAss,
+  buildEditList,
+  buildSrt,
   checkAvDuration,
+  checkEditList,
   checkFrameRate,
   checkFreeze,
   checkShotTail,
+  editListToCsv,
+  editListToEdl,
   parseFreezeSpans,
   resolveSoundCues,
+  usToTimecode,
   type AlignWord,
 } from "@toonflow/post-production";
 import type { ToolContext, ToolDefinition, ToolPlugin } from "@toonflow/tools-scaffold/runtime";
@@ -47,6 +53,20 @@ const cueSchema = z.strictObject({
   })).max(2000),
   shots: z.array(z.object({ id: z.string(), start: z.number(), end: z.number() })).max(500).describe("分镜表（秒）"),
   offsetMs: z.number().min(0).max(500).optional().describe("输出音轨偏移；不给则用配置值"),
+}).strict();
+
+const deliverySchema = z.strictObject({
+  shots: z.array(z.object({
+    id: z.string().min(1).max(64),
+    source: z.string().min(1).max(512).optional().describe("源素材；缺省继承上一段"),
+    start: z.number().min(0).describe("镜头起点（秒）"),
+    end: z.number().min(0).describe("镜头终点（秒）"),
+    sourceStart: z.number().min(0).optional().describe("源素材入点（秒）；缺省等于 start"),
+  })).min(1).max(2000).describe("镜头表（秒）"),
+  source: z.string().trim().max(512).optional().describe("统一源素材；给了就不必每段写 source"),
+  timestamps: z.string().trim().max(512).optional().describe("timestamps.json；给了就一并导出 SRT 字幕"),
+  outputDirectory: z.string().trim().max(512).optional().describe("输出目录，默认 assets/delivery"),
+  name: z.string().trim().max(64).optional().describe("交付物文件名前缀，默认 delivery"),
 }).strict();
 
 interface RemoteResult {
@@ -289,6 +309,87 @@ const plugin: ToolPlugin = {
             content: [{ type: "text", text: `${summary}${note}\n${JSON.stringify({ cues: result.cues, warnings: result.warnings, problems: result.problems })}` }],
             details: { cues: result.cues, warnings: result.warnings, problems: result.problems },
           };
+        },
+      },
+      {
+        name: "exportDelivery",
+        label: "导出可编辑交付物",
+        description: "把镜头表与字幕导出成平台无关的可编辑交付物：镜头切段表（CSV，任何剪辑软件或表格工具可读）、可选的标准 EDL（仅单源时）、以及 SRT 字幕。并对切段表做对账（重叠/缝隙/零长段/总时长）。",
+        promptSnippet: "交付时用 exportDelivery 导出切段表与 SRT，用户可在自己的剪辑软件里继续改。",
+        promptGuidelines: [
+          "导出前会先对账切段表：重叠或缝隙会直接失败——剪辑软件对同轨重叠是报错的，缝隙则会让播放闪一下。",
+          "标准 EDL 只能表达单一源素材；多源时工具会拒绝导出 EDL 并让你改用 CSV，不要硬塞。",
+          "这只是可编辑的交付数据，不是某个剪辑软件的内部工程文件——那些格式是私有的、会随版本变，照猜生成只会给出打不开的坏文件。",
+        ],
+        parameters: z.toJSONSchema(deliverySchema, { io: "input", target: "draft-07" }),
+        executionMode: "sequential",
+        async execute(_id, params, signal) {
+          signal?.throwIfAborted();
+          const request = deliverySchema.parse(params);
+          const directory = (request.outputDirectory ?? "assets/delivery").replace(/\/+$/, "");
+          const prefix = request.name ?? "delivery";
+
+          const { segments, totalUs } = buildEditList(
+            request.shots.map(shot => ({
+              id: shot.id,
+              ...(shot.source ? { source: shot.source } : {}),
+              start: shot.start,
+              end: shot.end,
+              ...(shot.sourceStart === undefined ? {} : { sourceStart: shot.sourceStart }),
+            })),
+            config.targetFps,
+            request.source ?? "",
+          );
+
+          // 对账不过就不写文件：给出坏数据比不给更糟（用户会在剪辑软件里才发现）
+          const report = checkEditList(segments);
+          if (report.failures.length) {
+            return {
+              content: [{ type: "text", text: `切段表未通过对账，未写出任何文件：\n${report.failures.map(f => `  ✗ ${f.name}  ${f.detail}`).join("\n")}` }],
+              details: { failures: report.failures },
+            };
+          }
+
+          await context.files.mkdir(directory, true).catch(() => undefined);
+          const written: string[] = [];
+          const csvPath = `${directory}/${prefix}-edit.csv`;
+          await context.files.writeFile(csvPath, editListToCsv(segments, config.targetFps));
+          written.push(csvPath);
+
+          // EDL 仅单源可用；多源不是错误，是格式本身的限制
+          let edlNote = "";
+          try {
+            const edlPath = `${directory}/${prefix}-edit.edl`;
+            await context.files.writeFile(edlPath, editListToEdl(segments, config.targetFps));
+            written.push(edlPath);
+          } catch (error) {
+            edlNote = `\n未导出 EDL：${error instanceof Error ? error.message : "格式限制"}`;
+          }
+
+          let srtNote = "";
+          if (request.timestamps) {
+            const timestamps = await readJson<{ sentences?: { text: string; beginMs: number; endMs: number }[] }>(request.timestamps);
+            const srtPath = `${directory}/${prefix}.srt`;
+            await context.files.writeFile(srtPath, buildSrt(timestamps.sentences ?? []));
+            written.push(srtPath);
+            srtNote = `\n字幕 ${(timestamps.sentences ?? []).length} 条 → ${srtPath}（SRT 不带样式，便于在别的软件里改）`;
+          }
+
+          const detail = {
+            totalUs,
+            totalSeconds: Number((totalUs / 1_000_000).toFixed(3)),
+            segments: segments.map(segment => ({
+              id: segment.id,
+              source: segment.source,
+              sourceIn: usToTimecode(segment.sourceStartUs),
+              duration: Number((segment.durationUs / 1_000_000).toFixed(3)),
+              targetStart: usToTimecode(segment.targetStartUs),
+            })),
+            written,
+          };
+          const summary = `已导出 ${written.length} 个交付物（${segments.length} 段，总时长 ${detail.totalSeconds}s）`
+            + `\n${written.map(path => "  " + path).join("\n")}${edlNote}${srtNote}`;
+          return { content: [{ type: "text", text: `${summary}\n${JSON.stringify(detail)}` }], details: detail };
         },
       },
     ];

@@ -144,3 +144,37 @@ export function buildAss(sentences: AssSentence[], options: AssOptions = {}): st
 export function subtitleFilter(fileName: string): string {
   return `subtitles=${fileName}`;
 }
+
+/** SRT 时间格式：HH:MM:SS,mmm（逗号是 SRT 的规定，不是 ASS 的点）。 */
+function srtTime(ms: number): string {
+  const total = Math.max(0, Math.round(ms));
+  const hours = Math.floor(total / 3_600_000);
+  const minutes = Math.floor((total % 3_600_000) / 60_000);
+  const seconds = Math.floor((total % 60_000) / 1000);
+  const millis = total % 1000;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")},${String(millis).padStart(3, "0")}`;
+}
+
+/**
+ * SRT 字幕：几乎所有剪辑软件与播放器都认的公开格式。
+ *
+ * 与 ASS 的分工：ASS 用于**烧录进成片**（要样式与逐字高亮）；SRT 用于
+ * **交给用户在别的软件里继续编辑**（只带文本与时间，任何工具都能导入）。
+ * 所以这里刻意不带任何样式标记 —— 带样式的 SRT 会被多数工具当正文显示出来。
+ *
+ * ACT: 多行文本按 SRT 规定加空行分隔；单条内换行保留（不转成 \N，那是 ASS 的写法）。
+ */
+export function buildSrt(sentences: AssSentence[], options: { maxCharsPerLine?: number } = {}): string {
+  const maxChars = options.maxCharsPerLine ?? 0;
+  const blocks: string[] = [];
+  sentences.forEach((sentence, index) => {
+    const text = sentence.text.replace(/\r?\n/g, " ").trim();
+    if (!text) return;
+    // 需要限制行宽时按字数硬折（SRT 没有排版能力，只能靠换行）
+    const lines = maxChars > 0
+      ? (text.match(new RegExp(`.{1,${maxChars}}`, "g")) ?? [text])
+      : [text];
+    blocks.push(`${index + 1}\n${srtTime(sentence.beginMs)} --> ${srtTime(sentence.endMs)}\n${lines.join("\n")}`);
+  });
+  return `${blocks.join("\n\n")}\n`;
+}
