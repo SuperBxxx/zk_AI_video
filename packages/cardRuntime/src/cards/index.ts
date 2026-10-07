@@ -19,6 +19,12 @@ import { handDrawnEllipse } from "./handDrawnEllipse";
 import { chartLiveOscilloscope } from "./chartLiveOscilloscope";
 import { gaugeReadout } from "./gaugeReadout";
 import { barChartGrowth } from "./barChartGrowth";
+import { typeAssembly } from "./typeAssembly";
+import { softBlurIn } from "./softBlurIn";
+import { wordSlotCycle } from "./wordSlotCycle";
+import { timelineTravel } from "./timelineTravel";
+import { metricWithSparkline } from "./metricWithSparkline";
+import { titleDemoteToLabel } from "./titleDemoteToLabel";
 
 export const htmlCards = [
   digitRoll,
@@ -36,6 +42,12 @@ export const htmlCards = [
   chartLiveOscilloscope,
   gaugeReadout,
   barChartGrowth,
+  typeAssembly,
+  softBlurIn,
+  wordSlotCycle,
+  timelineTravel,
+  metricWithSparkline,
+  titleDemoteToLabel,
 ];
 
 export function findHtmlCard(slug: string) {

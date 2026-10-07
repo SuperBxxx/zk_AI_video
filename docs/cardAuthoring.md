@@ -169,9 +169,9 @@ bun scripts/renderCard.mjs --print-chrome   # 打印确切命令
 批次 3 口播语法   ✅ keywordPopHighlight · ✅ highlighterSweep · ✅ focusDimSpotlight
 批次 4 叠加标注   ✅ markerUnderlineTitle · ✅ scanlineAnnotateFocus · ✅ handDrawnEllipse
 批次 5 图表       ✅ chartLiveOscilloscope · ✅ gaugeReadout · ✅ barChartGrowth
-批次 6 文字强化   ⏳ type-assembly-moves · soft-blur-in · word-slot-cycle
-批次 7 时间轴     ⏳ timeline-travel · metric-with-sparkline · title-demote-to-label
+批次 6 文字强化   ✅ typeAssembly · ✅ softBlurIn · ✅ wordSlotCycle
+批次 7 时间轴     ✅ timelineTravel · ✅ metricWithSparkline · ✅ titleDemoteToLabel
 批次 8 转场       ⏳ wipe-transitions · white-flash-logo-simplify-cut · scan-bracket-sweep
 ```
 
-**已完成 15/24。** 每完成一批就提交并汇报。
+**已完成 21/24。** 每完成一批就提交并汇报。
