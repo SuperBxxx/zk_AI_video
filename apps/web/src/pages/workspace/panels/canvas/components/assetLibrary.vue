@@ -20,7 +20,7 @@
     <el-scrollbar class="libraryScroll" :maxHeight="scrollMaxHeight">
       <el-tree ref="assetTree" class="assetTree" :data="displayEntries" nodeKey="path" :props="{ label: 'name' }" :currentNodeKey="folder === '.' ? undefined : folder" :filterNodeMethod="filterEntry" defaultExpandAll highlightCurrent emptyText="" @nodeClick="selectFolder">
         <template #default="{ data }">
-          <div class="assetEntry" :title="data.name" :draggable="canvasMode && data.type === 'file'" @dragstart.stop="canvasMode && startAssetDrag($event, data)" @dblclick.stop="openPreview(data)" @contextmenu="openItemMenu($event, data)">
+          <div class="assetEntry" :title="data.name" :draggable="canUseInCanvas && data.type === 'file'" @dragstart.stop="canUseInCanvas && startAssetDrag($event, data)" @dblclick.stop="openPreview(data)" @contextmenu="openItemMenu($event, data)">
             <icon-folder-filled v-if="data.type === 'directory'" class="folderIcon" :size="30" />
             <el-image v-else-if="mediaKind(data) === 'image'" class="assetThumbnail" :src="assetUrl(data.path)" fit="cover" loading="lazy" draggable="false" @click.stop="openPreview(data)">
               <template #error><icon-photo :size="22" /></template>
@@ -134,7 +134,10 @@ const activeTab = ref<"asset" | "voice">("asset");
 // ACT: 画布专属能力（拖拽到画布、保存节点输出）只在画布内启用。
 // 素材库本身的数据是全局的（服务端 6 个接口都以 {数据目录}/assets 为根），
 // 因此首页等画布之外的场景传入 canvas=false 复用同一个组件，不必抽两份实现。
-const canvasMode = computed(() => props.canvas !== false);
+// ACT: 原先是 `props.canvas !== false`。实测画布里的实例读出来竟是 canvas=false（见 openSave 的注释），
+// 那个开关不可靠；能不能用画布专属能力，真实依据是**有没有项目目录**
+// —— 画布与对话框两种用法都会传 directory，首页的素材库不传。
+const canUseInCanvas = computed(() => Boolean(props.directory));
 const visible = defineModel<boolean>({ default: false });
 const saveVisible = ref(false);
 const saving = ref(false);
@@ -384,7 +387,13 @@ async function openSave(label: string, items: AssetOutput[]) {
   // 于是用户看到的现象就是「点『添加到素材库』完全没反应」且控制台无报错 —— 极难查。
   // 哪怕真是「不该在这里用」，也要把原因说出来。
   // 保存节点输出需要一个项目目录来读节点文件，画布之外没有这个上下文。
-  if (!canvasMode.value) throw new Error("当前视图不支持保存到素材库");
+  // ACT: 判断依据是**有没有项目目录**，不是那个 canvas 布尔开关。
+  // 实测：画布里的节点工具条点「添加到素材库」时，props.canvas 竟然是 false
+  // （诊断输出 canvas=false、fill=false、directory 是有效的项目目录），
+  // 于是这里抛错、对话框永远不开 —— 正是用户看到的「点了没反应」。
+  // 能不能保存，取决于上下文是否具备（有项目目录、能读到节点文件），
+  // 而 props.directory 在画布与对话框两种用法里都是真实依据；
+  // 首页那个实例本来就不具备目录，会由下一道判断如实挡住。
   if (!props.directory) throw new Error("还没有打开项目目录，无法保存到素材库");
   if (!items.length) throw new Error("节点还没有内容，先生成或上传后再保存");
   outputs.value = items;

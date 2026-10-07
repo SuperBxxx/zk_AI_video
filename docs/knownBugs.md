@@ -87,7 +87,59 @@ textReady.value = true;   // ← 只有成功才置 true
 
 ---
 
-## BUG-2 画布图片节点「添加到素材库」按钮无反应 🟡 静默失败已全部消除
+## BUG-2 画布图片节点「添加到素材库」按钮无反应 ✅ 已修（浏览器实测确认）
+
+### 根因（**用 CDP 驱动真实 Chrome 复现并定位**）
+
+`assetLibrary.vue` 的 `openSave` 里那道守卫读的开关不可靠：
+
+```ts
+const canvasMode = computed(() => props.canvas !== false);   // ← 画布里竟是 false
+...
+if (!canvasMode.value) return;      // 原先静默 return
+```
+
+**实测诊断输出**（在画布里点按钮时打印 `props`）：
+
+```
+canvas=false   directory=E:\...\cdpProject（有效）   fill=false
+```
+
+即 **画布里的这个实例，`props.canvas` 读出来是 false**，于是 `openSave` 直接挡掉、
+对话框永远不开。加上上层 `handleCommand` 原本 `saveNodeToAssets?.(...)` **没有 await 没有 catch**，
+整条链就是**完全静默** —— 正是用户看到的「点了没反应、控制台也没有报错」。
+
+> `index.vue:64` 并没有传 `canvas` 属性（全仓库只有首页那个传 `:canvas="false"`），
+> 所以这个 false 的来源**仍未完全解释清楚**。修法绕开了这个不可靠的开关。
+
+### 修法
+
+判断依据从「那个 canvas 布尔开关」改成「**有没有项目目录**」——
+能不能保存取决于上下文是否具备（有目录、能读节点文件），而 `directory` 在画布与对话框
+两种用法里都是真实依据；首页那个实例本来就不传目录，会被如实挡住。
+
+1. `assetLibrary.vue`：`canvasMode` → `canUseInCanvas = Boolean(props.directory)`（拖拽也用同一依据）
+2. `openSave`：**删掉** `!canvasMode` 那道守卫，改为 `if (!props.directory) throw`（如实报错）
+3. `handleCommand`：`await saveNodeToAssets(...)` + `try/catch` + `ElMessage.error`，不再静默
+4. `canvas/index.vue`：注入函数在 ref 为空时抛错，不再用 `?.` 静默吞掉
+
+### 验证（**端到端，在真实 Chrome 里跑完**）
+
+```
+① 点「添加到素材库」 → CLICKED
+② 对话框：标题「保存到素材库」、素材名预填「测试图片.png」、
+   保存位置「素材库」、文件夹树 2 项、保存按钮可用
+③ 点「保存」 → CLICKED，对话框关闭
+④ 落盘确认：PUT /api/assets/save?path=测试图片.png → 200
+   data\assets\测试图片.png → 70 字节，真实写入
+```
+
+连跑 2 次均稳定打开对话框。
+
+---
+
+## BUG-2 原始记录（保留，含**我两次错误结论**的订正）
+
 
 ### ❌ 先订正一条**错误结论**（我上一轮写的）
 
