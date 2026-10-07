@@ -117,26 +117,40 @@ class Cdp {
   }
 }
 
-// 连上 Chrome。**默认自己起一个**（见下），也支持连已经在跑的。
+// 连上浏览器。**默认自己起一个**，也支持连已经在跑的（外层先起好、端口一致时直接用）。
 //
-// ACT: 早先这里写的是「本机沙箱不允许 Bun 起浏览器，必须外部先起 Chrome」——
-// 那个结论是错的，来自一次没加 --no-sandbox 的失败尝试，之后就一直被当成事实沿用。
-// 实测：Bun.spawn + stdio:"ignore" + **--no-sandbox** 能正常起 headless Chrome 并连通 CDP
-// （不加 --no-sandbox 时进程立刻退出，status=3，且没有 EPERM 之类的线索）。
-// 所以默认自己起浏览器，不再要求调用方先手工起一个 —— 这条路径要能被工具复用的前提。
+// 这里有两个此前判错、后来实测纠正的点：
+//
+//  1. **「沙箱不允许起浏览器」是错的。** 早先一次没加 --no-sandbox 的失败尝试没有任何
+//     报错线索，就被我归结成「环境不允许」，之后一直当成事实沿用。实测下来是能起的。
+//  2. **但不能默认关沙箱。** 实测（见 scripts 的历史验证）：
+//        Chrome 默认沙箱      → 起不来（本任务沙箱环境限制了它的沙箱初始化）
+//        Chrome + --no-sandbox → 起得来
+//        Edge   默认沙箱      → 起得来
+//     也就是说「起不来」是**本任务环境**的限制，不是用户环境的。用户机器上不该关沙箱。
+//
+// 所以策略是**先试安全方式，失败才降级**：默认带沙箱启动，起不来再退到 --no-sandbox。
+// 这样交付到用户机器上走的是安全路径，而受限环境里仍然能跑。
+const chromeStartupTimeoutMs = 12000;
+
 let ownedChrome = null;
 let targets;
 async function fetchTargets() {
   return await (await fetch(`http://127.0.0.1:${cdpPort}/json/list`)).json();
 }
+
 /**
- * 找本机的 Chrome 可执行文件。
+ * 找本机的浏览器可执行文件。
  *
  * ACT: 必须用绝对路径 —— Windows 上 Chrome 默认不写进 PATH，`spawn("chrome")` 找不到
  * （踩过：报「起不了 Chrome」，实际是命令名解析失败，不是浏览器起不来）。
- * 按「环境变量 → 常见安装位置」找，Edge 作为兜底。
+ *
+ * 顺序：环境变量 → Chrome → **Edge**。
+ * Edge 排在 Chrome 之后但必须在内：Windows 11 必装 WebView2 运行时（内核就是 Edge），
+ * 而 Electrobun 桌面版本来就依赖它渲染界面 —— 所以**装了本应用的机器一定有 Edge**，
+ * 但不一定有 Chrome。这就是「交付后浏览器会不会有问题」的答案：兜底是稳的。
  */
-function resolveChrome() {
+function resolveBrowser() {
   return [
     process.env.ZK_CHROME_PATH,
     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
@@ -146,37 +160,76 @@ function resolveChrome() {
   ].filter(Boolean).find(candidate => existsSync(candidate));
 }
 
+/** 起一个浏览器实例并等 CDP 就绪；成功返回进程句柄，失败返回 null。 */
+async function launchBrowser(executable, profile, port, extraArgs) {
+  const child = spawn(executable, [
+    "--headless=new", "--disable-gpu", "--no-first-run", "--hide-scrollbars",
+    ...extraArgs,
+    `--remote-debugging-port=${port}`,
+    `--user-data-dir=${profile}`,
+    "about:blank",
+  ], { stdio: "ignore" });
+  const deadline = Date.now() + chromeStartupTimeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    try {
+      await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();
+      return child;
+    } catch { /* 还没起来 */ }
+  }
+  if (!child.killed) child.kill();
+  return null;
+}
+
 try {
   targets = await fetchTargets();
 } catch {
-  const chromePath = resolveChrome();
-  if (!chromePath) {
+  const browserPath = resolveBrowser();
+  if (!browserPath) {
     console.error("找不到 Chrome/Edge。设 ZK_CHROME_PATH 指向可执行文件，或先手工起一个：\n  bun scripts/renderCard.mjs --print-chrome");
     process.exit(1);
   }
   const profile = join(root, ".tmp-build", "chromeProfile");
   mkdirSync(profile, { recursive: true });
-  ownedChrome = spawn(chromePath, [
-    "--headless=new", "--disable-gpu", "--no-first-run", "--hide-scrollbars",
-    // 关键：不加这个，headless Chrome 在本机会立刻退出（status=3）
-    "--no-sandbox",
-    `--remote-debugging-port=${cdpPort}`,
-    `--user-data-dir=${profile}`,
-    "about:blank",
-  ], { stdio: "ignore" });
-  // 等 CDP 就绪（最多约 16s）
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    await new Promise(resolve => setTimeout(resolve, 400));
-    try { targets = await fetchTargets(); break; } catch { /* 还没起来 */ }
+  // 先试安全方式（带沙箱）。用户机器上就应该走这条。
+  ownedChrome = await launchBrowser(browserPath, profile, cdpPort, []);
+  if (!ownedChrome) {
+    // 降级：某些受限环境（包括本任务的沙箱）会拦住 Chrome 的沙箱初始化，只能关掉它。
+    // 这只在默认方式确实起不来时才发生，且会打印出来 —— 不要让它悄悄关掉沙箱。
+    console.error("带沙箱起不来，降级为 --no-sandbox 重试（受限环境才会走到这里）");
+    ownedChrome = await launchBrowser(browserPath, profile, cdpPort, ["--no-sandbox"]);
+  }
+  if (ownedChrome) {
+    try { targets = await fetchTargets(); } catch { targets = undefined; }
   }
   if (!targets) {
-    console.error(`起不了 Chrome（${chromePath}，端口 ${cdpPort}）。可先手工起一个：\n  bun scripts/renderCard.mjs --print-chrome`);
+    console.error(`起不了浏览器（${browserPath}，端口 ${cdpPort}）。可先手工起一个：\n  bun scripts/renderCard.mjs --print-chrome`);
     process.exit(1);
   }
 }
-/** script 结束时收掉自己起的浏览器。 */
+/**
+ * script 结束时收掉自己起的浏览器。
+ *
+ * ACT: 这里有两个坑，都实际踩过：
+ *
+ *  1. **必须杀整棵进程树**，`child.kill()` 不够。Chromium 是多进程架构，只杀父进程
+ *     会留下 8~10 个孤儿子进程，它们还占着 profile 目录，下次启动可能直接失败。
+ *     Windows 上用 `taskkill /T /F` 递归结束。
+ *  2. **不能因为「启动器已退出」就跳过清理**。`chrome.exe` / `msedge.exe` 在 Windows 上
+ *     是个启动器：它把真正的浏览器进程起起来后就自己退出了。所以 `child.exitCode !== null`
+ *     恰恰是**最需要清理**的时刻 —— 早先在这里加了「已退出就 return」的判断，
+ *     结果一次都没清掉。不能加那个判断。
+ */
 function shutdown() {
-  if (ownedChrome && !ownedChrome.killed) ownedChrome.kill();
+  if (!ownedChrome) return;
+  const pid = ownedChrome.pid;
+  if (!pid) return;
+  if (process.platform === "win32") {
+    // 递归结束启动器及其全部子进程（启动器本身可能已退出，不影响 /T 按 pid 找树）
+    spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore" });
+    return;
+  }
+  try { ownedChrome.kill("SIGKILL"); } catch { /* 已经退了 */ }
 }
 
 // 卡页面写到工作目录外的临时目录：file:// 下加载更稳妥，也不污染工作区
@@ -244,11 +297,14 @@ for (const frame of [0, 20, 40, 20, 0]) {
 }
 
 // 确定性自检：同一帧渲染两次必须字节级一致，否则逐帧抓帧会闪
-await cdp.evaluate(`window.renderAt(7)`);
+// ACT: 探针帧不能硬编码 —— 早先写死 renderAt(7)，短卡（--frames 2）会被夹到末帧，
+// 两次截图必然相同，自检就变成了永远通过。取 min(7, total-2) 保证探针落在动画中段。
+const probeFrame = Math.min(7, Math.max(0, total - 2));
+await cdp.evaluate(`window.renderAt(${probeFrame})`);
 await cdp.evaluate(awaitPaint);
 const shotFormat = wantAlpha ? { format: "png", background: "transparent" } : { format: "jpeg", quality };
 const first = await cdp.send("Page.captureScreenshot", shotFormat);
-await cdp.evaluate(`window.renderAt(7)`);
+await cdp.evaluate(`window.renderAt(${probeFrame})`);
 await cdp.evaluate(awaitPaint);
 const second = await cdp.send("Page.captureScreenshot", shotFormat);
 const deterministic = first.data === second.data;

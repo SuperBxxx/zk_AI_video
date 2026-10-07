@@ -1,0 +1,18 @@
+{
+  "name": "@toonflow/card-renderer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./browser": "./src/browser.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@toonflow/card-runtime": "workspace:*",
+    "@toonflow/file": "workspace:*",
+    "@toonflow/post-production": "workspace:*"
+  }
+}

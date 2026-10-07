@@ -72,6 +72,18 @@ function resolveParams(card: CardDefinition, overrides: Record<string, number> =
 import { designCanvasFor, designShortSide } from "@toonflow/post-production";
 export { designCanvasFor, designShortSide };
 
+// 卡的公共类型。渲染内核（@toonflow/card-renderer）要按 CardDefinition 的契约接卡，
+// 所以这些类型属于对外接口，必须导出。
+export type {
+  CardDefinition,
+  CardShape,
+  CardParamSpec,
+  CardParams,
+  CardDesign,
+  CardHelpers,
+  CardRenderOptions,
+} from "./types";
+
 /**
  * 组装一个自足的 HTML 页面：把卡与运行时内联进去，不依赖任何外部文件。
  *
