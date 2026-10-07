@@ -117,3 +117,15 @@ export {
   type StoryAnchorSpec,
   type StoryAnchorGroup,
 } from "./storyAnchor";
+
+export {
+  resolveMomentTiming,
+  resolveMomentFromScript,
+  checkSemanticMoment,
+  describeMomentAnchor,
+  describeMoments,
+  type NodeSemanticMoment,
+  type NodeSemanticValue,
+  type SemanticUtterance,
+  type ResolvedTiming,
+} from "./semanticMoment";
