@@ -12,7 +12,7 @@
 | BUG-2 | 素材库「添加到素材库」无反应 | 🟡 **已修「禁用无提示」**（用户看到的现象）；若仍无反应，按「新发现」一节继续查 |
 | BUG-3 | 营销模式创建项目连续 409 | ✅ **已修**（根因已复现并验证） |
 | BUG-4 | 画布工具成功也回错误文案 | ❌ 未修，需要一次现场证据 |
-| BUG-5 | `/api/desktop/update` 500 | ❌ 未修，根因已确定（很好修） |
+| BUG-5 | `/api/desktop/update` 500 | ✅ **已修**（根因：去 Toonflow 化留下的 identifier 不一致） |
 | BUG-6 | `<label for>` 可访问性提示 | ❌ 未修（轻微） |
 
 BUG-1 与 BUG-3 其实是**同一条链**：6 个 textNode 并发建 `assets` 目录 → 撞锁 409 / 父目录未就绪 404
@@ -279,20 +279,54 @@ Failed to load resource: the server responded with a status of 500 (Internal Ser
 :58944/api/desktop/update:1        ×3
 ```
 
-### 根因（已确定）
+### 根因（**已确定，两个独立缺陷，都实测过**）
 
-`apps/server/src/utils/desktop/index.ts:116`
+#### 主因：去 Toonflow 化留下的 **identifier 不一致** ← 这才是 500 的来源
 
-```ts
-export function getDesktopRuntime(req: Request): DesktopRuntime {
-  return req.app.locals.desktop;          // 独立 server 下是 undefined
-}
+`apps/desktop/src/update/windowsUpdater.ts:95` 的 `getLocalInfo()` 会校验打包进
+`Resources/version.json` 的安装标识。而两个文件的值**不一致**：
+
+| 位置 | 值 |
+|---|---|
+| `electrobun.config.ts:6` `app.identifier` | `local.zhukai.desktop`（品牌已改成住凯） |
+| `windowsUpdater.ts:98` 的校验 | `info.identifier !== "local.toonflow.desktop"`（旧标识） |
+
+于是 `getLocalInfo()` **每次都抛**「桌面安装标识无效，请重新安装」→ `/api/desktop/update` 500。
+
+**实测证据**：把**真实打包产物**的 `version.json`
+（`{"identifier":"local.zhukai.desktop", ...}`，从 `Resources/ynlwszz9zbu0.tar.zst` 里抽出）
+分别喂给新旧两套校验逻辑：
+
+```
+① 旧逻辑（identifier !== local.toonflow.desktop） → 抛错 ✗  ← 500 的原因
+② 新逻辑（只校验格式合法）                        → 通过 ✓
+   10 项边界（identifier 非法/channel 非法/version 格式错/…/换品牌标识）全部符合预期
 ```
 
-`getDesktopUpdate`（L138）第一行就 `const { updater } = getDesktopRuntime(req);` →
-**解构 undefined 抛 TypeError** → 统一错误处理中间件当 500 返回。
+> ⚠️ 注意 `getLocalInfo` 里 identifier 与 name 用的是**不同**的字符集规则：
+> `identifier` 允许 `[a-zA-Z0-9._-]`、`name` 只允许 `[a-zA-Z0-9_-]`。
+> 写验证脚本时必须与源码 `windowsUpdater.ts:13-14` 的正则**逐字一致**，
+> 我第一次照猜写成十六进制 hash，得出「修复无效」的错误结论。
 
-即：**在非桌面运行时（独立 server / 浏览器访问）调这个接口必然 500**，属既有缺陷。
+**修法**：不再拿 identifier 跟写死的字符串比，只校验它是合法名字 ——
+品牌由 `electrobun.config.ts` 决定，代码里钉常量只会让下次改名重演同一个故障。
+`identifier` 的自洽性由别处保证（`windowsUpdater.ts:171/194/294`、
+`compat/macIntel/updater.ts:170` 都是拿 `info.identifier` 跟自己比）。
+
+#### 次因：独立 server 下解构 undefined
+
+`getDesktopUpdate` 原先第一行就 `const { updater } = getDesktopRuntime(req);`，
+而独立 server 下 `req.app.locals.desktop` 是 `undefined` → TypeError → 500。
+
+不过 `/api/desktop/*` 前面有一道门 `apps/server/src/lib/desktop.ts:5`：
+
+```ts
+if (!req.app.locals.desktop) return res.status(404).json(error("此接口仅在桌面客户端中可用", null, 404));
+```
+
+所以**独立 server 下实际是 404、根本进不到这里** —— 这也解释了我一开始
+用裸请求打这个接口拿到 404 的原因。次因属防御性修复
+（`getDesktopUpdate` 返回 `canUpdate: false` 的空快照；`checkDesktopUpdate` 如实报 400）。
 
 ### 谁在调
 

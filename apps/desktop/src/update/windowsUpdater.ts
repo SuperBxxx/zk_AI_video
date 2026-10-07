@@ -95,7 +95,16 @@ export default function createWindowsUpdater(resourcesDirectory: string, lifecyc
   async function getLocalInfo() {
     if (!localInfo) {
       const info = await file(join(resourcesDirectory, "version.json")).json();
-      if (!info || info.identifier !== "local.toonflow.desktop" || !["stable", "canary", "dev"].includes(info.channel)
+      // ACT: 这里**不要**拿 identifier 跟写死的字符串比。
+      // 踩过：去 Toonflow 化时 electrobun.config.ts 的 app.identifier 改成了 local.zhukai.desktop，
+      // version.json 随之写成新值，而这里还在校验旧值 local.toonflow.desktop ——
+      // 于是 getLocalInfo 每次都抛「桌面安装标识无效，请重新安装」，
+      // /api/desktop/update 变成 500（开发者面板每打开一次就刷一片红）。
+      // 校验该文件**格式是否合法**，而不是它属于哪个品牌：品牌由 config 决定，
+      // 代码里再钉一个常量只会让下次改名重演同一个故障。
+      // identifier 的自洽性由别处保证（下游都是拿 info.identifier 跟自己比）。
+      if (!info || typeof info.identifier !== "string" || !/^[a-zA-Z0-9._-]+$/.test(info.identifier)
+        || !["stable", "canary", "dev"].includes(info.channel)
         || typeof info.version !== "string" || !versionPattern.test(info.version) || typeof info.hash !== "string" || !hashPattern.test(info.hash)
         || typeof info.baseUrl !== "string" || typeof info.name !== "string" || !/^[a-zA-Z0-9_-]+$/.test(info.name)) {
         throw new Error(t`桌面安装标识无效，请重新安装`);

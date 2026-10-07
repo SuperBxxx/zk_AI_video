@@ -136,7 +136,14 @@ export async function readProviderFile(req: Request, token: string) {
 }
 
 export async function getDesktopUpdate(req: Request): Promise<updateSnapshot> {
-  const { updater } = getDesktopRuntime(req);
+  // ACT: 非桌面运行时（独立 server / 浏览器访问）没有 updater，原先直接解构会抛
+  // TypeError，被统一错误处理当成 500 —— 开发者面板每打开一次就刷一片红的
+  // 「/api/desktop/update 500」。这里如实返回「没有更新能力」的快照，让前端自行隐藏更新区。
+  const runtime = getDesktopRuntime(req);
+  if (!runtime?.updater) {
+    return { version: "", channel: "", hash: "", latestVersion: "", latestHash: "", error: "", updateAvailable: false, updateReady: false, updating: false, canUpdate: false };
+  }
+  const { updater } = runtime;
   const state = getDesktopState(req);
   const local = await updater.getLocalInfo();
   const { version, channel, hash } = local;
@@ -163,7 +170,10 @@ export async function getDesktopUpdate(req: Request): Promise<updateSnapshot> {
 }
 
 export async function checkDesktopUpdate(req: Request): Promise<void> {
-  const { updater } = getDesktopRuntime(req);
+  // 同 getDesktopUpdate：非桌面运行时没有 updater，解构会变成 500，这里如实报 400。
+  const runtime = getDesktopRuntime(req);
+  if (!runtime?.updater) throw Object.assign(new Error("当前运行方式不支持应用内更新，请下载安装包。"), { status: 400 });
+  const { updater } = runtime;
   const state = getDesktopState(req);
   if (state.checkingUpdate || state.downloadingUpdate || state.applyingUpdate)
     throw Object.assign(new Error("更新操作正在执行，请稍后再试。"), { status: 409 });
