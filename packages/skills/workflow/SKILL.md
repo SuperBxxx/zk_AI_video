@@ -1463,6 +1463,24 @@ A12 只允许：
    并把这条如实告诉用户，不要说「竖屏也完全没问题」。
 4. **`html` 卡的文案不可改**。文案写在卡内，只能调工具返回的那些数值参数。
    用户要改字时，如实说明这一点，不要假装能改。
+5. **叠加卡要先定卡、再生成视频（顺序反过来多半要返工）**。
+   `overlay` 卡是**叠在 AI 视频上**的，所以它跟视频的依赖是**反向**的：不是卡去迁就视频，
+   而是**视频必须给卡留位**。取卡时看它返回的 `occlusion`：
+
+   | `occlusion` | 含义 | 生成视频时怎么写 |
+   |---|---|---|
+   | `{x,y,w,h}`（归一化 0~1） | 卡的文字占这块屏 | 把「主体避开该区域、不要居中」写进视频生成提示词，**然后再生成** |
+   | `"full"` | 整屏参与（压暗/盖满） | 没有可让的位置：底下视频只能当纹理。要么接受，要么改短文案、换别的卡 |
+
+   实测数据（12 张叠加卡的真实占位）：8 张把文字画在**中间**（`focusDimSpotlight`、
+   `handDrawnEllipse`、`highlighterSweep`、`keywordPopHighlight`、`markerUnderlineTitle`、
+   `perCharacterRise`、`softBlurIn`、`wordSlotCycle`），1 张**贴底**（`typewriterReveal`），
+   `focusDimSpotlight` 把**窗口以外整屏压暗**、`numberSlabPop` 的舞台本身就是实心铺满 ——
+   后两张标 `"full"`。
+
+   **所以：「主体居中」的画面 + 叠加卡 = 主体被文字压住。** 这类段落要么让主体偏一侧，
+   要么用 `fullscreen` 卡（它替代画面，没有这个问题）。
+   `fullscreen` / `transition` 卡**没有**这个顺序要求。
 
 **取到 `html` 卡之后**：用 `postProduction.renderCard` 把它渲出来。
 **不要**试图把 html 卡接进 `filter_complex` —— 它不是滤镜。

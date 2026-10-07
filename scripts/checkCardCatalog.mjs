@@ -66,6 +66,36 @@ for (const entry of catalog) {
   seen.add(entry.slug);
 }
 
+// ── 4b. 叠加卡必须标占位区（occlusion），且区域合法 ──────────────────
+// 这条守的是**顺序依赖**：叠加卡叠在 AI 视频上，视频必须先给卡留位。
+// 没有这个信息，「主体避开文字」就无从谈起 —— 而视频一旦生成完，主体被压住只能重做。
+// 踩过：12 张叠加卡的 meta 里原先没有这个字段，卡库只说了「它会叠在视频上」，
+// 没说「它占哪块屏」，于是 Agent 只能先出视频、再叠卡，顺序天然是反的。
+for (const card of htmlCards) {
+  const shape = card.meta.shape;
+  const occlusion = card.meta.occlusion;
+  if (shape !== "overlay") {
+    if (occlusion !== undefined) {
+      failures.push(`${card.meta.slug}：shape 是 ${shape}，不该有 occlusion（占位区只对叠加卡有意义）`);
+    }
+    continue;
+  }
+  if (occlusion === undefined) {
+    failures.push(`${card.meta.slug}：叠加卡没有标 occlusion —— Agent 无法知道要为它让开哪块屏，只能先出视频再叠卡（顺序反了，主体被压住就得重做）`);
+    continue;
+  }
+  if (occlusion === "full") continue;
+  const { x, y, w, h } = occlusion;
+  const values = [x, y, w, h];
+  if (values.some(value => typeof value !== "number" || !Number.isFinite(value))) {
+    failures.push(`${card.meta.slug}：occlusion 的 x/y/w/h 必须是数字`);
+    continue;
+  }
+  if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > 1.0001 || y + h > 1.0001) {
+    failures.push(`${card.meta.slug}：occlusion ${JSON.stringify(occlusion)} 越界（应满足 0≤x、0≤y、w>0、h>0、x+w≤1、y+h≤1）`);
+  }
+}
+
 // ── 5. 每张 HTML 卡都要能被检索到（至少能被自己的语义检索到）────────
 for (const card of htmlCards) {
   const semantics = card.meta.semantics ?? [];

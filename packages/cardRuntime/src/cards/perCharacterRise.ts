@@ -28,6 +28,8 @@ export const perCharacterRise: CardDefinition = {
     shape: "overlay",
     semantics: ["论点", "金句"],
     inputs: ["V"],
+    // ACT: 占位区（视频生成时要让开的地方）—— 居中一行逐字上浮（boxHeight ≈ 字号 × 1.25）；透明底
+    occlusion: { x: 0.07, y: 0.34, w: 0.86, h: 0.32 },
     oneliner: "每字从自己位置下方升到位，位移与淡入走两条不同缓动、逐字只错峰一帧——整句读作「一股气顶上来」，不是一个个蹦。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/per-character-rise.md",
   },

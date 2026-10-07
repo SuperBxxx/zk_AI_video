@@ -24,6 +24,8 @@ export const highlighterSweep: CardDefinition = {
     shape: "overlay",
     semantics: ["引用", "强调"],
     inputs: ["V"],
+    // ACT: 占位区（视频生成时要让开的地方）—— 居中实心白卡（cardWidth = 设计宽 × 0.72）盖住底片
+    occlusion: { x: 0.14, y: 0.35, w: 0.72, h: 0.30 },
     oneliner: "半透明黄色荧光笔从左到右扫过引用文段的关键句，同帧其余文字压暗，扫完整句轻微浮起——替观众划重点。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/highlighter-sweep.md",
   },

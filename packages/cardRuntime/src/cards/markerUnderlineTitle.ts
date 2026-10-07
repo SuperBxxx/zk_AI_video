@@ -25,6 +25,8 @@ export const markerUnderlineTitle: CardDefinition = {
     shape: "overlay",
     semantics: ["标题", "强调"],
     inputs: ["V"],
+    // ACT: 占位区（视频生成时要让开的地方）—— 居中大标题 + 贴着字底的马克笔；透明底，只占这一条带
+    occlusion: { x: 0.05, y: 0.36, w: 0.9, h: 0.28 },
     oneliner: "大标题落定后，关键词下方马克笔从左到右一笔描画——变宽笔形、跟斜体字势微上斜、贴着字底。",
     origin: "按上游 video-shotcraft（Apache-2.0）规格实现：gallery/source/marker-underline-title.md",
   },

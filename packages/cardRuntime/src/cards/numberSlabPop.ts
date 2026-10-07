@@ -30,6 +30,8 @@ export const numberSlabPop: CardDefinition = {
     shape: "overlay",
     semantics: ["数据", "钩子"],
     inputs: ["V"],
+    // ACT: 占位区（视频生成时要让开的地方）—— stage 自身就是 background: #f5f5f7 实心铺满，底片被完全盖住
+    occlusion: "full",
     oneliner: "色块先从上方落定、块稳住那一帧巨大整数一次弹出，小数与单位再延后 6 帧单独淡入——结论感，不给过程。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/number-slab-pop.md",
   },

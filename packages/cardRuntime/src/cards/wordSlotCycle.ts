@@ -20,6 +20,8 @@ export const wordSlotCycle: CardDefinition = {
     shape: "overlay",
     semantics: ["列举", "选择"],
     inputs: ["V"],
+    // ACT: 占位区（视频生成时要让开的地方）—— 居中"固定词干 + 轮换词槽"（cellHeight ≈ 字号 × 1.7）；透明底
+    occlusion: { x: 0.09, y: 0.33, w: 0.82, h: 0.34 },
     oneliner: "句干锚死不动，句尾胶囊每 0.7s 向上翻一格换一个短语，末词换成结论并转强调色。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/word-slot-cycle.md",
   },

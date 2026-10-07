@@ -27,6 +27,8 @@ export const softBlurIn: CardDefinition = {
     shape: "overlay",
     semantics: ["金句", "论点"],
     inputs: ["V"],
+    // ACT: 占位区（视频生成时要让开的地方）—— 居中一行，从模糊解糊淡入；透明底
+    occlusion: { x: 0.08, y: 0.36, w: 0.84, h: 0.28 },
     oneliner: "一句话像被镜头对焦出来——整块从模糊起、边解糊边淡入，位移只占前 1/3 时长，逐字只错峰一帧。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/soft-blur-in.md",
   },

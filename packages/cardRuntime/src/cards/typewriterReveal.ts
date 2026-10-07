@@ -26,6 +26,8 @@ export const typewriterReveal: CardDefinition = {
     shape: "overlay",
     semantics: ["时间地点", "引用"],
     inputs: ["V"],
+    // ACT: 占位区（视频生成时要让开的地方）—— stage 用 justify-content: flex-end + padding 0 8% 14% —— 贴底一行，占位在画面下部
+    occlusion: { x: 0.08, y: 0.74, w: 0.84, h: 0.20 },
     oneliner: "等宽字体逐字符敲出时间地点戳、速度带随机抖动，方块光标 500ms 周期闪，句尾闪 3 次后副信息行再跟进——纪录片式档案感。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/typewriter-reveal.md",
   },

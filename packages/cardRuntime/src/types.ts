@@ -25,6 +25,24 @@ export type CardShape =
   /** 转场卡：作用在**两个镜头之间**。 */
   | "transition";
 
+/**
+ * 叠加卡在画面上**占用**的区域（归一化 0~1，相对画幅）。
+ *
+ * 为什么需要它：`overlay` 卡叠在 AI 视频上，而 12 张叠加卡里 8 张把文字**画在中间**、
+ * 1 张贴底，`focusDimSpotlight` 更是**把整屏压暗、只留目标行**。生成视频时若不知道这件事，
+ * 画面主体很容易正好落在文字底下 —— 而视频那时已经生成完，只能重做。
+ *
+ * 所以这里是个**反向依赖**：卡不迁就视频，是**视频必须给卡留位**。
+ * 分镜阶段用 `useCard` 查到本区域后，把它写进视频生成的提示词（主体避开该区、别居中），再生成。
+ *
+ * ACT: 用归一化矩形而不是像素 —— 卡是分辨率无关的，区域也必须与画幅无关。
+ * `"full"` 表示这张卡**整屏参与**（压暗/模糊全屏），底片只能当纹理，没有可让的位置。
+ */
+// ACT: 定义在 postProduction/cardFrame（画幅契约的唯一出处，与 CardShape 同处），
+// 这里 import 进来供本文件使用、并 re-export 给卡的实现 —— 两处各写一份必然漂移。
+import type { CardOcclusion } from "@toonflow/post-production";
+export type { CardOcclusion } from "@toonflow/post-production";
+
 /** 参数说明。与 postProduction 的 CardParameter 同构。 */
 export interface CardParamSpec {
   min: number;
@@ -62,6 +80,11 @@ export interface CardDefinition {
     semantics?: string[];
     /** 这张卡吃什么素材（同 FFmpeg 卡的词表）。不填则由 shape 推。 */
     inputs?: string[];
+    /**
+     * 叠加卡占用的画面区域。**必须是显式标注的实测值**，不从 CSS 猜 ——
+     * 卡的外层是 `inset: 0` 满屏容器，看 CSS 只会得出「整屏」（那是错的）。
+     */
+    occlusion?: CardOcclusion;
     oneliner: string;
     /** 移植来源（有的话），便于回溯上游组件。 */
     origin?: string;

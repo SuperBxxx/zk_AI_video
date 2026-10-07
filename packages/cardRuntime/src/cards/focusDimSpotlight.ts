@@ -25,6 +25,10 @@ export const focusDimSpotlight: CardDefinition = {
     shape: "overlay",
     semantics: ["强调", "列举"],
     inputs: ["V"],
+    // ACT: 标 "full" —— 它的聚光窗口靠 `box-shadow: 0 0 0 9999px` 把**窗口以外整屏压暗**
+    // （dim 默认 0.4），底片整幅都参与，没有哪块是"安全的"。这一段的视频只能当纹理，
+    // 要么换成短文案/别的卡，要么接受画面被压暗。
+    occlusion: "full",
     oneliner: "讲到哪里哪里亮——目标行保持原亮，其余整屏压暗，焦点随口播 0.2s 滑到下一目标，讲完整体恢复。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/focus-dim-spotlight.md",
   },

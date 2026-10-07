@@ -24,6 +24,8 @@ export const handDrawnEllipse: CardDefinition = {
     shape: "overlay",
     semantics: ["强调", "金句"],
     inputs: ["V"],
+    // ACT: 占位区（视频生成时要让开的地方）—— 居中手绘椭圆圈住目标，整体按画幅居中放大；透明底但覆盖很宽
+    occlusion: { x: 0, y: 0.24, w: 1.0, h: 0.52 },
     oneliner: "一笔逆时针画出的歪椭圆圈住关键短语，尾巴过头 8% 与起笔交叉，圈完留半拍呼吸再让被圈的词自己弹一下。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/hand-drawn-ellipse.md",
   },

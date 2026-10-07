@@ -50,6 +50,18 @@ export function designCanvasFor(width: number, height: number): { w: number; h: 
 /** HTML 卡的输出形态。全屏卡替代这一段画面；叠加卡叠在 AI 视频上。 */
 export type CardShape = "fullscreen" | "overlay" | "transition";
 
+/**
+ * 叠加卡在画面上**占用**的区域（归一化 0~1，相对画幅）；`"full"` 表示整屏参与。
+ *
+ * 为什么放在这里（而不是 cardRuntime）：这是**画幅契约**的一部分，与 CardShape 同类，
+ * 渲染入口、工具与卡目录共用同一份定义；cardRuntime 反过来从这里引用，避免两处定义漂移。
+ *
+ * 它回答的是「生成视频之前要知道什么」：12 张叠加卡里 8 张把文字画在中间、1 张贴底，
+ * `focusDimSpotlight` 与 `numberSlabPop` 更是整屏参与。不知道这件事就生成视频，
+ * 主体很容易正好落在文字底下 —— 那时视频已经产出，只能重做。
+ */
+export type CardOcclusion = { x: number; y: number; w: number; h: number } | "full";
+
 /** 目标画幅。 */
 export interface FrameSize {
   width: number;

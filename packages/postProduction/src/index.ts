@@ -83,6 +83,7 @@ export {
   fitCardToFrame,
   sameAspect,
   type CardShape,
+  type CardOcclusion,
   type FrameFit,
   type FrameSize,
 } from "./cardFrame";

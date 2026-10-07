@@ -19,6 +19,8 @@ export const scanBracketSweep: CardDefinition = {
     shape: "overlay",
     semantics: ["强调", "机制"],
     inputs: ["V"],
+    // ACT: 占位区（视频生成时要让开的地方）—— 本卡参数本身就是归一化目标框（targetX/Y/W/H 默认值），直接对齐
+    occlusion: { x: 0.42, y: 0.32, w: 0.24, h: 0.30 },
     oneliner: "四个直角框从画外滑入、收拢到目标上停住，锁定瞬间轻微一顿，附一行等宽状态标注。",
     origin: "按上游 video-shotcraft（Apache-2.0）规格实现：gallery/source/scan-bracket-sweep.md",
   },

@@ -24,6 +24,8 @@ export const keywordPopHighlight: CardDefinition = {
     shape: "overlay",
     semantics: ["强调", "钩子"],
     inputs: ["V"],
+    // ACT: 占位区（视频生成时要让开的地方）—— 居中一行关键词，红块按放大后的真实占位画；透明底
+    occlusion: { x: 0.05, y: 0.36, w: 0.9, h: 0.28 },
     oneliner: "字幕念到关键词的瞬间，该词带色块底从 0 弹到 1.65 倍再回落定格 1.15 倍，画面跟着微震一下。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/keyword-pop-highlight.md",
   },

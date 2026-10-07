@@ -39,6 +39,12 @@ import type { ToolContext, ToolDefinition, ToolPlugin } from "@toonflow/tools-sc
  */
 const cardCatalog: CardCatalogEntry[] = buildCardCatalog(builtInCards, htmlCards);
 
+/** 把占位区转成 Agent 好读的百分比描述（给提示词用，不是给程序用）。 */
+function formatOcclusion(occlusion: { x: number; y: number; w: number; h: number }) {
+  const pct = (value: number) => `${Math.round(value * 100)}%`;
+  return `横向 ${pct(occlusion.x)}~${pct(occlusion.x + occlusion.w)}、纵向 ${pct(occlusion.y)}~${pct(occlusion.y + occlusion.h)}`;
+}
+
 const configSchema = z.object({
   targetFps: z.number().min(1).max(240).default(30),
   freezeDuration: z.number().min(0.1).max(10).default(0.8),
@@ -581,6 +587,9 @@ const plugin: ToolPlugin = {
           "**先看 kind**：ffmpeg 卡给滤镜链（接在 -vf/filter_complex 里）；html 卡是浏览器渲染的整段画面（fullscreen，替代这一段）或透明叠加层（overlay，叠在视频上），**不能当滤镜用**。",
           // ACT: 这句话要同时点明两件事：卡的 baseSize 只是默认值；以及取卡时给 frameSize 的收益。
           "**画幅**：所有卡都是分辨率无关的 —— 卡里声明的 `size`/baseSize 只是**未指定时的默认值**，与目标画幅不同是**预期的**，不是限制。取卡时**一律传 frameSize**（成片宽高）：HTML 卡据此算设计画布，滤镜卡据此填好尺寸参数（未传则用默认 1920×1080，竖屏会错）。不要以为卡「按横屏调好的」就去手改卡里的数字。",
+          // ACT: 叠加卡是**反向依赖**：它叠在 AI 视频上，所以卡必须先定、视频后生成。
+          // 顺序反了的话，主体落在文字底下时视频已经产出，只能重做。
+          "**叠加卡（overlay）必须先定卡、再生成视频**。取到叠加卡后看它的 `occlusion`（占位区，归一化）或 `\"full\"`（整屏参与）：把「画面主体避开该区域、不要居中」写进**视频生成的提示词**，然后才生成那一段。`fullscreen` / `transition` 卡没有这个顺序要求（前者替代画面、后者作用于两镜之间）。",
         ],
         parameters: cardQueryParameters,
         executionMode: "sequential",
@@ -621,6 +630,13 @@ const plugin: ToolPlugin = {
               const text = [
                 `${definition.meta.title}：${definition.meta.oneliner}`,
                 `形态：${definition.meta.shape} — ${shapeNote}`,
+                // ACT: 叠加卡必须把「占哪块屏」交出来，这是**生成视频之前**要用的信息。
+                // 不知道它就会先做视频、再叠卡，主体正好落在文字底下时视频已经产出，只能重做。
+                ...(definition.meta.occlusion
+                  ? [definition.meta.occlusion === "full"
+                    ? "**占位：整屏参与** —— 这张卡会压暗/盖住整个画面，底下视频只能当纹理，没有可让的位置。要用它就先接受这一点，或改短文案/换别的卡。"
+                    : `**占位：${formatOcclusion(definition.meta.occlusion)}**（归一化，相对画幅）—— 生成这一段的视频时**先把这个区域写进提示词**（主体避开该区、不要居中），再生成；否则主体会被这张卡的文字压住，而视频已经产出、只能重做。`]
+                  : []),
                 `时长：${definition.frames} 帧 @30fps（${(definition.frames / 30).toFixed(2)}s）`,
                 `可调参数：${params.join("、")}`,
                 `形状：${definition.meta.shape}`,
@@ -643,6 +659,7 @@ const plugin: ToolPlugin = {
                   textLocked: true,
                   parameters: definition.params,
                   origin: definition.meta.origin,
+                  ...(definition.meta.occlusion ? { occlusion: definition.meta.occlusion } : {}),
                   ...(fit ? { frameFit: fit } : {}),
                 },
               };
@@ -734,6 +751,8 @@ const plugin: ToolPlugin = {
               // kind 决定后续怎么用：ffmpeg 给滤镜链，html 给一段页面
               kind: entry.kind,
               ...(entry.shape ? { shape: entry.shape } : {}),
+              // 候选阶段就带上占位区：分镜时才能判断「这一段要不要为它让位」
+              ...(entry.occlusion ? { occlusion: entry.occlusion } : {}),
               oneliner: entry.oneliner,
               score,
               reasons,
@@ -744,8 +763,14 @@ const plugin: ToolPlugin = {
             };
           });
           const htmlCount = candidates.filter(entry => entry.kind === "html").length;
+          const overlayCandidates = candidates.filter(entry => entry.kind === "html" && entry.shape === "overlay");
           return {
-            content: [{ type: "text", text: `${candidates.length} 张候选（按分排序；HTML 画面卡 ${htmlCount} 张）：\n${candidates.map(c => `  ${c.slug} [${c.kind}${c.shape ? "·" + c.shape : ""}] ${c.score} ${c.title} — ${c.reasons.join("；")}`).join("\n")}\n\n**kind 决定怎么用**：ffmpeg 卡取出来是滤镜链，接在 ffmpeg 的 -vf/filter_complex 里；html 卡是浏览器渲染的整段画面（fullscreen）或透明叠加层（overlay），**不能当滤镜用**。选定后用 slug 取卡的完整内容。` }],
+            content: [{ type: "text", text: `${candidates.length} 张候选（按分排序；HTML 画面卡 ${htmlCount} 张）：\n${candidates.map(c => `  ${c.slug} [${c.kind}${c.shape ? "·" + c.shape : ""}] ${c.score} ${c.title} — ${c.reasons.join("；")}`).join("\n")}\n\n**kind 决定怎么用**：ffmpeg 卡取出来是滤镜链，接在 ffmpeg 的 -vf/filter_complex 里；html 卡是浏览器渲染的整段画面（fullscreen）或透明叠加层（overlay），**不能当滤镜用**。选定后用 slug 取卡的完整内容。`
+              // ACT: 这里就把「顺序」点出来。叠加卡叠在 AI 视频上，所以**卡要先定、视频后生成** ——
+              // 反过来（先生成视频再叠卡）一旦主体落在文字底下，只能重做视频。
+              + (overlayCandidates.length
+                ? `\n\n**顺序提醒**：候选里有 ${overlayCandidates.length} 张叠加卡（overlay）。叠加卡是**叠在 AI 视频上**的，所以**先定卡、再生成视频**：取卡时看它的 occlusion（占位区），把该区域写进视频生成提示词（主体避开、别居中），然后再生成。先生成视频再叠卡，主体被文字压住时视频已经产出，只能重做。`
+                : "") }],
             details: { candidates },
           };
         },

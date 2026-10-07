@@ -11,7 +11,7 @@
 
 import type { RecipeCard, CardInput, CardSemantic } from "./cardLibrary";
 import { matchCards } from "./cardLibrary";
-import type { CardShape } from "./cardFrame";
+import type { CardShape, CardOcclusion } from "./cardFrame";
 
 /** 目录里的卡是哪种实现。 */
 export type CardKind = "ffmpeg" | "html";
@@ -31,6 +31,13 @@ export interface CardCatalogEntry {
   baseSize?: { width: number; height: number };
   /** 卡自带文案（HTML 卡目前文案写在卡里，Agent 改不了）。 */
   textLocked?: boolean;
+  /**
+   * 叠加卡**占用**的画面区域（归一化 0~1）或 `"full"`。
+   *
+   * 这是给「生成视频」用的：查到这一段要用某张叠加卡后，先把这个区域写进视频生成提示词
+   * （主体避开该区、别居中），**再**生成视频 —— 否则主体正好落在文字底下，视频已经产出，只能重做。
+   */
+  occlusion?: CardOcclusion;
   origin?: string;
   inputs: CardInput[];
   semantics: CardSemantic[];
@@ -47,6 +54,8 @@ interface HtmlCardLike {
     semantics?: string[];
     /** 显式素材形态。不填则按 shape 推。 */
     inputs?: string[];
+    /** 叠加卡占用的画面区域（归一化）或 "full"。 */
+    occlusion?: CardOcclusion;
     oneliner: string;
     origin?: string;
   };
@@ -96,6 +105,7 @@ export function htmlCardToCatalogEntry(card: HtmlCardLike): CardCatalogEntry {
     baseSize: card.size,
     // HTML 卡的文案目前写在卡里（每张卡的 render 里），Agent 只能调参数、不能改字
     textLocked: true,
+    ...(card.meta.occlusion ? { occlusion: card.meta.occlusion } : {}),
     origin: card.meta.origin,
     inputs: inputsForCard(card),
     // ACT: 语义是**显式标注**，不从文案里猜。踩过：先写过「从 oneliner 里查关键词」的推导，
