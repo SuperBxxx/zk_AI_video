@@ -1,12 +1,45 @@
-# 待修 bug（未修复，等待下次处理）
+# 待修 bug
 
-> 记录时间：2026-10-07。**这些 bug 都还没修**，只做了定位。
+> 记录时间：2026-10-07。逐条修复中，状态见下表。
 > 每一条都标了「已确定」与「未查清」，避免下次从零重查。
 > 复现环境：开发版（`bun run dev` → http://localhost:5173）；安装包版本同代码。
 
+## 修复进度一览
+
+| # | 问题 | 状态 |
+|---|---|---|
+| BUG-1 | ② 节点写不进文本 | ✅ **已修**（文本载入兜底 + 路径缺失时落盘） |
+| BUG-2 | 素材库「添加到素材库」无反应 | ❌ 未修，怀疑点已收敛到 3 处静默早退 |
+| BUG-3 | 营销模式创建项目连续 409 | ✅ **已修**（根因已复现并验证） |
+| BUG-4 | 画布工具成功也回错误文案 | ❌ 未修，需要一次现场证据 |
+| BUG-5 | `/api/desktop/update` 500 | ❌ 未修，根因已确定（很好修） |
+| BUG-6 | `<label for>` 可访问性提示 | ❌ 未修（轻微） |
+
+BUG-1 与 BUG-3 其实是**同一条链**：6 个 textNode 并发建 `assets` 目录 → 撞锁 409 / 父目录未就绪 404
+→ `textPath` 读不到 → 载入失败且无重试 → `textReady` 永远 false → 工具写入报「文本尚未加载」。
+两处都改完后整条链才通。
+
 ---
 
-## BUG-1 ② 节点写不进文本：「文本尚未加载，无法保存」★ 根因已确定
+## BUG-1 ② 节点写不进文本：「文本尚未加载，无法保存」✅ 已修
+
+### 修法（已实现并验证）
+
+`packages/nodes/textNode/src/index.vue` 的 `loadText()`：
+
+1. **新增 `isMissingPath(error)`**：把「读不到文件」（HTTP 404 / `ENOENT`）识别为**尚未有内容**，
+   而不是失败 —— 取空文本继续走，并在下面把 `assets/<id>/content.md` 真正创建出来。
+2. **建目录改为顺序执行**（`assets` 再 `assets/<id>`）：原先两处 mkdir 并发，
+   父目录还没落地就建子目录 → 6 个 `assets/m-*` 全部 404。顺序化后消失。
+3. mkdir 的失败容忍扩到 `EEXIST` / `EBUSY` / HTTP 409 —— 目录已存在或正被别的请求建，都算达成目的。
+
+### 验证
+
+- `bun run typecheck`（textNode）通过
+- 重建节点产物并核对 `textNode.umd.js` 含 `ENOENT` / `EBUSY` 分支
+- 见 BUG-3 的复现脚本：6 个节点并发载入 → 建目录 + 写文件**全部 200**
+
+### 原始记录（保留，便于回溯）
 
 ### 现象
 
@@ -118,29 +151,54 @@ assetLibrary.vue:258  loadEntries() → /api/assets/list（失败会弹 ElMessag
 
 ---
 
-## BUG-3 首页选「营销/推广模式」创建项目后连续多个 409 ★ 未查清
+## BUG-3 首页选「营销/推广模式」创建项目后连续多个 409 ✅ 已修（已复现）
 
-### 现象
+### 根因（**已实测复现**，不是推断）
 
-在首页选营销/推广模式进入画布后，**提示了好几个 409**（`Request failed with status code 409`）。
-
-### 已查
-
-服务端 409 有 20+ 处，最可能的三个（**但哪一个还没确认**）：
+用脚本照前端的真实调用顺序打接口，一次复现：
 
 ```
-apps/server/src/utils/workspace/files.ts:63        文件正在使用，请等待操作完成
-apps/server/src/agent/mentionFiles.ts:35           画布正在保存，请重试
-apps/server/src/app.ts:88                          EEXIST / ENOTEMPTY → 409（已存在同名文件或目录）
+=== 6 个 textNode 并发 mkdir（就是那批 409）===
+✗ mkdir assets/m-brief    HTTP 404  找不到这个文件或文件夹     ← 父目录还没建好
+✓ mkdir assets (m-brief)  HTTP 200
+✗ mkdir assets (m-visual) HTTP 409  文件正在使用，请等待操作完成  ← 抢锁失败
+✗ mkdir assets (m-cut)    HTTP 409  文件正在使用，请等待操作完成
+✗ mkdir assets (m-script) HTTP 409  文件正在使用，请等待操作完成
+✗ mkdir assets (m-audio)  HTTP 409  文件正在使用，请等待操作完成
+✗ mkdir assets (m-video)  HTTP 409  这个名称已经被占用了
+✗ mkdir assets/m-*        HTTP 409  文件正在使用 / 已被占用
 ```
 
-### 下次该查
+**用户的猜测方向是对的**（「模式默认创建了多个节点造成冲突」），
+但不是节点之间冲突 —— 而是**营销模式一次铺 6 个 textNode，
+每个节点挂载时都去建同一个 `assets` 目录**：
 
-F12 → Network → 点 409 请求 → 读响应体 `message`（前端只显示了英文的 axios 文案，真实原因在 `message` 里）。
-或看服务端控制台日志。
+- `apps/server/src/utils/workspace/files.ts` 的 `lockWorkspaceFiles` 对**嵌套路径**也判冲突，
+  并发建 `assets` 时 1 个拿到锁、其余撞 `EBUSY` → **409「文件正在使用，请等待操作完成」**
+- `assets/<id>` 的父目录尚未落地 → `mkdir`（非 recursive）→ ENOENT → **404**
 
-**提示**：因为是「营销/推广模式」这种**模板/模式**初始化流程，且是**连续多个**，
-更像是初始化时并发写了同一批文件 / 或目录已存在（重复创建模式时会撞 EEXIST）。
+这两个码都跟「模式里有几个节点」成正比放大了 —— 节点越多，红得越多。
+
+### 修法（已实现并验证）
+
+1. **`apps/server/src/routes/workspaces/files/mkdir.ts` 改为幂等**：
+   - 先**无锁探测** `stat(path).isDirectory()` → 已经是目录就直接成功（重入/再进项目零冲突）
+   - 还没建好才拿锁建；拿不到锁按 20ms 递增退避重试（上限 10 次 ≈ 1.1s）
+   - 建的时候撞 `EEXIST`/`ENOTEMPTY` 也算成功
+2. **`textNode` 改为顺序建目录**（见 BUG-1），从源头不再制造 404
+
+### 验证
+
+复现脚本连跑 3 轮：**无 404、无 409**（`mkdir assets` 6 个并发全部 200，
+子目录、写文件全部 200）。
+
+### 关于「重复创建画布 409」
+
+单独验过：`write 画布1.json` 第二次确实返回 409
+（「这个名称已经被占用了，请换一个名称。原来的内容不会被覆盖。」）——
+**这是 exclusive 的正确行为**，且前端 `createProject` 会先 `list()` 判空并拒绝非空目录，
+正常路径碰不到。只在「两次提交」这类竞态下才会出现，不是这批 409 的主因。
+
 
 ---
 

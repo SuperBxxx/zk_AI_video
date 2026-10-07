@@ -105,17 +105,49 @@ nodeEvent.on("save", async (reason) => {
   if (reason === "reload" && generating.value) throw new Error("文本正在生成，请完成后再刷新节点");
 });
 onMounted(() => { textLoading = loadText(); });
+/** 文件不存在（读不到）与目录不存在，都视为「还没有内容」而不是失败。 */
+function isMissingPath(error: unknown) {
+  const response = (error as { response?: { status?: number; data?: { data?: { code?: string } } } })?.response;
+  return response?.status === 404 || response?.data?.data?.code === "ENOENT";
+}
 async function loadText() {
   try {
     if (!node.id || /[\\/]/.test(node.id) || node.id === "." || node.id === "..") throw new Error("节点 ID 不能作为文件夹名称");
     if (data.value.textPath !== undefined && data.value.textPath !== textPath) throw new Error("文本文件路径无效");
     textFiles = files.getWorkspaceFiles();
-    const value = data.value.textSnapshot !== undefined ? data.value.textSnapshot : data.value.textPath ? await textFiles.readText(textPath) : outputs.value.text.value;
+    let value: string;
+    let missing = false;
+    if (data.value.textSnapshot !== undefined) {
+      value = data.value.textSnapshot;
+    } else if (data.value.textPath) {
+      // ACT: 读不到文件**不等于出错**。模板预置的节点绑了 assets/<id>/content.md，
+      // 但那个文件从没被创建过 —— 原先这里直接抛，异常被 catch 吞掉、textReady 永远 false，
+      // 于是工具写入永远报「文本尚未加载」、退出保存也报同一句，整条链路卡死。
+      // 现在当作空文本继续，并在下面把文件真正创建出来。
+      try {
+        value = await textFiles.readText(textPath);
+      } catch (error) {
+        if (!isMissingPath(error)) throw error;
+        missing = true;
+        value = "";
+      }
+    } else {
+      value = outputs.value.text.value;
+    }
     if (typeof value !== "string") throw new Error("文本内容无效");
-    if (!data.value.textPath) {
+    // 首次（未绑路径）或路径缺失（绑了但文件不在）都要建目录并落盘，把路径坐实
+    if (!data.value.textPath || missing) {
+      // ACT: **顺序建**，不要并发。
+      // `assets/<id>` 的父目录是 `assets`，并发建子目录时父目录很可能还没落地 ——
+      // 实测：营销模式一次铺 6 个 textNode，每个都并发 mkdir，结果是
+      // 6 个 `assets/m-*` 全部 404（父目录不存在）、并发的 `assets` 之间互相撞锁。
+      // 服务端的 mkdir 已改为幂等，这里再把顺序理顺，两边一起才干净。
       for (const directory of ["assets", `assets/${node.id}`]) {
-        await textFiles.mkdir(directory).catch((error: { response?: { data?: { data?: { code?: string } } } }) => {
-          if (error.response?.data?.data?.code !== "EEXIST") throw error;
+        await textFiles.mkdir(directory).catch((error: { response?: { status?: number; data?: { data?: { code?: string } } } }) => {
+          // 目录已存在（EEXIST）是正常情况；并发的临时占用（409/EBUSY）也不该
+          // 让整次载入失败 —— 目的（目录存在）已经达成。
+          const code = error.response?.data?.data?.code;
+          if (code !== "EEXIST" && code !== "EBUSY" && error.response?.status !== 409) throw error;
         });
       }
       await textFiles.write(textPath, value);
