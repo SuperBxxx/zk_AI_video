@@ -13,6 +13,9 @@ import { perCharacterRise } from "./perCharacterRise";
 import { keywordPopHighlight } from "./keywordPopHighlight";
 import { highlighterSweep } from "./highlighterSweep";
 import { focusDimSpotlight } from "./focusDimSpotlight";
+import { markerUnderlineTitle } from "./markerUnderlineTitle";
+import { scanlineAnnotateFocus } from "./scanlineAnnotateFocus";
+import { handDrawnEllipse } from "./handDrawnEllipse";
 
 export const htmlCards = [
   digitRoll,
@@ -24,6 +27,9 @@ export const htmlCards = [
   keywordPopHighlight,
   highlighterSweep,
   focusDimSpotlight,
+  markerUnderlineTitle,
+  scanlineAnnotateFocus,
+  handDrawnEllipse,
 ];
 
 export function findHtmlCard(slug: string) {
