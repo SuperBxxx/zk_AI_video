@@ -389,7 +389,20 @@ const saveAssetHint = computed(() => {
 });
 
 async function handleCommand(command: string) {
-  if (command === "saveAsset") saveNodeToAssets?.(props.label, assetOutputs.value);
+  // ACT: 这里原先是一行 `saveNodeToAssets?.(...)`，**没有 await、没有 catch**。
+  // openSave 是 async，它内部一旦抛错就变成未处理的 Promise 拒绝 ——
+  // 用户看到的现象就是「点了没反应」，连报错都没有，极难查。
+  // 现在显式等待并把失败说出来；注入缺失也如实告知，而不是被 `?.` 静默吞掉。
+  if (command === "saveAsset") {
+    if (!saveNodeToAssets) return ElMessage.error("当前画布不支持保存到素材库");
+    if (!assetOutputs.value.length) return ElMessage.error("节点还没有内容，先生成或上传后再保存");
+    try {
+      await saveNodeToAssets(props.label, assetOutputs.value);
+    } catch (error) {
+      ElMessage.error(error instanceof Error ? error.message : "保存到素材库失败");
+    }
+    return;
+  }
   if (command === "clipboard" && copyNodeToClipboard && !copyingToClipboard.value) {
     copyingToClipboard.value = true;
     try {

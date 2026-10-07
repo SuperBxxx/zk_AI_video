@@ -249,7 +249,13 @@ const { addNodes, addEdges, removeEdges, findEdge, findNode, toObject, viewport,
 provide("copyNodeToClipboard", (node: Parameters<typeof copyNodeToClipboard>[0]) => copyNodeToClipboard(node, project.value?.directory ?? ""));
 provide("retainNodeFiles", true);
 provide("selectionConnection", shallowRef<NodeConnectionFeedback>());
-provide("saveNodeToAssets", (label: string, outputs: { label: string; output: NodeOutput }[]) => assetLibraryRef.value?.openSave(label, outputs));
+// ACT: 这里原先用 `assetLibraryRef.value?.openSave(...)`。组件 ref 为空时 `?.` 会静默吞掉，
+// 表现为「点『添加到素材库』没反应」且无任何提示。改为如实抛出，让上层报出原因。
+provide("saveNodeToAssets", (label: string, outputs: { label: string; output: NodeOutput }[]) => {
+  const library = assetLibraryRef.value;
+  if (!library) throw new Error("素材库面板尚未就绪，请稍后重试");
+  return library.openSave(label, outputs);
+});
 let canvasController = new AbortController();
 let workspaceController = new AbortController();
 const createCanvasContext = useCanvasTools({

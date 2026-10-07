@@ -380,8 +380,13 @@ async function createAssetFolder(parent: string, name: string) {
 }
 
 async function openSave(label: string, items: AssetOutput[]) {
+  // ACT: 这两个早退原先都是**静默** return，上层又是 `saveNodeToAssets?.(...)` 没 await 没 catch，
+  // 于是用户看到的现象就是「点『添加到素材库』完全没反应」且控制台无报错 —— 极难查。
+  // 哪怕真是「不该在这里用」，也要把原因说出来。
   // 保存节点输出需要一个项目目录来读节点文件，画布之外没有这个上下文。
-  if (!canvasMode.value) return;
+  if (!canvasMode.value) throw new Error("当前视图不支持保存到素材库");
+  if (!props.directory) throw new Error("还没有打开项目目录，无法保存到素材库");
+  if (!items.length) throw new Error("节点还没有内容，先生成或上传后再保存");
   outputs.value = items;
   selectedOutput.value = 0;
   assetName.value = label.endsWith(extension.value) ? label : `${label}${extension.value}`;
