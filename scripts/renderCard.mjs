@@ -17,7 +17,7 @@
 //   bun scripts/renderCard.mjs --card digitRoll --out out/digitRoll.mp4
 //   bun scripts/renderCard.mjs --print-chrome
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildCardPage } from "@toonflow/card-runtime";
@@ -117,13 +117,66 @@ class Cdp {
   }
 }
 
-// 连上已运行的 Chrome；没有就按 --print-chrome 的提示让用户先起
+// 连上 Chrome。**默认自己起一个**（见下），也支持连已经在跑的。
+//
+// ACT: 早先这里写的是「本机沙箱不允许 Bun 起浏览器，必须外部先起 Chrome」——
+// 那个结论是错的，来自一次没加 --no-sandbox 的失败尝试，之后就一直被当成事实沿用。
+// 实测：Bun.spawn + stdio:"ignore" + **--no-sandbox** 能正常起 headless Chrome 并连通 CDP
+// （不加 --no-sandbox 时进程立刻退出，status=3，且没有 EPERM 之类的线索）。
+// 所以默认自己起浏览器，不再要求调用方先手工起一个 —— 这条路径要能被工具复用的前提。
+let ownedChrome = null;
 let targets;
+async function fetchTargets() {
+  return await (await fetch(`http://127.0.0.1:${cdpPort}/json/list`)).json();
+}
+/**
+ * 找本机的 Chrome 可执行文件。
+ *
+ * ACT: 必须用绝对路径 —— Windows 上 Chrome 默认不写进 PATH，`spawn("chrome")` 找不到
+ * （踩过：报「起不了 Chrome」，实际是命令名解析失败，不是浏览器起不来）。
+ * 按「环境变量 → 常见安装位置」找，Edge 作为兜底。
+ */
+function resolveChrome() {
+  return [
+    process.env.ZK_CHROME_PATH,
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+  ].filter(Boolean).find(candidate => existsSync(candidate));
+}
+
 try {
-  targets = await (await fetch(`http://127.0.0.1:${cdpPort}/json/list`)).json();
+  targets = await fetchTargets();
 } catch {
-  console.error(`连不上 127.0.0.1:${cdpPort} 上的 Chrome。先跑：\n  bun scripts/renderCard.mjs --print-chrome`);
-  process.exit(1);
+  const chromePath = resolveChrome();
+  if (!chromePath) {
+    console.error("找不到 Chrome/Edge。设 ZK_CHROME_PATH 指向可执行文件，或先手工起一个：\n  bun scripts/renderCard.mjs --print-chrome");
+    process.exit(1);
+  }
+  const profile = join(root, ".tmp-build", "chromeProfile");
+  mkdirSync(profile, { recursive: true });
+  ownedChrome = spawn(chromePath, [
+    "--headless=new", "--disable-gpu", "--no-first-run", "--hide-scrollbars",
+    // 关键：不加这个，headless Chrome 在本机会立刻退出（status=3）
+    "--no-sandbox",
+    `--remote-debugging-port=${cdpPort}`,
+    `--user-data-dir=${profile}`,
+    "about:blank",
+  ], { stdio: "ignore" });
+  // 等 CDP 就绪（最多约 16s）
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 400));
+    try { targets = await fetchTargets(); break; } catch { /* 还没起来 */ }
+  }
+  if (!targets) {
+    console.error(`起不了 Chrome（${chromePath}，端口 ${cdpPort}）。可先手工起一个：\n  bun scripts/renderCard.mjs --print-chrome`);
+    process.exit(1);
+  }
+}
+/** script 结束时收掉自己起的浏览器。 */
+function shutdown() {
+  if (ownedChrome && !ownedChrome.killed) ownedChrome.kill();
 }
 
 // 卡页面写到工作目录外的临时目录：file:// 下加载更稳妥，也不污染工作区
@@ -248,4 +301,5 @@ console.log(`  抓帧 ${renderSeconds.toFixed(1)}s（${(total / renderSeconds).t
 
 // ACT: 显式退出。本机的 Bun 在跑完这类脚本后**偶发不退出**（stdio 句柄没收干净），
 // 会让外层 for 循环里的下一个渲染永远等下去。所有写入都是同步的，直接退出是安全的。
+shutdown();
 process.exit(0);
