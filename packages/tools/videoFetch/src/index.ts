@@ -37,12 +37,24 @@ async function fetchToWorkspace(context: ToolContext, url: string, name?: string
   );
 }
 
-/** 词级时间：转写由配置好的媒体供应商做，失败不阻断分析（要如实说明）。 */
+/** 词级时间：转写由配置好的媒体供应商做，失败不阻断分析（要如实说明并给出补救路径）。 */
 async function transcribe(context: ToolContext, path: string, language?: string, signal?: AbortSignal) {
   try {
     const models = await callServer<{ providerId: string; providerLabel: string; type: string }[]>("/api/ai/media/models", { method: "GET" });
     const provider = models.find(model => model.type === "audio" || model.type === "video");
-    if (!provider) return { ok: false as const, reason: "还没有配置可用的语音识别供应商，所以这次没有词级时间" };
+    if (!provider) {
+      // ACT: 这条消息要**说清失去了什么**并给出补救路径，不能只说"没取到"。
+      // 词级时间是"钩子落在哪个词上"的唯一依据 —— 缺了它，解读就只能停在画面结构层面，
+      // 而爆款片的动效几乎都踩在词上。所以这里明说后果 + 指向设置面板，
+      // 并给出一条不需要配置也能继续的替代路（让用户说出开场原句）。
+      return {
+        ok: false as const,
+        reason: "还没有配置语音识别（ASR）供应商",
+        impact: "没有词级时间，就无法判断「钩子落在哪个词上」，也无法把叠加卡对准说话节奏 —— 这类解读只能停在画面结构层面。",
+        remedy: "在「设置 → 语音模型」里添加一个支持词级时间戳的识别供应商，然后重跑一次分析。",
+        fallback: "在此之前，可以直接问用户「这条视频开场那句原话是什么」—— 把原句写进解读，比猜一个钩子位置可靠。",
+      };
+    }
     const result = await callServer<unknown>("/api/ai/media/transcript", {
       method: "POST",
       body: { providerId: provider.providerId, directory: context.cwd, path, languageHints: language ? [language] : undefined },
@@ -52,7 +64,13 @@ async function transcribe(context: ToolContext, path: string, language?: string,
   } catch (error) {
     // ACT: 转写失败不该让整次分析失败 —— 画面证据仍然有用，
     // 但**必须如实说明这次没有词级时间**，不能假装有。
-    return { ok: false as const, reason: error instanceof Error ? error.message : String(error) };
+    return {
+      ok: false as const,
+      reason: error instanceof Error ? error.message : String(error),
+      impact: "没有词级时间，判断不了钩子落在哪个词、也对不准说话节奏。",
+      remedy: "检查「设置 → 语音模型」里的识别供应商是否可用，然后重跑一次分析。",
+      fallback: "也可以直接问用户开场那句原话，写进解读。",
+    };
   }
 }
 
@@ -144,20 +162,67 @@ const plugin: ToolPlugin = {
           void probeMedia;
 
           // 3) 词级时间（可选，失败不阻断，但如实说明）。
-          const transcript = input.skipTranscript || !evidence.media.hasAudio
-            ? { ok: false as const, reason: evidence.media.hasAudio ? "你选择了跳过语音转写" : "这条素材没有音轨，无法取词级时间" }
-            : await transcribe(context, localPath, input.language, signal);
+          // ACT: 这里刻意写**三条完整**的失败分支（reason/impact/remedy/fallback），
+          // 不要只给简短 reason —— 缺字段会让联合类型不完整（踩过：TS 报 "属性不存在"），
+          // 而且 Agent 需要"失去了什么 + 怎么补 + 现在能做什么"这三条才知道该怎么继续。
+          const transcript = input.skipTranscript
+            ? {
+              ok: false as const,
+              reason: "你选择了跳过语音转写",
+              impact: "这次解读没有词级依据，钩子位置与说话节奏只能靠画面变化推测。",
+              remedy: "需要词级时间时重跑一次分析、不要传 skipTranscript。",
+              fallback: "也可以直接问用户开场那句原话，写进解读。",
+            }
+            : !evidence.media.hasAudio
+              ? {
+                ok: false as const,
+                reason: "这条素材没有音轨",
+                impact: "没有声音就没有词级时间，钩子只能从画面变化判断。",
+                remedy: "换一条带音轨的素材；纯画面素材本身就不适用按词对齐。",
+                fallback: "按画面变化候选（boundaries）来分段同样成立。",
+              }
+              : await transcribe(context, localPath, input.language, signal);
+
+          // ACT: 用显式分支而不是三元 —— 三元里的联合类型收窄不可靠（踩过：三元里访问
+          // `transcript.impact` 报"属性不存在"，改成 if 分支后正常）。
+          let transcriptLines: string[];
+          if (transcript.ok) {
+            transcriptLines = [`词级时间：已取到（供应商 ${transcript.provider}），完整结果见 details.transcript`];
+          } else {
+            transcriptLines = [
+              `词级时间：**没有取到** —— ${transcript.reason}`,
+              `  这意味着：${transcript.impact}`,
+              `  怎么补上：${transcript.remedy}`,
+              `  现在也能做的：${transcript.fallback}`,
+            ];
+          }
 
           const lines = [
             `参考素材：${localPath}${isLink ? `（来自 ${input.source}）` : ""}`,
             ...evidence.notes,
-            transcript.ok
-              ? `词级时间：已取到（供应商 ${transcript.provider}），完整结果见 details.transcript`
-              : `词级时间：**没有取到** —— ${transcript.reason}`,
+            ...transcriptLines,
             "",
-            "接下来由你写解读：这类视频的套路（骨架、节奏、钩子位置）、值得复用的手法（每条引用上面的证据路径）、已知坑。",
+            // ACT: 这一段是**必须**的。只给帧的路径清单时，Agent 写出来的解读只会是
+            // "节奏紧凑、钩子有力"这类空话 —— 它能引用 12.4s 这个时刻，但不知道那一帧
+            // 画的是什么。`read` 工具支持图片（返回 image 内容块、自动缩放到 2000x2000），
+            // 所以这里明确要求它真的去打开这些帧再下结论。
+            "**在写解读之前，先用 `read` 工具打开下面这些帧图**（它支持图片，会直接给你画面）。",
+            "只看路径清单写不出画面内容，那样写出来的只会是空话。",
+            evidence.pages.length
+              ? `  先看这几页网格（一眼看完整段）：${evidence.pages.slice(0, 3).map(page => page.path).join("、")}`
+              : "",
+            (() => {
+              // 帧图给一张首帧 + 一条覆盖全片的均匀取样，避免只挑开头那段。
+              const picked = evidence.frames.length <= 8
+                ? evidence.frames
+                : [evidence.frames[0]!, ...Array.from({ length: 6 }, (_, index) => evidence.frames[Math.floor((index + 1) * (evidence.frames.length - 1) / 7)]!)];
+              return `  再看这几帧原图（时刻即文件名）：${picked.map(frame => `${frame.at}s → ${frame.path}`).join("；")}`;
+            })(),
+            "变化候选那几个时刻的帧**一定要看**——它们是画面发生变化的地方，也是最可能藏着手法的地方。",
+            "",
+            "然后写解读：这类视频的套路（骨架、节奏、钩子位置）、值得复用的手法（每条引用上面的证据路径）、已知坑。",
             "写完后如果用户认可，用 save_analysis_recipe 把它命名保存成一张配方卡，下次做同类视频可以直接取用。",
-          ];
+          ].filter(Boolean);
 
           return {
             content: [{ type: "text", text: lines.join("\n") }],
