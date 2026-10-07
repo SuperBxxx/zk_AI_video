@@ -9,7 +9,7 @@
 //   · 画幅契约破损 → 设计画布短边不再是 270（卡的参数是按这个短边标定的）
 //
 // 用法：bun scripts/checkCardCatalog.mjs [--quiet]
-import { designCanvasFor, buildCardCatalog, builtInCards } from "@toonflow/post-production";
+import { designCanvasFor, buildCardCatalog, builtInCards, videoAnalysisCards } from "@toonflow/post-production";
 import { htmlCards } from "@toonflow/card-runtime/cards";
 
 const quiet = process.argv.includes("--quiet");
@@ -55,10 +55,13 @@ for (const [width, height] of [[1920, 1080], [1080, 1920], [1080, 1080], [2560, 
   }
 }
 
-// ── 4. 目录必须两张库都收进来，且 slug 不重复 ──────────────────────
-const catalog = buildCardCatalog(builtInCards, htmlCards);
-if (catalog.length !== builtInCards.length + htmlCards.length) {
-  failures.push(`目录条数（${catalog.length}）≠ 两个卡库之和（${builtInCards.length} + ${htmlCards.length}）`);
+// ── 4. 目录必须三套卡都收进来，且 slug 不重复 ──────────────────────
+// ACT: 分析卡也进同一份目录。少了这段等式检查，分析卡漏接时目录会「静默变小」，
+// Agent 就查不到「读参考视频」这一类做法 —— 那正是加分析卡时要修的缺口。
+const catalog = buildCardCatalog(builtInCards, htmlCards, videoAnalysisCards);
+const expected = builtInCards.length + htmlCards.length + videoAnalysisCards.length;
+if (catalog.length !== expected) {
+  failures.push(`目录条数（${catalog.length}）≠ 三个卡库之和（${builtInCards.length} + ${htmlCards.length} + ${videoAnalysisCards.length}）`);
 }
 const seen = new Set();
 for (const entry of catalog) {
@@ -115,6 +118,17 @@ const shapeCount = {
 };
 const unnamedSemantics = htmlCards.filter(card => !(card.meta.semantics ?? []).length).length;
 
+// ── 5. 分析卡：必须写清产出什么证据、以及为什么必须用它 ────────────
+// 分析卡最容易退化成"一句说明"，那样 Agent 就不会去用它。
+for (const card of videoAnalysisCards) {
+  if (!card.evidence?.length) failures.push(`分析卡 ${card.slug} 没写产出哪些证据（evidence）`);
+  if (!card.why?.trim()) failures.push(`分析卡 ${card.slug} 没写为什么必须用它（why）`);
+  if (!card.oneliner?.trim()) failures.push(`分析卡 ${card.slug} 缺少一句话说明`);
+  // 分析卡不产画面，带上 filters 会让 Agent 以为能直接喂给 ffmpeg
+  if ("filters" in card) failures.push(`分析卡 ${card.slug} 不该带 filters —— 它不产出画面`);
+}
+const analysisEntries = catalog.filter(entry => entry.kind === "analysis");
+
 if (failures.length) {
   console.log(`卡目录自检失败 ${failures.length} 项：`);
   for (const failure of failures) console.log("  ✗ " + failure);
@@ -122,7 +136,7 @@ if (failures.length) {
 }
 if (!quiet) {
   console.log(
-    `卡目录自检通过（FFmpeg ${builtInCards.length} 张 + HTML ${htmlCards.length} 张：`
+    `卡目录自检通过（FFmpeg ${builtInCards.length} 张 + HTML ${htmlCards.length} 张 + 分析 ${videoAnalysisCards.length} 张：`
     + `全屏 ${shapeCount.fullscreen} / 叠加 ${shapeCount.overlay} / 转场 ${shapeCount.transition}；`
     + `未标语义 ${unnamedSemantics} 张）`,
   );

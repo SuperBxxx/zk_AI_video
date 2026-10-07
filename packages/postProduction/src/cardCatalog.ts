@@ -12,9 +12,11 @@
 import type { RecipeCard, CardInput, CardSemantic } from "./cardLibrary";
 import { matchCards } from "./cardLibrary";
 import type { CardShape, CardOcclusion } from "./cardFrame";
+import type { AnalysisRecipeCard, AnalysisEvidence } from "./videoAnalysisCards";
+import { videoAnalysisCards } from "./videoAnalysisCards";
 
 /** 目录里的卡是哪种实现。 */
-export type CardKind = "ffmpeg" | "html";
+export type CardKind = "ffmpeg" | "html" | "analysis";
 
 /** 统一目录项。两个卡库都被归一成这个形状。 */
 export interface CardCatalogEntry {
@@ -41,6 +43,15 @@ export interface CardCatalogEntry {
   origin?: string;
   inputs: CardInput[];
   semantics: CardSemantic[];
+  /**
+   * 分析卡才有：产出哪些证据。
+   *
+   * ACT: 分析卡**不产画面**，所以没有 shape/frames/filters ——
+   * 在目录里显式带上这一项，Agent 才不会拿它当可执行的滤镜卡。
+   */
+  evidence?: AnalysisEvidence[];
+  /** 分析卡才有：为什么必须用它（不用会怎样）。 */
+  why?: string;
 }
 
 /** HTML 卡的原型（与 cardRuntime 的 CardDefinition 结构兼容，避免这里引它的类型）。 */
@@ -127,11 +138,38 @@ export function recipeCardToCatalogEntry(card: RecipeCard): CardCatalogEntry {
   };
 }
 
-/** 两套卡合成一份目录。 */
-export function buildCardCatalog(recipeCards: RecipeCard[], htmlCards: HtmlCardLike[]): CardCatalogEntry[] {
+/**
+ * 把一张分析卡归一成目录项。
+ *
+ * ACT: 分析卡的 `inputs` 用的是自己的词表（视频/音频/词表），
+ * 与后期卡的封闭词表（人/V/图/…）不是一套；这里做映射而不是硬塞，
+ * 免得把「视频」当成后期卡里的「V」（原片画面）而产生错误联想。
+ */
+export function analysisCardToCatalogEntry(card: AnalysisRecipeCard): CardCatalogEntry {
+  return {
+    kind: "analysis",
+    slug: card.slug,
+    title: card.title,
+    category: card.category,
+    oneliner: card.oneliner,
+    inputs: card.inputs.map(input => input === "视频" ? "V" : input === "音频" ? "文" : "文") as CardInput[],
+    semantics: [],
+    evidence: card.evidence,
+    why: card.why,
+  };
+}
+
+/**
+ * 三套卡合成一份目录。
+ *
+ * ACT: `analysisCards` 有默认值，所以已有调用方（脚本、工具、卡目录自检）不改也能跑，
+ * 且不会因为漏传而让分析卡在目录里消失 —— 那是这次要修的核心缺口。
+ */
+export function buildCardCatalog(recipeCards: RecipeCard[], htmlCards: HtmlCardLike[], analysisCards: AnalysisRecipeCard[] = videoAnalysisCards): CardCatalogEntry[] {
   return [
     ...recipeCards.map(recipeCardToCatalogEntry),
     ...htmlCards.map(htmlCardToCatalogEntry),
+    ...analysisCards.map(analysisCardToCatalogEntry),
   ];
 }
 

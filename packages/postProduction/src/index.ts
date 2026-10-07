@@ -91,9 +91,18 @@ export {
 export {
   buildCardCatalog,
   htmlCardToCatalogEntry,
+  analysisCardToCatalogEntry,
   matchCatalog,
   matchCatalogDetailed,
   recipeCardToCatalogEntry,
   type CardCatalogEntry,
   type CardKind,
 } from "./cardCatalog";
+
+export {
+  videoAnalysisCards,
+  videoAnalysisCategories,
+  type AnalysisRecipeCard,
+  type AnalysisInput,
+  type AnalysisEvidence,
+} from "./videoAnalysisCards";

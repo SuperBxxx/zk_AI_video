@@ -6,6 +6,8 @@ import * as mediaProvider from "@/utils/media/provider";
 import * as ffmpeg from "@/utils/ffmpeg";
 import * as cardRender from "@/utils/cardRender";
 import * as assetPreview from "@/utils/assetPreview";
+import * as ytDlp from "@/utils/ytDlp";
+import * as cardLibrary from "@/utils/cardLibrary";
 import * as pluginInstall from "@/utils/plugins/install";
 import conf, { removeLegacySettings } from "@/utils/conf";
 import * as ai from "@/utils/ai";
@@ -33,6 +35,8 @@ export default {
   ffmpeg,
   cardRender,
   assetPreview,
+  ytDlp,
+  cardLibrary,
   pluginInstall,
   conf,
   removeLegacySettings,

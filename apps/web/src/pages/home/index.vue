@@ -4,6 +4,7 @@
     <el-header class="pageHeader">
       <el-space wrap :size="12">
         <el-button round size="large" :icon="IconFolders" aria-label="素材库" @click="assetsVisible = true">素材库</el-button>
+        <el-button round size="large" :icon="IconLayoutGrid" aria-label="配方卡片库" @click="cardLibraryVisible = true">配方卡片库</el-button>
         <el-badge isDot :hidden="!hasDesktopUpdate">
           <el-button round size="large" :icon="IconSettings" :aria-label="hasDesktopUpdate ? '设置，有新版本可用' : '设置'" @click="settingsVisible = true">设置</el-button>
         </el-badge>
@@ -79,6 +80,7 @@
            放进对话框会把内容区压成 0，同样是「什么都没有」。 -->
       <assetLibrary v-model="assetsVisible" :canvas="false" fill />
     </el-dialog>
+    <cardLibrary v-model="cardLibraryVisible" />
     <workspacePicker ref="relocationPicker" hideTrigger />
   </el-container>
 </template>
@@ -111,11 +113,14 @@ import modelSetupDialog from "@/components/modelSetupDialog.vue";
 // 素材库组件位于画布目录下，但它操作的是全局 assets 目录，与画布无耦合。
 // 跨目录引用此处是有意的：先复用同一份实现，避免维护两套素材库。
 import assetLibrary from "@/pages/workspace/panels/canvas/components/assetLibrary.vue";
+import cardLibrary from "@/components/cardLibrary.vue";
 import minimalBackground from "@/components/minimalBackground.vue";
 import workspacePicker from "./workspacePicker.vue";
 const settingsVisible = ref(false);
 // 首页的素材库：素材库是全局的，不需要先打开项目就能管理素材。
 const assetsVisible = ref(false);
+// 配方卡片库：浏览现有卡（分析卡 / HTML 卡 / FFmpeg 配方卡），不依赖当前项目。
+const cardLibraryVisible = ref(false);
 const router = useRouter();
 const creating = ref(false);
 const opening = ref(false);

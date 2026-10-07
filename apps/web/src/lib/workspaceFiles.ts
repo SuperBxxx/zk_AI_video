@@ -131,6 +131,23 @@ export default function useWorkspaceFiles(directory?: MaybeRefOrGetter<string | 
     return data.data.path;
   }
 
+  /**
+   * 从链接取流：把一个视频页面链接下载成工作区里的本地文件。
+   *
+   * ACT: 服务端在 yt-dlp 缺失时会**按需下载并校验**，所以这里不需要前端先引导安装。
+   * 站点要求登录态（如部分抖音视频）时下载会失败，错误信息由服务端透出 ——
+   * 那时应引导用户手动导出成本地文件，而不是反复重试。
+   */
+  async function fetchVideo(url: string, name?: string) {
+    const { data } = await client.post<{ code: number; data: { path: string; duration: number | null; width: number | null; height: number | null; hasAudio: boolean }; message?: string }>(
+      "/videoFetch",
+      { directory: getDirectory(), url, name },
+      { timeout: 1800000 },
+    );
+    if (data.code !== 200 || !data.data?.path) throw new Error(data.message || "下载失败");
+    return data.data;
+  }
+
   // ACT: 当前目录逐次读取；跨 await 或防抖的操作传入目录字符串，固定本次目标。
-  return { list, read, acquireUrl, readText, readJson, write, writeJson, rename, remove, mkdir, prepareVideo };
+  return { list, read, acquireUrl, readText, readJson, write, writeJson, rename, remove, mkdir, prepareVideo, fetchVideo };
 }
