@@ -14,6 +14,7 @@
 | BUG-4 | 画布工具成功也回错误文案 | 🟡 **已修结构性根因**（操作已生效后的落盘失败不再让整次调用变成错误） |
 | BUG-5 | `/api/desktop/update` 500 | ✅ **已修**（根因：去 Toonflow 化留下的 identifier 不一致） |
 | BUG-6 | `<label for>` 可访问性提示 | ✅ **已修**（el-input-number 的 id 落在根 div 上，for 永远匹配不到） |
+| LIMIT-1 | 抖音链接取流不可用 | ⛔ **平台限制，非缺陷**（四种方案全部被它的安全 SDK 拦掉，见下） |
 
 BUG-1 与 BUG-3 其实是**同一条链**：6 个 textNode 并发建 `assets` 目录 → 撞锁 409 / 父目录未就绪 404
 → `textPath` 读不到 → 载入失败且无重试 → `textReady` 永远 false → 工具写入报「文本尚未加载」。
@@ -543,4 +544,79 @@ web typecheck：仅 7 个**既有** TS7006（与我改的文件无关），无�
 - **验证脚本的常量必须与源码逐字对齐**（BUG-5 那次我把 hash 正则照猜成十六进制，
   得出「修复无效」的错误结论）。照猜的规则验证的是自己的假设，不是代码。
 
+---
 
+## LIMIT-1 抖音链接取流不可用 ⛔ 平台限制（不是我们的缺陷）
+
+> 记录时间：2026-10-08。**结论已定，不要再重查**。
+> 验证用的真实链接：`https://v.douyin.com/nAo9EQ6qfZM/` → 解析到视频 id `7688392913676713915`
+> （作者「冉冉启山河」，标题「300多3天2晚住进南宁全新开业酒店」）。
+
+### 现象
+
+粘贴抖音分享链接取流，报 `ERROR: [Douyin] <id>: Fresh cookies (not necessarily logged in) are needed`。
+`--verbose` 下能看到真因：`Failed to download web detail JSON: HTTP Error 403: Forbidden`。
+
+### 已排除的原因（都实测过，不要重复试）
+
+| 猜测 | 实测结果 |
+|---|---|
+| 缺 cookies | ✗ 不是。用 `--cookies-from-browser` 取不到（见下），但**我自己启动的浏览器**里取到 32 条 cookie（含 `ttwid`、`__ac_signature`、`s_v_web_id`），写成 Netscape 格式喂给 yt-dlp **仍然 403** |
+| `--cookies-from-browser chrome` | ✗ Chrome 127+ 的 App-Bound 加密，yt-dlp 报 `Failed to decrypt with DPAPI`（yt-dlp #10927） |
+| `--cookies-from-browser edge` | ✗ 报 `Could not copy Chrome cookie database`（数据库被占用，yt-dlp #7271） |
+| 缺 Referer 头 | ✗ 加 `--add-header "Referer:https://www.douyin.com/"` 仍 403 |
+| TLS 指纹 | ✗ `--impersonate chrome / chrome-136 / safari` 三种都试过（curl_cffi 0.16.0 可用），仍要 cookie |
+| yt-dlp 版本旧 | 大概不是。用的是官方最新 `2026.08.19`（与上游锁的版本一致） |
+
+### 关键对照：**同一接口，浏览器 200、yt-dlp 403**
+
+在真实浏览器页面里请求同一个 detail 接口：
+
+```
+同源 fetch detail → HTTP 200，69923 字节，返回完整 aweme_detail
+页面 video 元素 → duration 39.83、videoWidth 1280（正常播放）
+视频真实规格 → 1920x1080，39.834 秒
+```
+
+所以不是平台封禁，而是**抖音的风控识别出"不是真实浏览器页面的请求"**。
+
+### 试过并失败的绕过方案（四种，都被同一个安全 SDK 拦掉）
+
+抖音页面加载了 `lf-security.bytegoofy.com/.../sdk-glue.js`，它**替换了 `window.fetch`**。
+
+| 方案 | 结果 |
+|---|---|
+| 主世界（页面上下文）`fetch` | ✗ 被 SDK 拦，`TypeError: Failed to fetch`，堆栈直接指向它自己的 `onRequest` |
+| `XMLHttpRequest` | ✗ detail 能过，但视频 CDN 跨域失败（`xhr.onerror`）——SDK 的 hook 显然为跨域加了别的东西 |
+| 隔离环境（`Page.createIsolatedWorld`）里 `fetch` | ✗ WAF 返回 `Blocked by ...` 页面（不是 JSON），说明隔离环境的请求被判为异常 |
+| 隔离环境取原生 `fetch`、在主世界调用 | ✗ 仍被 SDK 拦 —— 它拦的是**调用点**，不是函数本身 |
+
+另外两条路也试过，不成立：
+- 让 Chrome 自己下载（`Browser.setDownloadBehavior` + `<a download>`）：跨域资源上 `download` 属性被浏览器忽略，**0 字节落地**
+- 直接下 CDN 地址（带浏览器取到的播放地址）：**403**，CDN 也要会话
+
+### 结论与产品的处置
+
+**这是抖音专门对抗自动化的结果，不是我们代码能修的。** 已按此处置：
+
+- `POST /api/videoFetch` 遇到这类拒绝时，返回**可执行的中文提示**：
+  「这个站点拒绝了自动下载（需要它的登录态或签名）。可以：① 在浏览器里打开该视频并另存为文件，再上传到素材库；② 换其他站点的链接。」
+  （`code: "SITE_BLOCKED"`）
+- **不再尝试浏览器辅助提取** —— 试了四种实现都被拦，继续做只会得到一个不稳定、随时失效的功能。
+
+### 教训
+
+排查时踩过两次误判，记下来避免下次重复：
+
+1. **`Fresh cookies` 不是真因**。它是 yt-dlp 对「detail 接口没返回可用 JSON」的兜底文案；
+   真因要 `--verbose` 才看得到（403）。我第一次只按 `403` 做降级判断，
+   结果**非 verbose 输出里没有 403**，降级从未触发。
+2. **`TypeError: Failed to fetch` 不一定是我们的连接失败**。它出在抖音页面自己的
+   Slardar 遥测脚本里；我当时花了很久查自己的 CDP `fetch`，其实连接一直是通的。
+   判断依据：看堆栈是不是指向站点的 SDK。
+
+### 仍然可用的取流
+
+- **B站**：完整可用，无需 cookie。实测 `POST /api/videoFetch` 4.3 秒 →
+  `参考_bili.mp4` 71.75 MB、`h264/avc1 + aac/mp4a`、1920x1080、212.3 秒。
+- **本地文件**：永远可用，也是抖音这条的兜底路径。

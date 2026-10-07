@@ -1,0 +1,16 @@
+{
+  "name": "@toonflow/tool-media-analysis",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build.ts",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@toonflow/ffmpeg": "workspace:*"
+  },
+  "devDependencies": {
+    "@toonflow/tools-scaffold": "workspace:*"
+  }
+}

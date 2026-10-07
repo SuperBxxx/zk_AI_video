@@ -84,8 +84,16 @@ export async function fetchVideo(options: { directory: string; url: string; name
     ],
   });
   if (result.code !== 0) {
-    // 透出 yt-dlp 的原始错误；站点要求登录/额外参数时，调用方据此引导用户改用手动导出
     const detail = (result.stderr || result.stdout).split(/\r?\n/).filter(Boolean).slice(-3).join("；");
+    // ACT: 站点拒绝 yt-dlp 时（抖音的 detail 接口对 yt-dlp 直接 403，而同一接口在真实浏览器里
+    // 是 200），错误信息要能让用户知道该换什么办法，而不是只看到一句英文报错。
+    // 注意匹配词要宽：抖音**非 verbose** 输出里只有 "Fresh cookies (not necessarily logged in) are needed"，
+    // "HTTP Error 403" 只在 --verbose 下才出现。
+    if (/403|Forbidden|Fresh cookies/i.test(detail)) {
+      throw Object.assign(new Error(
+        "这个站点拒绝了自动下载（需要它的登录态或签名）。可以：① 在浏览器里打开该视频并用下载工具另存为文件，再上传到素材库；② 换其他站点的链接。",
+      ), { status: 502, code: "SITE_BLOCKED" });
+    }
     throw Object.assign(new Error(detail || "下载失败"), { status: 502, code: "YTDLP_FAILED" });
   }
 
