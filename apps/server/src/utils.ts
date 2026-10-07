@@ -8,6 +8,7 @@ import * as cardRender from "@/utils/cardRender";
 import * as assetPreview from "@/utils/assetPreview";
 import * as ytDlp from "@/utils/ytDlp";
 import * as cardLibrary from "@/utils/cardLibrary";
+import * as analysisRecipe from "@/utils/analysisRecipe";
 import * as pluginInstall from "@/utils/plugins/install";
 import conf, { removeLegacySettings } from "@/utils/conf";
 import * as ai from "@/utils/ai";
@@ -37,6 +38,7 @@ export default {
   assetPreview,
   ytDlp,
   cardLibrary,
+  analysisRecipe,
   pluginInstall,
   conf,
   removeLegacySettings,

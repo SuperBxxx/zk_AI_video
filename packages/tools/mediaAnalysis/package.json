@@ -3,6 +3,10 @@
   "version": "2.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./evidence": "./src/evidence.ts"
+  },
   "scripts": {
     "build": "bun build.ts",
     "typecheck": "tsc"

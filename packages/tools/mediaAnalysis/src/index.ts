@@ -1,4 +1,4 @@
-// 素材分析工具：读一条视频/音频，产出**可核对的证据**（媒体信息 / 证据帧 / 帧网格）。
+// 素材分析工具：读一条视频/音频，产出**可核对的证据**。
 //
 // 为什么需要它：技能文档要求「参考素材先逐帧拆解成手法清单」，但在这之前 Agent
 // 手上没有任何读素材的手段 —— 那条规则一直是空的。这个工具把「取证」这一步补上。
@@ -6,22 +6,12 @@
 // 与后期卡的分工：后期卡产出**画面**，本工具产出**证据**。所以它不写滤镜链、不成片，
 // 只把素材里的东西摊开给人核对。
 //
-// ACT: 帧与网格用**原生 fluent 工厂**直接落盘。`context.ffmpeg()` 在 server 进程里就是
-// `createWorkspaceFfmpeg(cwd)`（原生 @renmu/fluent-ffmpeg），所以 `.save()` 可用；
-// 而远端桥（executeRemoteFfmpeg）是给浏览器侧用的 fluent 链，没有"读回原始像素"这类能力，
-// 所以画面变化检测不能用它 —— 见文件末尾说明。
+// 取证实现与「参考分析节点」共用 `./evidence`（写两份必然漂移）。
 import type { ToolContext, ToolDefinition, ToolPlugin } from "@toonflow/tools-scaffold/runtime";
+import type { EvidenceFfmpeg, EvidenceFiles } from "./evidence";
+import { generateEvidence, probeMedia, sampleTimes } from "./evidence";
 
-interface ProbeInfo {
-  duration: number | null;
-  width: number | null;
-  height: number | null;
-  fps: number | null;
-  videoCodec: string | null;
-  audioCodec: string | null;
-  hasAudio: boolean;
-  container: string | null;
-}
+export * from "./evidence";
 
 function round(value: number, digits = 3) {
   return Number(value.toFixed(digits));
@@ -42,59 +32,8 @@ function assertInsideWorkspace(path: string) {
   if (path.split(/[\\/]/).includes("..")) throw new Error("输出目录不能包含 ..");
 }
 
-/** ffprobe 一条素材。 */
-async function probe(context: ToolContext, path: string, signal?: AbortSignal): Promise<ProbeInfo> {
-  const ffmpeg = await context.ffmpeg(signal);
-  const data = await new Promise<{
-    streams?: { codec_type?: string; codec_name?: string; width?: number; height?: number; avg_frame_rate?: string; r_frame_rate?: string }[];
-    format?: { duration?: string; format_name?: string };
-  }>((done, reject) => {
-    ffmpeg.ffprobe(path, (error, metadata) => error ? reject(error) : done(metadata as never));
-  });
-  const video = data?.streams?.find(stream => stream.codec_type === "video");
-  const audio = data?.streams?.find(stream => stream.codec_type === "audio");
-  const rate = video?.avg_frame_rate && video.avg_frame_rate !== "0/0" ? video.avg_frame_rate : video?.r_frame_rate;
-  const [numerator, denominator] = (rate ?? "").split("/").map(Number);
-  return {
-    duration: data?.format?.duration ? Number(data.format.duration) : null,
-    width: video?.width ?? null,
-    height: video?.height ?? null,
-    fps: numerator && denominator ? round(numerator / denominator) : null,
-    videoCodec: video?.codec_name ?? null,
-    audioCodec: audio?.codec_name ?? null,
-    hasAudio: Boolean(audio),
-    container: data?.format?.format_name ?? null,
-  };
-}
-
-/** 采样时刻：`at` 显式给，或用 start/end/every 按区间取。 */
-function sampleTimes(options: { duration: number; at?: number[]; start?: number; end?: number; every?: number; max: number }) {
-  if (options.at?.length) {
-    return [...new Set(options.at.map(at => round(clamp(at, 0, Math.max(0, options.duration - 0.001)))))].sort((a, b) => a - b).slice(0, options.max);
-  }
-  const start = options.start ?? 0;
-  const end = options.end ?? options.duration;
-  if (!(end > start)) throw new Error("end 必须大于 start");
-  const every = options.every ?? (end - start) / 12;
-  if (every < 0.02) throw new Error("采样间隔不能小于 0.02 秒，请扩大区间或加大 every");
-  const times: number[] = [];
-  // ACT: 取每格**中点**而不是格起点 —— 格起点会让第一帧落在区间边界上，
-  // 常取到转场的那一帧，而不是这一格真正的内容。
-  for (let at = start + every / 2; at < end && times.length < options.max; at += every) times.push(round(at));
-  if (!times.length) throw new Error("这个区间长度取不出采样点，请扩大区间");
-  return times;
-}
-
-/** 在某个时刻取一帧存成图片。 */
-async function grabFrame(
-  context: ToolContext,
-  source: string,
-  at: number,
-  target: string,
-  signal?: AbortSignal,
-) {
-  const ffmpeg = await context.ffmpeg(signal);
-  await context.files.mkdir(target.split("/").slice(0, -1).join("/") || ".", true).catch(() => undefined);
+/** 在某个时刻取一帧存成图片（单独导出给 Agent 的 frames 分支用）。 */
+async function grabFrame(ffmpeg: EvidenceFfmpeg, source: string, at: number, target: string, signal?: AbortSignal) {
   await new Promise<void>((done, reject) => {
     let settled = false;
     const finish = (error?: Error) => {
@@ -114,41 +53,6 @@ async function grabFrame(
   });
 }
 
-/** 把一个目录下的帧拼成网格图。用 ffmpeg 的 tile 滤镜（它本来就是为分页拼图做的）。 */
-async function buildGrid(
-  context: ToolContext,
-  files: string[],
-  target: string,
-  options: { columns: number; rows: number; cell: number },
-  signal?: AbortSignal,
-) {
-  if (!files.length) throw new Error("没有可拼的帧");
-  const ffmpeg = await context.ffmpeg(signal);
-  await context.files.mkdir(target.split("/").slice(0, -1).join("/") || ".", true).catch(() => undefined);
-  await new Promise<void>((done, reject) => {
-    let settled = false;
-    const finish = (error?: Error) => {
-      if (settled) return;
-      settled = true;
-      signal?.removeEventListener("abort", onAbort);
-      if (error) reject(error); else done();
-    };
-    const onAbort = () => { command.kill("SIGKILL"); finish(new Error("已取消")); };
-    signal?.addEventListener("abort", onAbort, { once: true });
-    const command = ffmpeg();
-    for (const file of files) command.input(file);
-    command
-      .complexFilter([
-        `${files.map((_, index) => `[${index}:v]`).join("")}concat=n=${files.length}:v=1:a=0[joined]`,
-        `[joined]scale=${options.cell}:-2,tile=${options.columns}x${options.rows}[grid]`,
-      ], "grid")
-      .outputOptions(["-frames:v", "1", "-q:v", "3"])
-      .on("error", error => finish(error instanceof Error ? error : new Error(String(error))))
-      .on("end", () => finish());
-    command.save(target);
-  });
-}
-
 // ACT: 与 postProduction 工具同样的理由 —— **手写 JSON Schema 字面量**，不调 z.toJSONSchema。
 // 工具产物会被构建压缩，zod 的内部标记在产物里被抹掉，z.toJSONSchema 会在工具加载时直接抛错。
 const analyzeSchema = {
@@ -158,47 +62,55 @@ const analyzeSchema = {
   properties: {
     operation: {
       type: "string",
-      enum: ["probe", "frames", "grid"],
-      description: "probe=读媒体信息；frames=按时刻取帧图；grid=区间采样拼成帧网格",
+      enum: ["probe", "frames", "evidence"],
+      description: "probe=只读媒体信息；frames=按精确时刻取帧图；evidence=一次生成完整证据（帧网格 + 变化候选）",
     },
     source: { type: "string", minLength: 1, maxLength: 4096, description: "素材路径（工作区内相对路径）" },
     output: { type: "string", minLength: 1, maxLength: 4096, description: "输出目录（工作区内相对路径）；不填则放在 analysis/<素材名>/ 下" },
     at: {
       type: "array", maxItems: 48,
       items: { type: "number", minimum: 0 },
-      description: "frames 用：要取的时刻列表（秒）。与 start/end/every 二选一",
+      description: "frames 用：要取的时刻列表（秒）",
     },
     start: { type: "number", minimum: 0, description: "区间起点（秒）" },
     end: { type: "number", minimum: 0, description: "区间终点（秒），不含" },
     every: { type: "number", minimum: 0.02, description: "采样间隔（秒）；不填则区间内均匀取 12 点" },
-    columns: { type: "number", minimum: 1, maximum: 12, description: "grid 用：网格列数，默认 3" },
-    rows: { type: "number", minimum: 1, maximum: 12, description: "grid 用：网格行数，默认 3" },
-    cell: { type: "number", minimum: 64, maximum: 1920, description: "grid 用：每格画面宽度，默认 480" },
+    columns: { type: "number", minimum: 1, maximum: 12, description: "网格列数，默认 3" },
+    rows: { type: "number", minimum: 1, maximum: 12, description: "网格行数，默认 3" },
+    cell: { type: "number", minimum: 64, maximum: 1920, description: "每格画面宽度，默认 480" },
+    rate: { type: "number", minimum: 1, maximum: 120, description: "变化检测的采样帧率，默认 12" },
+    threshold: { type: "number", minimum: 0, maximum: 1, description: "变化分数阈值，默认 0.1" },
   },
 } as const;
 
+interface AnalyzeInput {
+  operation: "probe" | "frames" | "evidence";
+  source: string;
+  output?: string;
+  at?: number[];
+  start?: number; end?: number; every?: number;
+  columns?: number; rows?: number; cell?: number;
+  rate?: number; threshold?: number;
+}
+
 const plugin: ToolPlugin = {
+  // 本工具不需要可调配置（采样上限是防止产物爆炸的硬边界，写在 schema 里）。
+  validateConfig: config => config,
   async createTools(context: ToolContext): Promise<ToolDefinition[]> {
     const tool: ToolDefinition = {
       name: "media_analyze",
       label: "分析素材",
-      description: "读一条视频/音频，产出可核对的证据：媒体信息、指定时刻的帧图、区间帧网格。不产出画面、不成片。",
-      promptSnippet: "读参考视频取证：先 probe 看清编码与时长，再用 frames 取关键帧或用 grid 看整段变化。",
+      description: "读一条视频/音频，产出可核对的证据：媒体信息、精确时刻的帧图、帧网格与画面变化候选。不产出画面、不成片。",
+      promptSnippet: "读参考视频取证：先 probe 看清编码与时长，再用 evidence 一次拿到帧网格与变化候选，最后按需 frames 补精确帧。",
       parameters: analyzeSchema as never,
       async execute(_id, params, signal) {
-        const input = params as {
-          operation: "probe" | "frames" | "grid";
-          source: string;
-          output?: string;
-          at?: number[];
-          start?: number; end?: number; every?: number;
-          columns?: number; rows?: number; cell?: number;
-        };
+        const input = params as AnalyzeInput;
         signal?.throwIfAborted();
-
-        const info = await probe(context, input.source, signal);
+        const ffmpeg = await context.ffmpeg(signal) as unknown as EvidenceFfmpeg;
+        const files = context.files as unknown as EvidenceFiles;
 
         if (input.operation === "probe") {
+          const info = await probeMedia(ffmpeg, input.source);
           const lines = [
             `素材：${input.source}`,
             `容器：${info.container ?? "未知"}`,
@@ -211,18 +123,20 @@ const plugin: ToolPlugin = {
           return { content: [{ type: "text", text: lines.join("\n") }], details: { operation: "probe", ...info } };
         }
 
-        if (info.duration === null) throw new Error("读不到素材时长，无法按时间取样");
-
         if (input.operation === "frames") {
           if (!input.at?.length) throw new Error("frames 需要 at（时刻列表，秒）");
+          const info = await probeMedia(ffmpeg, input.source);
+          if (info.duration === null) throw new Error("读不到素材时长，无法按时间取样");
           const output = input.output ?? defaultOutput(input.source, "frames");
           assertInsideWorkspace(output);
-          const times = sampleTimes({ duration: info.duration, at: input.at, max: 48 });
+          const times = [...new Set(input.at.map(at => round(clamp(at, 0, Math.max(0, info.duration! - 0.001)))))].sort((a, b) => a - b).slice(0, 48);
+          if (!times.length) throw new Error("at 里没有有效的时刻");
+          await files.mkdir(output, true);
           const frames: { at: number; path: string }[] = [];
           for (const at of times) {
             signal?.throwIfAborted();
             const target = `${output}/at-${at.toFixed(3).replace(".", "_")}s.jpg`;
-            await grabFrame(context, input.source, at, target, signal);
+            await grabFrame(ffmpeg, input.source, at, target, signal);
             frames.push({ at, path: target });
           }
           const text = [
@@ -233,36 +147,28 @@ const plugin: ToolPlugin = {
           return { content: [{ type: "text", text }], details: { operation: "frames", output, frames, media: info } };
         }
 
-        // grid：先按采样点落帧，再拼成网格（多于一页时自动分页）。
-        const output = input.output ?? defaultOutput(input.source, "grid");
+        // evidence：一次拿到帧网格与变化候选。
+        const output = input.output ?? defaultOutput(input.source, "evidence");
         assertInsideWorkspace(output);
-        const columns = input.columns ?? 3;
-        const rows = input.rows ?? 3;
-        const cell = input.cell ?? 480;
-        const perPage = columns * rows;
-        const times = sampleTimes({ duration: info.duration, start: input.start, end: input.end, every: input.every, max: 144 });
-        const frameDirectory = `${output}/frames`;
-        const frames: { at: number; path: string }[] = [];
-        for (const at of times) {
-          signal?.throwIfAborted();
-          const target = `${frameDirectory}/at-${at.toFixed(3).replace(".", "_")}s.jpg`;
-          await grabFrame(context, input.source, at, target, signal);
-          frames.push({ at, path: target });
-        }
-        const pages: { path: string; times: number[] }[] = [];
-        for (let offset = 0; offset < frames.length; offset += perPage) {
-          const slice = frames.slice(offset, offset + perPage);
-          const target = `${output}/page-${String(pages.length + 1).padStart(2, "0")}.jpg`;
-          await buildGrid(context, slice.map(item => item.path), target, { columns, rows, cell }, signal);
-          pages.push({ path: target, times: slice.map(item => item.at) });
-        }
+        const result = await generateEvidence(ffmpeg, files, {
+          source: input.source,
+          output,
+          columns: input.columns,
+          rows: input.rows,
+          cell: input.cell,
+          every: input.every,
+          start: input.start,
+          end: input.end,
+          boundaryRate: input.rate,
+          boundaryThreshold: input.threshold,
+          signal,
+        });
         const text = [
-          `已生成 ${pages.length} 页网格（每页 ${columns}x${rows}，每格宽 ${cell}px），输出目录：${output}`,
-          `单帧原图在 ${frameDirectory}（文件名即时刻）`,
-          ...pages.map((page, index) => `第 ${index + 1} 页：${page.path} —— 格内时刻（从左到右、从上到下）：${page.times.join("、")}`),
-          "图上没有烧时间码，格子对应的时间以这份清单为准；最后一页不足时补黑格。",
+          `已生成证据，输出目录：${output}`,
+          ...result.notes,
+          "格内对应时刻以 notes 里的清单为准（图上没有烧时间码）。",
         ].join("\n");
-        return { content: [{ type: "text", text }], details: { operation: "grid", output, columns, rows, cell, pages, frames, media: info } };
+        return { content: [{ type: "text", text }], details: { operation: "evidence", output, ...result } };
       },
     } as ToolDefinition;
     return [tool];
@@ -270,3 +176,4 @@ const plugin: ToolPlugin = {
 };
 
 export default plugin;
+export { sampleTimes };
