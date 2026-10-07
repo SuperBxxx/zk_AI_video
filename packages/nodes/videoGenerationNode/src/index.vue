@@ -88,7 +88,7 @@ import promptInput from "@toonflow/nodes-scaffold/promptInput";
 import videoPlayer from "@toonflow/nodes-scaffold/videoPlayer";
 import referenceItem from "@toonflow/nodes-scaffold/referenceItem";
 import mediaHistory from "@toonflow/nodes-scaffold/mediaHistory";
-import { describeMoments, resolveMomentTiming, type NodeSemanticValue } from "@toonflow/post-production";
+import { compileTimeline, describeMoments, describeTimeline, resolveMomentTiming, type NodeSemanticValue } from "@toonflow/post-production";
 import generationSettings from "./components/generationSettings.vue";
 
 defineOptions({
@@ -427,6 +427,40 @@ function getConfig() {
     matchingModes: matchingModes.value,
   };
 }
+
+nodeTools.register({
+  name: "getShotPlan",
+  description: "把接进来的叙事锚点编译成一份**镜头时间表**：按时间排出每一镜的起止、长度、它是什么锚点、替观众做什么，并核对总长与模型时长档位。**先看这张表再动手生成** —— 它会把总长对不上、档位不匹配、锚点没解析这些问题直接列出来",
+  parameters: z.strictObject({
+    targetSeconds: z.number().positive().max(3600).optional().describe("整片目标总长（秒）；给了就会核对时间表总长与它是否一致"),
+    gapSeconds: z.number().min(0).max(10).optional().describe("相邻镜头之间的间隔（秒），默认 0（紧接）"),
+    toleranceSeconds: z.number().min(0).max(5).optional().describe("允许的误差（秒），默认 0.5"),
+  }),
+  async execute({ targetSeconds, gapSeconds, toleranceSeconds }, { signal }) {
+    signal?.throwIfAborted();
+    const value = semanticValue.value;
+    if (!value?.moments.length) {
+      return { text: "这个节点没有接进叙事锚点，编译不出时间表。先用参考分析节点写入并解析锚点，再连过来。" };
+    }
+    const choice = selectedModel.value;
+    const durations = choice ? getDurations(choice) : [];
+    const timeline = compileTimeline(value, {
+      ...(targetSeconds !== undefined ? { targetSeconds } : {}),
+      ...(gapSeconds !== undefined ? { gapSeconds } : {}),
+      ...(toleranceSeconds !== undefined ? { toleranceSeconds } : {}),
+      ...(durations.length ? { durations } : {}),
+    });
+    return {
+      text: [
+        describeTimeline(timeline),
+        "",
+        "**按这张表给每个镜头节点设时长**（一个镜头一个视频生成节点，各设自己的 duration）。",
+        "有问题的先解决再生成 —— 尤其别靠拉伸镜头把总长凑到目标上。",
+      ].join("\n"),
+      timeline,
+    };
+  },
+});
 
 nodeTools.register({
   name: "getAnchorTiming",

@@ -129,3 +129,11 @@ export {
   type SemanticUtterance,
   type ResolvedTiming,
 } from "./semanticMoment";
+
+export {
+  compileTimeline,
+  describeTimeline,
+  type CompiledShot,
+  type CompiledTimeline,
+  type CompileOptions,
+} from "./timeline";
