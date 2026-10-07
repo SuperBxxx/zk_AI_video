@@ -12,8 +12,10 @@
       @command="handleCommand">
       <template #dropdown>
         <el-dropdown-menu>
-          <el-dropdown-item v-if="assetOutputs.length && saveNodeToAssets" command="saveAsset" :icon="IconFolderPlus">保存到素材库</el-dropdown-item>
-          <el-dropdown-item :divided="!!(assetOutputs.length && saveNodeToAssets)" command="copy" :icon="IconCopy">复制节点</el-dropdown-item>
+          <!-- ACT: 不再用 v-if 让这一项整个消失 —— 菜单项直接不见，用户只会以为功能没了。
+               统一改成「始终显示、条件不满足时禁用」，并用 saveAssetHint 说清为什么。 -->
+          <el-dropdown-item command="saveAsset" :icon="IconFolderPlus" :disabled="saveAssetDisabled">{{ saveAssetHint }}</el-dropdown-item>
+          <el-dropdown-item :divided="!saveAssetDisabled" command="copy" :icon="IconCopy">复制节点</el-dropdown-item>
           <el-dropdown-item command="duplicate" :icon="IconCopyPlus">创建副本</el-dropdown-item>
           <el-dropdown-item command="delete" :icon="IconTrash">删除节点</el-dropdown-item>
           <el-dropdown-item divided command="clipboard" :icon="IconCopy" :disabled="!copyNodeToClipboard || copyingToClipboard">
@@ -33,13 +35,18 @@
       @contextmenu.stop>
       <slot name="top">
         <el-card class="mediaToolbar" shadow="never" :bodyStyle="{ padding: '6px' }">
-          <el-button
-            :icon="IconFolderPlus"
-            :disabled="!assetOutputs.length || !saveNodeToAssets"
-            text
-            title="添加到素材库"
-            aria-label="添加到素材库"
-            @click.stop="handleCommand('saveAsset')" />
+          <!-- ACT: 禁用时必须说明原因。原先这个按钮是裸的，节点没有内容时它是灰的、
+               `title` 却仍写着「添加到素材库」—— 用户看到的就是**点了没反应**，
+               根本不知道是「功能坏了」还是「现在没东西可存」。 -->
+          <el-tooltip :showArrow="false" :content="saveAssetHint" placement="top" :hideAfter="0" :enterable="false" :triggerKeys="[]" :disabled="!saveAssetDisabled">
+            <el-button
+              :icon="IconFolderPlus"
+              :disabled="saveAssetDisabled"
+              text
+              :title="saveAssetHint"
+              aria-label="添加到素材库"
+              @click.stop="handleCommand('saveAsset')" />
+          </el-tooltip>
           <slot name="topActions" />
           <el-button
             :tag="downloadUrl ? 'a' : 'button'"
@@ -169,7 +176,7 @@ import {
   IconCircleDot,
   IconLoader2,
 } from "@tabler/icons-vue";
-import { ElCard, ElButton, ElDropdown, ElDropdownMenu, ElDropdownItem, ElMessage } from "element-plus";
+import { ElCard, ElButton, ElDropdown, ElDropdownMenu, ElDropdownItem, ElMessage, ElTooltip } from "element-plus";
 import type { DropdownInstance } from "element-plus";
 import { validateConnection } from "./connection";
 import { useNodeEvent } from "./nodeEvent";
@@ -371,6 +378,15 @@ const assetOutputs = computed(() =>
     return [{ label: handle.label ?? handle.id, output }];
   })
 );
+
+// 节点还没产出内容时按钮是禁用的 —— 必须把这个原因说出来，
+// 否则用户看到的就是「点了没反应」，分不清是坏了还是没东西可存。
+const saveAssetDisabled = computed(() => !assetOutputs.value.length || !saveNodeToAssets);
+const saveAssetHint = computed(() => {
+  if (!saveNodeToAssets) return "当前画布不支持保存到素材库";
+  if (!assetOutputs.value.length) return "节点还没有内容，先生成或上传后再保存";
+  return "添加到素材库";
+});
 
 async function handleCommand(command: string) {
   if (command === "saveAsset") saveNodeToAssets?.(props.label, assetOutputs.value);
