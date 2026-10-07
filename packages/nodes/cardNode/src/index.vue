@@ -81,7 +81,7 @@
 import { computed, nextTick, ref } from "vue";
 import { IconPhoto } from "@tabler/icons-vue";
 import { ElButton, ElCard, ElInputNumber, ElMessage, ElOption, ElProgress, ElSelect } from "element-plus";
-import { nodeSkeleton, showNodeError, useNode, useNodeInputs, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
+import { nodeSkeleton, nodeTools, showNodeError, useNode, useNodeInputs, z, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import videoPlayer from "@toonflow/nodes-scaffold/videoPlayer";
 import { htmlCards } from "@toonflow/card-runtime/cards";
 
@@ -192,93 +192,103 @@ function targetVideoPath(): string | undefined {
 }
 
 /**
- * 渲染。
+ * 执行渲染（UI 按钮与 Agent 的 nodeTool 共用这一条）。
  *
  * 进度走 SSE：服务端按 stage 推 `browser / render / encode / done`。
  * ACT: 用 fetch + 手动解析 SSE，不引 eventsource-parser —— 这里只读一种事件，
- * 为它多进一个依赖不划算（节点产物是要塞进用户安装包的）。
+ * 为它多进一个依赖不划算（节点产物要塞进用户安装包）。
+ *
+ * 返回最终成片的工作区相对路径。校验不过时抛错，由调用方决定怎么呈现。
  */
-async function render() {
+async function runRender(): Promise<string> {
   const card = selectedCard.value;
-  if (!card) return;
+  if (!card) throw new Error("还没有选卡");
   const shape = card.meta.shape;
   const target = targetVideoPath();
   if (shape === "overlay" && !target) {
-    ElMessage.warning("叠加卡要垫在 AI 视频上：请把目标视频接到本节点的视频入口");
-    return;
+    throw new Error("叠加卡要垫在 AI 视频上：请把目标视频接到本节点的视频入口");
   }
   if (shape === "transition") {
-    ElMessage.warning("转场卡作用在两个镜头之间，不能直接叠在单段视频上");
-    return;
+    throw new Error("转场卡作用在两个镜头之间，不能直接叠在单段视频上");
   }
 
+  // 工作区目录由画布注入的文件能力提供（与其它节点一致）
+  const { directory } = await files.getWorkspaceFiles().list();
+  const output = `assets/${node.id}/card-${Date.now()}.mp4`;
+  const response = await fetch("/api/card/render", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      // 与其它画布请求一致：这个头 + 浏览器自动带的 Origin 才能通过服务端的应用校验
+      "x-toonflow-workspace": "1",
+    },
+    signal: controller.value?.signal,
+    body: JSON.stringify({
+      requestId: crypto.randomUUID(),
+      directory,
+      slug: card.meta.slug,
+      width: width.value,
+      height: height.value,
+      fps: fps.value,
+      parameters: parameters.value,
+      output,
+      ...(target && shape === "overlay" ? { targetVideo: target } : {}),
+    }),
+  });
+  if (!response.ok || !response.body) {
+    // 服务端的错误是 JSON（{code, message}），把它读出来再抛 —— 只报 HTTP 状态码
+    // 会让用户看不到真正的原因（例如「只允许住凯AI视频页面访问控制连接」）
+    const detail = await response.json().catch(() => undefined) as { message?: string } | undefined;
+    throw new Error(detail?.message || `渲染请求失败（HTTP ${response.status}）`);
+  }
+
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  let finalOutput = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += value;
+    const chunks = buffer.split("\n\n");
+    buffer = chunks.pop() ?? "";
+    for (const chunk of chunks) {
+      const line = chunk.split("\n").find(item => item.startsWith("data: "));
+      if (!line) continue;
+      const event = JSON.parse(line.slice(6)) as {
+        stage: string; frame?: number; total?: number; message?: string;
+      };
+      if (event.stage === "browser") statusText.value = "启动渲染器";
+      else if (event.stage === "render" && event.total) {
+        progressPercent.value = Math.round(((event.frame ?? 0) / event.total) * 90);
+        statusText.value = `渲染 ${event.frame ?? 0}/${event.total} 帧`;
+      } else if (event.stage === "encode") { progressPercent.value = 94; statusText.value = "编码中"; }
+      else if (event.stage === "done") {
+        progressPercent.value = 100;
+        statusText.value = "完成";
+        // ACT: 只认**带 message 的** done。真正的输出路径由路由在最后推；
+        // 早先服务端在中间也推过一次空的 done，会把路径覆盖成空串（已修服务端，
+        // 这里再稳一道，避免两个 done 的语义含糊）。
+        if (event.message) {
+          const parsed = JSON.parse(event.message) as { outputPath?: string };
+          if (parsed.outputPath) finalOutput = parsed.outputPath;
+        }
+      }
+    }
+  }
+  if (!finalOutput) throw new Error("渲染没有返回输出路径");
+  outputs.value.video = { dataType: "VIDEO", value: { url: finalOutput, mimeType: "video/mp4" } };
+  return finalOutput;
+}
+
+/** UI 按钮：包一层状态与提示。 */
+async function render() {
   rendering.value = true;
   progressPercent.value = 0;
   statusText.value = "准备中";
   const abort = new AbortController();
   controller.value = abort;
   try {
-    // 工作区目录由画布注入的文件能力提供（与其它节点一致）
-    const { directory } = await files.getWorkspaceFiles().list();
-    const output = `assets/${node.id}/card-${Date.now()}.mp4`;
-    const response = await fetch("/api/card/render", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal: abort.signal,
-      body: JSON.stringify({
-        requestId: crypto.randomUUID(),
-        directory,
-        slug: card.meta.slug,
-        width: width.value,
-        height: height.value,
-        fps: fps.value,
-        parameters: parameters.value,
-        output,
-        ...(target && shape === "overlay" ? { targetVideo: target } : {}),
-      }),
-    });
-    if (!response.ok || !response.body) {
-      // 服务端的错误是 JSON（{code, message}），把它读出来再抛 —— 只报 HTTP 状态码
-      // 会让用户看不到真正的原因（例如「只允许住凯AI视频页面访问控制连接」）
-      const detail = await response.json().catch(() => undefined) as { message?: string } | undefined;
-      throw new Error(detail?.message || `渲染请求失败（HTTP ${response.status}）`);
-    }
-
-    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-    let buffer = "";
-    let finalOutput = "";
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += value;
-      const chunks = buffer.split("\n\n");
-      buffer = chunks.pop() ?? "";
-      for (const chunk of chunks) {
-        const line = chunk.split("\n").find(item => item.startsWith("data: "));
-        if (!line) continue;
-        const event = JSON.parse(line.slice(6)) as {
-          stage: string; frame?: number; total?: number; message?: string;
-        };
-        if (event.stage === "browser") statusText.value = "启动渲染器";
-        else if (event.stage === "render" && event.total) {
-          progressPercent.value = Math.round(((event.frame ?? 0) / event.total) * 90);
-          statusText.value = `渲染 ${event.frame ?? 0}/${event.total} 帧`;
-        } else if (event.stage === "encode") { progressPercent.value = 94; statusText.value = "编码中"; }
-        else if (event.stage === "done") {
-          progressPercent.value = 100;
-          statusText.value = "完成";
-          // ACT: 只认**带 message 的** done。真正的输出路径由路由在最后推；
-          // 早先服务端在中间也推过一次空的 done，会把路径覆盖成空串（已修服务端，
-          // 这里再稳一道，避免两个 done 的语义含糊）。
-          if (event.message) {
-            const parsed = JSON.parse(event.message) as { outputPath?: string };
-            if (parsed.outputPath) finalOutput = parsed.outputPath;
-          }
-        }
-      }
-    }
-    if (!finalOutput) throw new Error("渲染没有返回输出路径");
-    outputs.value.video = { dataType: "VIDEO", value: { url: finalOutput, mimeType: "video/mp4" } };
+    await runRender();
     ElMessage.success("已渲染");
   } catch (error) {
     if ((error as Error).name === "AbortError") return;
@@ -289,6 +299,98 @@ async function render() {
     controller.value = undefined;
   }
 }
+
+// ── 暴露给 Agent 的节点函数 ──────────────────────────────────────────
+//
+// 与其它节点同一套做法：Agent 通过 canvas.nodeTools 调 `node:<函数名>`。
+// 没有这一段，Agent 只能新增一个空节点、调不动它 —— 节点就只是给人看的。
+nodeTools.register({
+  name: "getConfig",
+  description: "读取此画面卡节点当前的选择与配置：卡、形态、成片画幅、帧率、参数、目标视频、已有成片",
+  parameters: z.strictObject({}),
+  execute() {
+    const card = selectedCard.value;
+    return {
+      slug: slug.value,
+      title: card?.meta.title ?? "",
+      shape: card?.meta.shape ?? "",
+      width: width.value,
+      height: height.value,
+      fps: fps.value,
+      parameters: parameters.value,
+      // 卡自带文案，改不了字 —— 这里如实报出来，免得 Agent 以为能改
+      textLocked: Boolean(card),
+      parameterSpec: Object.fromEntries(Object.entries(card?.params ?? {})
+        .map(([name, spec]) => [name, `${spec.min}~${spec.max}，默认 ${spec.value}`])),
+      targetVideo: targetVideoPath() ?? "",
+      output: outputFile.value?.url ?? "",
+    };
+  },
+});
+
+nodeTools.register({
+  name: "setConfig",
+  description: "设置此画面卡节点的卡、成片画幅、帧率或参数。卡只能用 HTML 画面卡的 slug（用 useCard 查），不要传 FFmpeg 滤镜卡",
+  parameters: z.strictObject({
+    slug: z.string().min(1).max(64).optional(),
+    width: z.number().int().positive().max(8192).optional(),
+    height: z.number().int().positive().max(8192).optional(),
+    fps: z.number().int().positive().max(120).optional(),
+    parameters: z.record(z.string(), z.number()).optional(),
+  }),
+  execute(args, { signal }) {
+    signal?.throwIfAborted();
+    if (args.slug) {
+      const card = htmlCards.find(item => item.meta.slug === args.slug);
+      if (!card) {
+        const htmlOnly = htmlCards.map(item => item.meta.slug);
+        throw new Error(`${args.slug} 不是 HTML 画面卡。可用的卡：${htmlOnly.join("、")}`);
+      }
+      data.value.slug = card.meta.slug;
+      // 换卡时把默认画幅一起带过来（卡的默认是它自己标定的画幅）
+      if (!args.width && !args.height) {
+        data.value.width = card.size.width;
+        data.value.height = card.size.height;
+      }
+    }
+    if (args.width) data.value.width = args.width;
+    if (args.height) data.value.height = args.height;
+    if (args.fps) data.value.fps = args.fps;
+    if (args.parameters) data.value.parameters = { ...parameters.value, ...args.parameters };
+    return {
+      slug: slug.value,
+      width: width.value,
+      height: height.value,
+      fps: fps.value,
+      parameters: parameters.value,
+      shape: selectedCard.value?.meta.shape ?? "",
+    };
+  },
+});
+
+nodeTools.register({
+  name: "renderCard",
+  description: "用当前配置渲染这张画面卡并输出成片。要驱动无头浏览器逐帧截图，**一张卡约 6~15 秒**，属于慢操作；叠加卡必须先接好目标视频。返回成片的工作区相对路径",
+  parameters: z.strictObject({}),
+  async execute(_args, { signal }) {
+    signal?.throwIfAborted();
+    if (rendering.value) throw new Error("此节点正在渲染，请等待完成");
+    rendering.value = true;
+    progressPercent.value = 0;
+    statusText.value = "准备中";
+    controller.value = new AbortController();
+    try {
+      const output = await runRender();
+      return { output, mimeType: "video/mp4" };
+    } catch (error) {
+      statusText.value = "失败";
+      throw error;
+    } finally {
+      rendering.value = false;
+      controller.value = undefined;
+    }
+  },
+});
 
 nodeEvent.on("delete", () => files.removeNodeFiles());
 </script>
