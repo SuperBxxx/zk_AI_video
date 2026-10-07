@@ -157,23 +157,81 @@ nodeTools.register({
   },
 });
 
+/**
+ * 逐词时间从哪来：转写**参考片本身**，存进节点，供锚点解析用。
+ *
+ * ACT: 转写走服务端的 `/api/ai/media/transcript`（与 Agent 工具**同一套**），
+ * 因为识别供应商与 ffmpeg 抽取音轨都在服务端，节点这边不该再实现一遍。
+ * 转写结果按脚本存一份（`referenceWords`），`resolveMomentsFromScript` 默认就用它 ——
+ * 这样"参考片 → 词级时间 → 锚点解析"是一条自动路径，不需要 Agent 手工搬词表。
+ */
+nodeTools.register({
+  name: "transcribeReference",
+  description: "转写这条参考视频，取回**逐词时间戳**并存在节点上。之后 resolveMomentsFromScript 不传 words 也会自动用它。没有配置语音识别供应商时会如实失败，并说明失去了什么",
+  parameters: z.strictObject({
+    source: z.string().min(1).max(4096).describe("参考视频或音频的工作区相对路径"),
+    scriptId: z.string().min(1).max(64).optional().describe("这份词级时间属于哪个脚本，默认 reference"),
+    languageHints: z.array(z.string().min(1).max(16)).max(4).optional().describe("语言提示，例如 [\"zh\"]"),
+  }),
+  async execute({ source, scriptId, languageHints }, { signal }) {
+    signal?.throwIfAborted();
+    const { directory } = await files.getWorkspaceFiles().list();
+    const models = await fetch("/api/ai/media/models", { cache: "no-store", signal })
+      .then(async response => (await response.json()).data as { providerId: string; providerLabel: string; type: string }[]);
+    const provider = models.find(model => model.type === "audio" || model.type === "video");
+    if (!provider) {
+      throw new Error("还没有配置语音识别（ASR）供应商 —— 在「设置 → 语音模型」里添加一个支持词级时间戳的供应商后重试。没有词级时间就没法判断钩子落在哪个词上，锚点只能停在画面结构层面");
+    }
+    const response = await fetch("/api/ai/media/transcript", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-toonflow-workspace": "1" },
+      signal,
+      body: JSON.stringify({ providerId: provider.providerId, directory, path: source, languageHints }),
+    });
+    const payload = await response.json() as { code: number; message?: string; data?: { sentences?: { words?: { text: string; beginMs: number; endMs: number }[] }[] } };
+    if (!response.ok || payload.code !== 200) throw new Error(payload.message || `转写失败（HTTP ${response.status}）`);
+
+    // 展平成一条词序列 —— 解析锚点只需要"词 + 起止"，句子的分组在这里没有用。
+    const words = (payload.data?.sentences ?? []).flatMap(sentence => sentence.words ?? []);
+    if (!words.length) throw new Error("转写没有返回任何词级时间（可能这条素材没有说话声）");
+
+    const id = scriptId ?? "reference";
+    (node.data as { referenceWords?: Record<string, unknown> }).referenceWords = {
+      ...((node.data as { referenceWords?: Record<string, unknown> }).referenceWords ?? {}),
+      [id]: words,
+    };
+    const span = Number(((words[words.length - 1]!.endMs - words[0]!.beginMs) / 1000).toFixed(2));
+    return {
+      text: `已转写（脚本 ${id}）：${words.length} 个词，覆盖 ${span} 秒（供应商 ${provider.providerLabel}）。\n现在可以调 resolveMomentsFromScript 解析锚点，不传 words 也会用这份时间。`,
+      wordCount: words.length,
+      spanSeconds: span,
+    };
+  },
+});
+
 nodeTools.register({
   name: "resolveMomentsFromScript",
-  description: "用**新脚本自己的逐词时间**给已写入的锚点解出时间。传入一个脚本标识与它的词级时间，工具会把每个锚点的原话在词序列里找到并算成秒数。匹配不到的锚点会如实报出来（不猜）",
+  description: "用**指定脚本自己的逐词时间**给已写入的锚点解出时间。不传 words 时自动用 transcribeReference 存下的那份。匹配不到的锚点会如实报出来（不猜）",
   parameters: z.strictObject({
     scriptId: z.string().min(1).max(64).describe("这个脚本的标识（同一份分析可以配多个脚本）"),
     words: z.array(z.strictObject({
       text: z.string().min(1).max(200),
       beginMs: z.number().min(0),
       endMs: z.number().min(0),
-    })).min(1).max(20000).describe("新脚本的逐词时间戳"),
+    })).min(1).max(20000).optional().describe("新脚本的逐词时间戳；不传就用 transcribeReference 存下的"),
   }),
   async execute({ scriptId, words }, { signal }) {
     signal?.throwIfAborted();
     const current = outputs.value.moments?.dataType === "SEMANTIC" ? outputs.value.moments.value : undefined;
     if (!current) throw new Error("这个节点还没有锚点；先用 setReferenceMoments 写入");
 
-    const resolved = current.moments.map(moment => resolveMomentFromScript(moment, scriptId, words));
+    const stored = (node.data as { referenceWords?: Record<string, { text: string; beginMs: number; endMs: number }[]> }).referenceWords?.[scriptId];
+    const timing = words ?? stored;
+    if (!timing) {
+      throw new Error(`没有可用的逐词时间（脚本 ${scriptId}）。先用 transcribeReference 转写，或把 words 传进来 —— **不要给锚点编一个时间**`);
+    }
+
+    const resolved = current.moments.map(moment => resolveMomentFromScript(moment, scriptId, timing));
     const value: NodeSemanticValue = { scriptId, moments: resolved };
     outputs.value.moments = { dataType: "SEMANTIC", value };
 
