@@ -221,7 +221,114 @@ const plugin: ToolPlugin = {
   createTools(context) {
     const config = configSchema.parse(context.config);
 
-    async function readJson<T>(path: string): Promise<T> {
+    const recipeTools: ToolDefinition[] = [
+      {
+        name: "save_analysis_recipe",
+        label: "保存分析配方卡",
+        description: "把这次对参考视频的分析成果命名保存成一张「视频分析配方卡」，下次做同类视频时可用 list_analysis_recipes 取回来照着做。用户认可分析结论后再调用。",
+        promptSnippet: "分析完参考视频、用户认可结论后，问用户想给这张卡起什么名字，然后用这个工具保存。",
+        parameters: {
+          type: "object",
+          additionalProperties: false,
+          required: ["name"],
+          properties: {
+            name: { type: "string", minLength: 1, maxLength: 80, description: "用户给这张卡起的名字" },
+            slug: { type: "string", maxLength: 64, description: "更新已有卡时给它的标识；不填表示新建" },
+            source: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                path: { type: "string", maxLength: 4096 },
+                url: { type: "string", maxLength: 4096 },
+                title: { type: "string", maxLength: 300 },
+                durationSeconds: { type: "number", minimum: 0 },
+              },
+              description: "这条参考素材的来源信息，便于以后追溯",
+            },
+            pattern: { type: "string", maxLength: 8000, description: "这类视频的套路：骨架、节奏、钩子位置" },
+            intent: { type: "string", maxLength: 4000, description: "意图与受众" },
+            techniques: {
+              type: "array", maxItems: 80,
+              items: {
+                type: "object", additionalProperties: false, required: ["name", "when"],
+                properties: {
+                  name: { type: "string", minLength: 1, maxLength: 200, description: "手法名" },
+                  when: { type: "string", maxLength: 2000, description: "什么时候用、用在哪一段" },
+                  evidence: { type: "string", maxLength: 4096, description: "支撑这条手法的证据（帧图路径或时刻）" },
+                },
+              },
+              description: "值得复用的手法清单，每条都要引用证据",
+            },
+            evidence: {
+              type: "array", maxItems: 200,
+              items: {
+                type: "object", additionalProperties: false, required: ["kind", "label", "ref"],
+                properties: {
+                  kind: { type: "string", minLength: 1, maxLength: 64, description: "证据种类，如 帧网格 / 变化候选 / 词级时间" },
+                  label: { type: "string", minLength: 1, maxLength: 300 },
+                  ref: { type: "string", maxLength: 4096, description: "证据指向（工作区路径或时刻）" },
+                },
+              },
+            },
+            pitfalls: { type: "array", maxItems: 60, items: { type: "string", maxLength: 2000 } },
+          },
+        } as never,
+        async execute(_id, params, signal) {
+          signal?.throwIfAborted();
+          const { data } = await recipeRequest<{ slug: string; name: string }>("/api/analysisRecipes/save", "POST", params as Record<string, unknown>);
+          return {
+            content: [{ type: "text", text: `已保存配方卡「${data.name}」（标识 ${data.slug}）。下次做同类视频时用 list_analysis_recipes 取回它。` }],
+            details: data,
+          };
+        },
+      } as ToolDefinition,
+      {
+        name: "list_analysis_recipes",
+        label: "取用分析配方卡",
+        description: "列出用户保存的「视频分析配方卡」，含每张卡记录下来的套路、手法与坑。做同类视频前先取一张照着做；不给 slug 时返回全部卡。",
+        promptSnippet: "要复刻某类视频前，先 list_analysis_recipes 看有没有用户存过的同类配方卡，有就照它那套做法。",
+        parameters: {
+          type: "object",
+          additionalProperties: false,
+          properties: { slug: { type: "string", maxLength: 64, description: "给标识时只取这一张的完整内容" } },
+        } as never,
+        async execute(_id, params, signal) {
+          signal?.throwIfAborted();
+          const input = params as { slug?: string };
+          if (input.slug) {
+            const { data } = await recipeRequest<Record<string, unknown>>("/api/analysisRecipes/get", "GET", undefined, { slug: input.slug });
+            return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }], details: data };
+          }
+          const { data } = await recipeRequest<{ slug: string; name: string; pattern?: string; techniques?: unknown[] }[]>("/api/analysisRecipes/list", "GET");
+          const lines = data.length
+            ? data.map(recipe => `· ${recipe.name}（${recipe.slug}）：${recipe.pattern ?? "未写套路"}｜${recipe.techniques?.length ?? 0} 个手法`)
+            : ["用户还没有保存过配方卡。"];
+          return { content: [{ type: "text", text: lines.join("\n") }], details: data };
+        },
+      } as ToolDefinition,
+    ];
+
+    return [...recipeTools, ...buildTools(context, config)];
+  },
+};
+
+/** 调服务端的配方卡接口。ACT: 与 videoFetch 工具同做法 —— 浏览器与 Agent 走同一条实现。 */
+async function recipeRequest<T>(path: string, method: "GET" | "POST", body?: unknown, query?: Record<string, string>): Promise<{ data: T }> {
+  const port = process.env.TOONFLOW_PORT ?? process.env.PORT ?? "3000";
+  const url = new URL(`http://127.0.0.1:${port}${path}`);
+  for (const [key, value] of Object.entries(query ?? {})) url.searchParams.set(key, value);
+  const response = await fetch(url, {
+    method,
+    headers: { "content-type": "application/json", "x-toonflow-workspace": "1", origin: `http://127.0.0.1:${port}` },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+  const payload = await response.json().catch(() => undefined) as { code?: number; data?: T; message?: string } | undefined;
+  if (!response.ok || payload?.code !== 200) throw new Error(payload?.message ?? `请求失败（HTTP ${response.status}）`);
+  return { data: payload.data as T };
+}
+
+const buildTools = (context: ToolContext, config: ReturnType<typeof configSchema.parse>): ToolDefinition[] => {
+  async function readJson<T>(path: string): Promise<T> {
       const buffer = await context.files.readFile(path);
       // 容忍工具写入的 UTF-8 BOM（PowerShell 等会让 JSON.parse 直接抛错）
       return JSON.parse(buffer.toString("utf8").replace(/^\uFEFF/, "")) as T;
@@ -823,7 +930,6 @@ const plugin: ToolPlugin = {
       },
     ];
     return tools;
-  },
 };
 
 export default plugin;

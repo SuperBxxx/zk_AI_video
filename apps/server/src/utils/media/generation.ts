@@ -5,6 +5,7 @@ import { mediaProviders, type Provider } from "@toonflow/providers";
 import type { GeneratedMedia, MediaGenerationRequest, MediaModel, MediaReference, TranscriptResult } from "@toonflow/tools-scaffold/runtime";
 import conf from "@/utils/conf";
 import { getMediaProvider, listMediaProviders, loadMediaProviderSource } from "@/utils/media/provider";
+import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { lockWorkspaceFiles, resolveWorkspacePath, writeWorkspaceFile } from "@/utils/workspace/files";
 
 const maxMediaSize = 100 * 1024 * 1024;
@@ -283,18 +284,63 @@ export async function transcribeAudio(request: {
   const { provider } = await loadConfiguredProvider(request.providerId, request.signal, request.directory);
   if (typeof provider.transcribe !== "function") invalid("此供应商不支持语音转写");
 
-  const { path } = await resolveWorkspacePath(await realpath(request.directory), request.path);
+  const root = await realpath(request.directory);
+  const { path } = await resolveWorkspacePath(root, request.path);
   const info = await stat(path).catch(() => null);
-  if (!info?.isFile()) invalid("找不到要转写的音频文件");
-  if (info.size > maxMediaSize) invalid("音频超过 100 MB，请先裁剪或压缩");
-  const bytes = await readFile(path);
-  if (!bytes.length) invalid("音频文件为空");
+  if (!info?.isFile()) invalid("找不到要转写的文件");
 
-  const mimeType = detectMimeType(bytes, "");
-  if (!mimeType.startsWith("audio/")) invalid("转写只接受音频文件");
+  // ACT: 视频先抽出 16kHz 单声道音轨再送转写 —— ASR 供应商要的是音频字节，
+  // 直接送视频容器多数会被拒（MIME 不对），而"先自己抽音轨"比要求用户先转一道省事。
+  // 抽出的临时 wav 用完即删，不留在工作区里。
+  const head = await readFile(path).then(buffer => buffer.subarray(0, 4096));
+  const mimeType = detectMimeType(head, "");
+  let audioBytes: Uint8Array;
+  let audioMimeType: string;
+  if (mimeType.startsWith("audio/")) {
+    if (info.size > maxMediaSize) invalid("音频超过 100 MB，请先裁剪或压缩");
+    audioBytes = await readFile(path);
+    audioMimeType = detectMimeType(audioBytes, "audio/wav");
+  } else if (mimeType.startsWith("video/") || mimeType === "application/octet-stream") {
+    const scratch = join(root, `.transcribe-${crypto.randomUUID().slice(0, 8)}.wav`);
+    try {
+      const ffmpeg = await createWorkspaceFfmpeg(root, request.signal);
+      await new Promise<void>((done, reject) => {
+        let settled = false;
+        const finish = (error?: Error) => {
+          if (settled) return;
+          settled = true;
+          request.signal?.removeEventListener("abort", onAbort);
+          if (error) reject(error); else done();
+        };
+        const onAbort = () => { command.kill("SIGKILL"); finish(new Error("已取消")); };
+        request.signal?.addEventListener("abort", onAbort, { once: true });
+        const command = ffmpeg(relative(root, path))
+          .withNoVideo()
+          .audioFrequency(16000)
+          .audioChannels(1)
+          .audioCodec("pcm_s16le")
+          .on("error", error => finish(error instanceof Error ? error : new Error(String(error))))
+          .on("end", () => finish());
+        command.save(relative(root, scratch));
+      });
+      audioBytes = await readFile(scratch);
+      audioMimeType = "audio/wav";
+    } catch (error) {
+      invalid(`从视频里抽音轨失败：${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    } finally {
+      await unlink(scratch).catch(() => undefined);
+    }
+    if (!audioBytes.length) invalid("这个视频里没有可用的音轨");
+    // 16kHz 单声道 PCM 约 32 KB/秒，超过上限说明素材太长：转写在长音频上也会很慢且容易超时。
+    if (audioBytes.byteLength > maxMediaSize) invalid("音轨过长（超过 100 MB），请先裁剪到需要转写的片段");
+  } else {
+    invalid("转写只接受音频或视频文件");
+    throw new Error("unreachable");
+  }
 
   const result = await provider.transcribe({
-    audio: { type: "binary", data: bytes, mimeType },
+    audio: { type: "binary", data: audioBytes, mimeType: audioMimeType },
     languageHints: request.languageHints,
   });
   if (!result?.sentences?.length) invalid("供应商未返回可用的时间戳");

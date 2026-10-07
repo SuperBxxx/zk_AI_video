@@ -1,0 +1,16 @@
+{
+  "name": "@toonflow/tool-video-fetch",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build.ts",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@toonflow/tool-media-analysis": "workspace:*"
+  },
+  "devDependencies": {
+    "@toonflow/tools-scaffold": "workspace:*"
+  }
+}
