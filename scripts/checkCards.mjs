@@ -40,6 +40,14 @@ function frameSum(file, frame) {
 }
 
 /** 某帧是否全黑（YAVG 接近 0）。 */
+/** 某个视频文件的画面尺寸，形如 `1080x1920`；取不到返回 `?`。 */
+function ffprobeSize(file) {
+  const probe = spawnSync("ffprobe", ["-v", "error", "-select_streams", "v:0",
+    "-show_entries", "stream=width,height", "-of", "csv=p=0", file], { encoding: "utf8" });
+  const [width, height] = (probe.stdout ?? "").trim().split(",");
+  return width && height ? `${width}x${height}` : "?";
+}
+
 /** 某帧的平均亮度（YAVG）。取不到返回 undefined。 */
 function luma(file, frame) {
   const result = ffmpeg(["-hide_banner", "-loglevel", "info", "-i", file,
@@ -143,8 +151,16 @@ try {
 
   for (const card of builtInCards) {
     let filters;
+    let secondInput;
     try {
-      filters = instantiateCard(card).filters;
+      // ACT: secondInput 必须取**替换后**的值，不能用 card.secondInput 原始模板。
+      // 踩过：这里原先用 card.secondInput 直接喂 ffmpeg，而卡里写的是裸字面量
+      // （`color=c=white:s=1920x1080:r=30`）所以看不出问题；一旦卡改用 {{width}}x{{height}}
+      // 让画幅可配，原始模板就带着未替换的占位符进 ffmpeg，报 Invalid argument。
+      // 这条检查本来就该验「实例化之后交出去的串」，与 useCard 的行为一致。
+      const instantiated = instantiateCard(card);
+      filters = instantiated.filters;
+      secondInput = instantiated.secondInput;
     } catch (error) {
       failures.push({ slug: card.slug, detail: `默认参数无法实例化：${error.message}` });
       continue;
@@ -155,10 +171,10 @@ try {
     //   ③ 普通单路 → 接 -vf
     const output = join(work, `${card.slug}.mp4`);
     let result;
-    if (card.secondInput) {
+    if (secondInput) {
       result = ffmpeg(["-y", "-hide_banner", "-loglevel", "error",
         "-i", join(work, card.slug === "flashCut" ? "gray.mp4" : "a.mp4"),
-        "-f", "lavfi", "-i", card.secondInput,
+        "-f", "lavfi", "-i", secondInput,
         "-filter_complex", filters.join(";"), "-an", "-t", "2",
         "-c:v", "libx264", "-pix_fmt", "yuv420p", output]);
     } else if (card.inputs.includes("场")) {
@@ -182,6 +198,53 @@ try {
     if (semantic) {
       failures.push({ slug: card.slug, detail: `效果不对：${semantic}` });
       log(`  ✗ ${card.slug}  ${semantic}`);
+      continue;
+    }
+    // ACT: 需要绝对像素的卡必须验**竖屏也输出对尺寸**。
+    // 踩过：slowPushIn / flashCut 曾把分辨率写死进字符串，只在 pitfalls 里让 Agent 手改；
+    // 改成 width/height 参数后由 useCard 按 frameSize 自动填，这条检查保证它真的对。
+    //
+    // 注意：**不要用 `-s` 强制输出尺寸** —— 那等于替滤镜把尺寸定好，验不出卡里的参数有没有生效。
+    // 正确做法是给一个竖屏尺寸的**底片**（-s 只作用于输入），再验滤镜输出的尺寸没被改坏：
+    //   · slowPushIn 的 zoompan 带 s= → 必须自己产出 1080x1920
+    //   · flashCut 是 overlay，输出跟随底片 → 底片给竖屏即可，卡里的白场尺寸要与之相符
+    const hasDimension = card.parameters.some(parameter => parameter.name === "width")
+      && card.parameters.some(parameter => parameter.name === "height");
+    if (hasDimension) {
+      const portrait = instantiateCard(card, { width: 1080, height: 1920 });
+      const portraitSource = join(work, `${card.slug}-portrait-source.mp4`);
+      const makeSource = ffmpeg(["-y", "-hide_banner", "-loglevel", "error",
+        "-i", join(work, card.slug === "slowPushIn" ? "hd.mp4" : "gray.mp4"),
+        "-vf", "scale=1080:1920,setsar=1", "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p", portraitSource]);
+      if (makeSource.status !== 0) {
+        failures.push({ slug: card.slug, detail: "竖屏测试底片生成失败" });
+        log(`  ✗ ${card.slug}（竖屏底片）`);
+        continue;
+      }
+      const portraitOutput = join(work, `${card.slug}-portrait.mp4`);
+      // 用 filter_complex 统一处理：两路输入都进，滤镜串直接用卡实例化出来的。
+      // **不要在后面接 scale** —— 那等于替卡把尺寸修正好了，验不出卡里的参数有没有生效。
+      const portraitResult = portrait.secondInput
+        ? ffmpeg(["-y", "-hide_banner", "-loglevel", "error",
+          "-i", portraitSource, "-f", "lavfi", "-i", portrait.secondInput,
+          "-filter_complex", portrait.filters.join(";"),
+          "-an", "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p", portraitOutput])
+        : ffmpeg(["-y", "-hide_banner", "-loglevel", "error",
+          "-i", portraitSource, "-vf", portrait.filters.join(","),
+          "-an", "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p", portraitOutput]);
+      if (portraitResult.status !== 0) {
+        const tail = (portraitResult.stderr ?? "").split("\n").filter(Boolean).slice(-2).join(" / ");
+        failures.push({ slug: card.slug, detail: `竖屏 1080×1920 跑不通：${tail}` });
+        log(`  ✗ ${card.slug}（竖屏）`);
+        continue;
+      }
+      const probed = ffprobeSize(portraitOutput);
+      if (probed !== "1080x1920") {
+        failures.push({ slug: card.slug, detail: `竖屏输出尺寸是 ${probed}，应为 1080x1920` });
+        log(`  ✗ ${card.slug}（竖屏 → ${probed}）`);
+        continue;
+      }
+      log(`  ✓ ${card.slug}  ${filters.join(" ; ")}  ／ 竖屏 1080x1920 ✓`);
       continue;
     }
     log(`  ✓ ${card.slug}  ${filters.join(" ; ")}`);

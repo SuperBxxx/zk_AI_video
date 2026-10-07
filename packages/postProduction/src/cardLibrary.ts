@@ -72,10 +72,30 @@ export interface RecipeCard {
   checks: string[];
 }
 
+/**
+ * 需要绝对像素的卡共用这两个参数。
+ *
+ * ACT: 滤镜卡原先有两种做法 —— 5 张只用相对表达式（eq/vignette/fade/xfade/setpts），
+ * 天生与画幅无关；但 slowPushIn 的 `zoompan:s=1920x1080` 与 flashCut 的
+ * `color=...:s=1920x1080` 必须知道输出尺寸，于是**把分辨率写死进了字符串**，
+ * 只能在 pitfalls 里让 Agent「换画幅时记得手改成 1080x1920」。
+ *
+ * 这不必要：useCard 已经从成片拿到了 frameSize。把尺寸变成**已声明参数**后，
+ * 取卡时传 frameSize 就会被自动填进去（未传则用默认 1920×1080），
+ * 与 HTML 卡「按目标画幅渲染」的行为对齐。
+ *
+ * 注意：不能写成 `s={{frameSize}}` —— instantiateCard 只替换已声明参数，
+ * 未声明的占位符会直接抛错。
+ */
+export const dimensionParameters: CardParameter[] = [
+  { name: "width", description: "输出宽度（useCard 传 frameSize 时自动填）", min: 16, max: 8192, value: 1920 },
+  { name: "height", description: "输出高度（useCard 传 frameSize 时自动填）", min: 16, max: 8192, value: 1080 },
+];
+
 export class CardError extends Error {}
 
 /** 把模板里的 {{name}} 替换成参数值；缺参数或越界都直接报错。 */
-export function instantiateCard(card: RecipeCard, values: Record<string, number> = {}): { filters: string[]; applied: Record<string, number> } {
+export function instantiateCard(card: RecipeCard, values: Record<string, number> = {}): { filters: string[]; secondInput?: string; applied: Record<string, number> } {
   const applied: Record<string, number> = {};
   for (const parameter of card.parameters) {
     const raw = values[parameter.name] ?? parameter.value;
@@ -90,16 +110,21 @@ export function instantiateCard(card: RecipeCard, values: Record<string, number>
   const unknown = Object.keys(values).filter(name => !card.parameters.some(parameter => parameter.name === name));
   if (unknown.length) throw new CardError(`卡 ${card.slug} 没有这些参数：${unknown.join("、")}`);
 
-  const filters = card.filters.map(filter => {
-    const replaced = filter.replace(/\{\{(\w+)\}\}/g, (_match, name: string) => {
-      if (!(name in applied)) throw new CardError(`卡 ${card.slug} 的滤镜引用了未声明的参数 {{${name}}}`);
+  // ACT: secondInput 也要替换，并且必须**返回**出去。
+  // 踩过：原先只替换 filters、返回里也没有 secondInput，于是 flashCut 卡的第二路输入
+  // （`color=c=white:s=1920x1080:r=30`）从未到达 Agent —— 它只拿到 filter_complex 的滤镜串，
+  // 第二路得自己猜。现在与 filters 用同一套替换规则与残留检查。
+  const replaceIn = (template: string) => {
+    const replaced = template.replace(/\{\{(\w+)\}\}/g, (_match, name: string) => {
+      if (!(name in applied)) throw new CardError(`卡 ${card.slug} 的模板引用了未声明的参数 {{${name}}}`);
       return String(applied[name]);
     });
     const leftover = replaced.match(/\{\{\w+\}\}/);
-    if (leftover) throw new CardError(`卡 ${card.slug} 的滤镜里还有未替换的 ${leftover[0]}`);
+    if (leftover) throw new CardError(`卡 ${card.slug} 的模板里还有未替换的 ${leftover[0]}`);
     return replaced;
-  });
-  return { filters, applied };
+  };
+  const filters = card.filters.map(replaceIn);
+  return { filters, secondInput: card.secondInput ? replaceIn(card.secondInput) : undefined, applied };
 }
 
 /** 按素材类型与语义检索卡；返回带排序理由的候选，供 agent 决策。 */
@@ -165,17 +190,18 @@ export const builtInCards: RecipeCard[] = [
       { name: "fps", description: "成片帧率", min: 1, max: 120, value: 30 },
       { name: "seconds", description: "镜头时长（秒）", min: 0.2, max: 600, value: 5 },
       { name: "endZoom", description: "结束缩放（1.04~1.06 为宜；推得太快会像变焦炫技）", min: 1.005, max: 1.2, value: 1.05 },
+      ...dimensionParameters,
     ],
     // 踩过的坑：写成 `z='1+{{endZoom}}-1*on/(...)'` 时，替换结果是
     // `1+1.05-1*on/(150)` —— 运算符优先级把它算成 `2.05 - on/150`，
     // 起始就是 2.05 倍且几乎不动，而 FFmpeg **不会报错**。
     // 必须把增量括起来：`1+({{endZoom}}-1)*on/(...)`。
-    filters: ["zoompan=z='1+({{endZoom}}-1)*on/({{seconds}}*{{fps}})':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1920x1080:fps={{fps}}"],
+    filters: ["zoompan=z='1+({{endZoom}}-1)*on/({{seconds}}*{{fps}})':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={{width}}x{{height}}:fps={{fps}}"],
     pitfalls: [
       "**表达式里做算术一定要加括号**：模板替换是纯文本，`1+{{endZoom}}-1*...` 会按优先级算错，而 FFmpeg 照样跑出画面（静默错误）。",
       "zoompan 的 z 表达式里用 on（输出帧序）而不是 in；写成 in 会在多输入时异常。",
       "缩放窗口必须居中（x/y 那两项），否则推进会让人误以为画面在漂移。",
-      "本卡的 s=1920x1080 是写死的：换画幅（竖屏等）必须同时改这一项，否则输出尺寸不对。",
+      "本卡的输出尺寸由 width/height 两个参数决定：**取卡时传 frameSize 会自动按成片画幅填**；不传则用默认 1920×1080，竖屏会得到错尺寸的画面。",
       "细密纹理（特征 ≤2px、间距 ≤24px）放进缩放层会亚像素爬行，整块读作「画面在抖」——那种素材要么把纹理放大，要么改用静态层。",
     ],
     checks: [
@@ -329,20 +355,21 @@ export const builtInCards: RecipeCard[] = [
       { name: "peak", description: "峰值不透明度（1.0 = 纯白）", min: 0.1, max: 1, value: 1.0 },
       { name: "inDuration", description: "升到峰值用时（秒）", min: 0.05, max: 3, value: 0.4 },
       { name: "outDuration", description: "从峰值落回用时（秒）", min: 0.05, max: 3, value: 0.6 },
+      ...dimensionParameters,
     ],
     // ACT: 用「白色源 + fade 做 alpha + overlay」而不是在 overlay 的 alpha 里写表达式。
     // 踩过的坑：`overlay=alpha='if(between(t,0,0.4),t/0.4*0.85,if(...))'` 直接报
     // `Undefined constant or missing '('` —— 表达式里嵌套 if 的**逗号被当成滤镜链
     // 分隔符**，句子从逗号处被切断。改用普通滤镜（format/fade/overlay）就不必与
     // ffmpeg 的转义规则搏斗，而且 fade 的 alpha 曲线正是我们要的形状。
-    secondInput: "color=c=white:s=1920x1080:r=30",
+    secondInput: "color=c=white:s={{width}}x{{height}}:r=30",
     filters: [
       "[1:v]format=yuva420p,fade=t=in:st=0:d={{inDuration}}:alpha=1,fade=t=out:st={{inDuration}}:d={{outDuration}}:alpha=1,colorchannelmixer=aa={{peak}}[flash]",
       "[0:v][flash]overlay=format=auto",
     ],
     pitfalls: [
       "**滤镜表达式里不要写嵌套 if**：逗号会被当成滤镜链分隔符，报 `Undefined constant or missing '('`。要用条件分支就用普通滤镜表达，或给逗号转义。",
-      "`secondInput` 的分辨率写死成 1920x1080（与底片同尺寸，overlay 才不会错位）；换画幅要一起改。",
+      "`secondInput` 的尺寸由 width/height 参数决定：**取卡时传 frameSize 会自动按成片画幅填**（要与底片同尺寸，overlay 才不会错位）；不传则用默认 1920×1080。",
       "闪光只该出现在**切点**上：它的时间轴是相对这一段的，所以本卡要作用在切点附近的短片段上，不是整镜。",
       "闪白是「焊接硬切」的手段，不能用来掩盖对不上的动作 —— 动作不连贯该重做，不该靠闪一下糊过去。",
     ],

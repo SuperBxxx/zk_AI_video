@@ -111,6 +111,10 @@ const plugin: ToolPlugin = {
         'inputOptions/outputOptions 按 fluent 原生语法传参，不额外拆分空格。含空格的元数据使用 args:["-metadata","title=a b"]，不要再嵌套数组。先用 operation={"method":"availableEncoders","args":[]} 等查询实际能力，不猜测本机编码器。',
         "除非用户要求覆盖，否则使用新文件名；所有显式路径及参数、滤镜和媒体清单中引用的文件都应位于当前工作区。",
         "产出的视频会由工具自动创建视频节点并放到画布上，返回值里的 canvas 字段说明已放置的文件；不要自己再造视频节点或连线。",
+        // ACT: 实测有 Agent 直接手写 ASS + subtitles 滤镜烧字幕，跳过卡库并自称"我跳过了卡库"。
+        // 只在 postProduction 里写"做镜头效果前先查"不够 —— 字幕/文字它不认为是镜头效果，
+        // 而真正动手的地方是这个工具。所以把门槛放在这里：凡是要写滤镜的活儿，先查卡库。
+        "**写任何滤镜之前先查卡库**：subtitles/ASS 烧字幕、drawtext、转场、镜头运动、文字动画、调色包装都算。调 postProduction 的 useCard 检索一次（给 inputs + semantics），有合适的卡就用卡的 filters（卡给了 secondInput 时接成 -f lavfi 的第二路输入）；确实没有才自己写，并在回话里说明「查过卡库、没有对应卡」。不要不查就手写滤镜链。",
       ],
       parameters: z.toJSONSchema(processSchema, { io: "input", target: "draft-07" }),
       executionMode: "sequential",

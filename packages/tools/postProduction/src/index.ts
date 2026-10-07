@@ -568,14 +568,19 @@ const plugin: ToolPlugin = {
         name: "useCard",
         label: "查/用画面配方卡",
         description: "查询内置的画面卡（按素材类型与语义检索），或取某一张的完整内容。库里有两类卡：FFmpeg 滤镜卡（给出滤镜链、已知坑、落位自检）与 HTML 画面卡（浏览器渲染的整段画面或透明叠加层，给出形态、时长、可调参数与按目标画幅渲染的设计画布尺寸）。",
-        promptSnippet: "做镜头效果前先 useCard 查有没有现成的卡；库里既有滤镜卡也有整段画面/叠加层卡，不要每次临场写滤镜或自己画。",
+        promptSnippet: "做镜头效果前先 useCard 查有没有现成的卡；库里既有滤镜卡也有整段画面/叠加层卡，不要每次临场写滤镜或自己画。**烧字幕、做转场、加镜头运动、做文字动画之前都必须先检索一次卡库。**",
         promptGuidelines: [
+          // ACT: 这条原先太软（"做镜头效果前先查"），实测有 Agent 直接手写 ASS + subtitles 滤镜烧字幕、
+          // 完全没检索卡库，还自称"这轮我跳过了卡库" —— 因为字幕/文字它不认为属于"镜头效果"。
+          // 所以把范围写全，并把"跳过"变成一件必须声明的事。
+          "**强制门槛**：在写任何滤镜链之前 —— 包括 subtitles/ASS 烧字幕、drawtext、转场、镜头运动、文字动画、调色包装 —— **先调一次 useCard 检索**（给 inputs + semantics）。没检索就动手，等于漏了这一步。",
+          "确实没有合适的卡时**可以自己写**，但必须在回话里明确说「查过了卡库，X 类没有对应卡，原因……」。**不许不查就写，也不许假装用了卡。**",
           "先按素材类型与语义检索（inputs + semantics），再取具体卡 —— 卡是词汇表，不是关键词垃圾桶。",
           "卡上的「已知坑」必须逐条核，那些都是实际返工换来的；卡上的 checks 是做完要自检的项。",
-          "实例化出的 filters 交给 ffmpeg 工具执行（按顺序接在 -vf 或 filter_complex 里）。参数越界会被拒，不要绕过校验自己拼字符串。",
-          "没有合适的卡时可以自己写滤镜，但要说清楚「库里没有对应卡」而不是假装用了卡。",
+          "实例化出的 filters 交给 ffmpeg 工具执行（按顺序接在 -vf 或 filter_complex 里）；卡若给了 secondInput，把它当成 `-f lavfi -i` 的第二路输入。参数越界会被拒，不要绕过校验自己拼字符串。",
           "**先看 kind**：ffmpeg 卡给滤镜链（接在 -vf/filter_complex 里）；html 卡是浏览器渲染的整段画面（fullscreen，替代这一段）或透明叠加层（overlay，叠在视频上），**不能当滤镜用**。",
-          "取 html 卡时**必须给 frameSize**（成片的宽高）：卡按目标画幅等比渲染，给错画幅会得到错尺寸的画面；竖屏下长句卡会自动缩字，工具的提醒要如实转告用户。",
+          // ACT: 这句话要同时点明两件事：卡的 baseSize 只是默认值；以及取卡时给 frameSize 的收益。
+          "**画幅**：所有卡都是分辨率无关的 —— 卡里声明的 `size`/baseSize 只是**未指定时的默认值**，与目标画幅不同是**预期的**，不是限制。取卡时**一律传 frameSize**（成片宽高）：HTML 卡据此算设计画布，滤镜卡据此填好尺寸参数（未传则用默认 1920×1080，竖屏会错）。不要以为卡「按横屏调好的」就去手改卡里的数字。",
         ],
         parameters: cardQueryParameters,
         executionMode: "sequential",
@@ -654,10 +659,24 @@ const plugin: ToolPlugin = {
               };
             }
             let filters: string[] = [];
+            let secondInput: string | undefined;
             let applied: Record<string, number> = {};
             try {
-              const result = instantiateCard(card, request.parameters ?? {});
+              // ACT: 滤镜卡与 HTML 卡一样要按目标画幅走。
+              // 原先这里只把 request.parameters 传下去，frameSize 完全不参与 ——
+              // 于是需要绝对像素的卡（slowPushIn 的 zoompan s=、flashCut 的第二路白场）
+              // 只能把分辨率写死进字符串，靠 pitfalls 里一句「换画幅要手改」来兜。
+              // 现在把 frameSize 填进卡的 width/height 参数（卡已声明这两个参数，默认 1920×1080），
+              // Agent 传了画幅就自动对，与 HTML 卡的分辨率无关行为对齐。
+              const parameters: Record<string, number> = { ...(request.parameters ?? {}) };
+              const frameSize = request.frameSize;
+              if (frameSize) {
+                if (parameters.width === undefined) parameters.width = frameSize.width;
+                if (parameters.height === undefined) parameters.height = frameSize.height;
+              }
+              const result = instantiateCard(card, parameters);
               filters = result.filters;
+              secondInput = result.secondInput;
               applied = result.applied;
             } catch (error) {
               return {
@@ -675,11 +694,18 @@ const plugin: ToolPlugin = {
               semantics: card.semantics,
               parameters: applied,
               filters,
+              ...(secondInput ? { secondInput } : {}),
               pitfalls: card.pitfalls,
               checks: card.checks,
             };
+            // ACT: 必须把画幅结论说清楚 —— 实测有 Agent 以为滤镜卡「写死了 1920×1080、竖屏要手改」，
+            // 因为原先的文案只把 pitfalls 原样倒出来。现在把「这串滤镜实际按哪个画幅生成」明说。
+            const frameNote = request.frameSize
+              ? `输出画幅：${request.frameSize.width}×${request.frameSize.height}（已按它填好卡里的尺寸参数）`
+              : "输出画幅：未给 frameSize，尺寸参数取默认 1920×1080 —— **竖屏成片必须传 frameSize**，否则输出尺寸不对";
+            const secondNote = secondInput ? `\n第二路输入（lavfi 源，接成 -f lavfi -i "${secondInput}"）：${secondInput}` : "";
             return {
-              content: [{ type: "text", text: `${card.title}：${card.oneliner}\n滤镜链：${filters.join(" , ")}\n已知坑：\n${card.pitfalls.map(p => "  · " + p).join("\n")}\n落位自检：\n${card.checks.map(c => "  · " + c).join("\n")}` }],
+              content: [{ type: "text", text: `${card.title}：${card.oneliner}\n${frameNote}\n滤镜链：${filters.join(" , ")}${secondNote}\n已知坑：\n${card.pitfalls.map(p => "  · " + p).join("\n")}\n落位自检：\n${card.checks.map(c => "  · " + c).join("\n")}` }],
               details: payload,
             };
           }
