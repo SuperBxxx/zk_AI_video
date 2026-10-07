@@ -16,6 +16,9 @@ import { focusDimSpotlight } from "./focusDimSpotlight";
 import { markerUnderlineTitle } from "./markerUnderlineTitle";
 import { scanlineAnnotateFocus } from "./scanlineAnnotateFocus";
 import { handDrawnEllipse } from "./handDrawnEllipse";
+import { chartLiveOscilloscope } from "./chartLiveOscilloscope";
+import { gaugeReadout } from "./gaugeReadout";
+import { barChartGrowth } from "./barChartGrowth";
 
 export const htmlCards = [
   digitRoll,
@@ -30,6 +33,9 @@ export const htmlCards = [
   markerUnderlineTitle,
   scanlineAnnotateFocus,
   handDrawnEllipse,
+  chartLiveOscilloscope,
+  gaugeReadout,
+  barChartGrowth,
 ];
 
 export function findHtmlCard(slug: string) {

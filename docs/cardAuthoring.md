@@ -81,7 +81,7 @@ bun scripts/renderCard.mjs --print-chrome   # 打印确切命令
 | 表达式里做算术 | 滤镜/样式静默算错 | 加括号（FFmpeg 卡那边踩过同一类） |
 | **叠加卡用 jpeg 中间帧** | alpha 被丢掉，叠上去是白框 | 叠加卡走 png 中间帧 + **ProRes 4444** |
 | **以为 libvpx-vp9 能保 alpha** | 喂 png 进去也输出 yuv420p，alpha 悄悄没了 | 实测只有 `prores_ks` / `qtrle` / `png` 三种保得住 |
-| **render 引用了模块级函数却没进 helpers** | 页面报 `xxx is not defined`，渲染直接失败 | 每个 render 用到的模块级函数都要列进 helpers |
+| **render 引用了模块级函数却没进 helpers** | 页面报 `xxx is not defined`，渲染直接失败 | 每个 render 用到的模块级函数都要列进 helpers。**踩过 3 次**（bezierEase / scanTargets / polar）—— 浏览器自检的「页面没加载成功」会抓到 |
 | **SVG 宽高用百分比推导的表达式** | 椭圆被压扁成几条竖线 | SVG 宽高写成显式 px，并配同值 viewBox |
 | **累加循环里的抖动写成 ±** | 步长可能变负 → 累加值不再增长 → **动画永久停在中途**，不报错 | 抖动**只加不减** |
 | **参数是「内容长度的镜像」** | 文案 19 字而参数默认 14 → 只显示前 14 字，看着像动画坏了 | 这类参数一律由内容本身推导，不手填 |
@@ -168,10 +168,10 @@ bun scripts/renderCard.mjs --print-chrome   # 打印确切命令
 批次 2 文字类     ✅ typewriterTerminal · ✅ typewriterReveal · ✅ perCharacterRise
 批次 3 口播语法   ✅ keywordPopHighlight · ✅ highlighterSweep · ✅ focusDimSpotlight
 批次 4 叠加标注   ✅ markerUnderlineTitle · ✅ scanlineAnnotateFocus · ✅ handDrawnEllipse
-批次 5 图表       ⏳ chart-live-moves · gauge-readout-moves · bar-chart-growth
+批次 5 图表       ✅ chartLiveOscilloscope · ✅ gaugeReadout · ✅ barChartGrowth
 批次 6 文字强化   ⏳ type-assembly-moves · soft-blur-in · word-slot-cycle
 批次 7 时间轴     ⏳ timeline-travel · metric-with-sparkline · title-demote-to-label
 批次 8 转场       ⏳ wipe-transitions · white-flash-logo-simplify-cut · scan-bracket-sweep
 ```
 
-**已完成 12/24。** 每完成一批就提交并汇报。
+**已完成 15/24。** 每完成一批就提交并汇报。
