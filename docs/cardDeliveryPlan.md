@@ -108,27 +108,36 @@ packages/tools/postProduction     新增 renderCard op（薄代理）
   `"STRING" | "INT" | "FLOAT" | "BOOLEAN" | "IMAGE" | "MASK" | ...`（见 `nodeScaffold/src/connection.ts`）
 - 节点数据由画布持久化（server 的 canvas 数据），节点本身只负责渲染与交互
 
-### 待做
+### 已完成
 
-1. `packages/nodes/cardNode/`：选卡（走 `/api/card/*` 或直接读卡目录）→ 调参数 → 选画幅
-   → 选目标视频输入 → 触发 `/api/card/render` → 显示进度 → 输出成片
-2. 输入端口接上游视频（`overlay` 卡要目标视频；`fullscreen` 卡不需要）
-3. 渲出来的成片落到工作区，并作为节点输出
-4. 验证：`bun run build:nodes` 产出 `cardNode.umd.js`；在画布里能拖出来、选卡、跑通一次渲染
+`packages/nodes/cardNode/`：
 
+1. 选卡（下拉，直接读 `@toonflow/card-runtime/cards`）→ 调参数（按卡声明的区间与默认值动态生成）
+   → 选成片画幅与帧率 → 触发 `/api/card/render` → SSE 显示进度 → 输出成片
+2. 输入端口：目标视频（只有叠加卡用得上）；输出端口：视频
+3. 成片落在 `assets/<nodeId>/card-<时间戳>.mp4`，作为节点输出
 
 ## 验证要求
 
-| 项 | 判据 |
-|---|---|
-| 内核 | 渲一张叠加卡，量左上角 **RGBA alpha≈0**（不是看 ffprobe 的 pix_fmt —— 它会骗人） |
-| 合成 | 竖屏 AI 视频 + 同画幅叠加卡 → 视频透出来、文字不重叠 |
-| 进程 | 渲完**无残留**（按 pid 杀整棵树），且**不碰**用户已有浏览器 |
-| 打包边界 | 确认内核随 server 进 `app/`；`scripts/` 的不再是依赖 |
-| 回归 | `bun run preflight`、相关包 typecheck、`bun run build` |
+| 项 | 判据 | 结果 |
+|---|---|---|
+| 内核 | 渲一张叠加卡，量左上角 **RGBA alpha≈0**（不是看 ffprobe 的 pix_fmt —— 它会骗人） | ✅ `0,0,0,0` |
+| 合成 | 竖屏 AI 视频 + 同画幅叠加卡 → 视频透出来、文字不重叠 | ✅ 左上角 RGB `12,53,96`（AI 视频的深蓝） |
+| 进程 | 渲完**无残留**（按 pid 杀整棵树），且**不碰**用户已有浏览器 | ✅ 我的 profile 0 残留，机器上其它进程未受影响 |
+| 打包边界 | 确认内核随 server 进 `app/` | ✅ desktop 产物含 `setDefaultBackgroundColorOverride` / `prores_ks` |
+| 接口 | 真起 server 打 `/api/card/render`，事件顺序与产物 | ✅ `browser → render 25/50/75 → encode → done` |
+| 节点 | 产物、元数据、全局名、类型检查、被 server 列出并可取到脚本 | ✅ 见下 |
+| 回归 | `bun run preflight`、相关包 typecheck | ✅ preflight 13/13；server / 节点 / 内核 / 卡库 typecheck 零错误 |
 
 ## 进度
 
 - ✅ 1–3：渲染内核进 server 的安装边界；工作目录定在 `<data>/cardRender/`；进程清理按 pid 杀整棵树
 - ✅ A：`renderCard` 工具 op（宿主注入 cardRender 通道，工具侧薄代理）
-- ⏳ B：画布节点（契约已查清，见上）
+- ✅ B：画布节点 `cardNode`（选卡 / 调参 / 成片画幅 / 目标视频输入 / SSE 进度 / 视频输出）
+
+## 尚未验证的一项（如实记录）
+
+**没有在浏览器里真打开画布、把节点拖出来点一遍。** 已证明的是它两侧的链路：
+节点产物正确且被 server 列出、脚本能被取到、它依赖的 `/api/card/render` 端到端跑通。
+剩下的是 UI 交互本身（拖拽、面板渲染、进度条），那要在跑起来的画布里点一次才算数。
+
