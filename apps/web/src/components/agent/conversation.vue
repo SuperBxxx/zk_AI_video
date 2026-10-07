@@ -12,7 +12,7 @@
                   <h3>从一个想法开始</h3>
                 </div>
               </div>
-              <p class="welcomeDescription">聊聊你的故事、画面或镜头，让我们一起把想法落到画布上。</p>
+              <p class="welcomeDescription">直接说你想做什么就行 —— 还没有想清楚也可以先说个大概。有素材的话一并传上来（参考图、视频都行），我会据此问你几个关键问题，再动手。</p>
               <div class="welcomeSuggestions">
                 <el-button v-for="item in welcomeSuggestions" :key="item.label" class="welcomeSuggestion" text bg :disabled="locked" :aria-label="`填入提示：${item.label}`" @click="fillPrompt(item.prompt)">
                   <component :is="item.icon" :size="19" aria-hidden="true" />
@@ -20,7 +20,7 @@
                   <icon-arrow-up-right class="suggestionArrow" :size="15" aria-hidden="true" />
                 </el-button>
               </div>
-              <p class="welcomeHint">点击填入提示，也可以直接输入，或粘贴图片、视频。</p>
+              <p class="welcomeHint">可以直接输入，也可以把图片／视频<strong>粘贴或拖进输入框</strong>。<strong>上传现成素材往往比描述更省事</strong> —— 有实拍图就传上来，我会据此安排画面。</p>
             </section>
           </template>
         </chat-item>
@@ -282,6 +282,9 @@ const contextWindow = computed(() => contextUsage.value?.contextWindow ?? select
 const contextPercent = computed(() => (contextUsage.value?.tokens ?? 0) / contextWindow.value * 100);
 const inputTokens = computed(() => stats.value ? stats.value.tokens.input + stats.value.tokens.cacheRead + stats.value.tokens.cacheWrite : 0);
 const welcomeSuggestions = [
+  // ACT: 第一项刻意是「说清要什么 + 上传素材」—— 首页已经不再让用户选模式、也不再要求先写一段话，
+  // 所以进门后的第一步必须由这里承接：明确告诉用户「可以直接说、可以传素材」，而不是让他自己猜。
+  { label: "我要做一支视频", description: "说清用途与时长，或先传参考图／视频", icon: IconPhoto, prompt: "我要做一支视频。先问我几个关键问题：用途、投放平台、时长、画面风格、有没有现成素材（我可以上传参考图或视频），再开始。" },
   { label: "搭建创作画布", description: "把创意串成清晰的节点流程", icon: IconLayoutGrid, prompt: "帮我搭建一个创作画布，先和我确认需要的节点与流程。" },
   { label: "梳理故事分镜", description: "拆解故事，安排画面与镜头", icon: IconMovie, prompt: "帮我把故事整理成分镜，先和我确认故事内容、时长和画面风格。" },
   { label: "生成图片素材", description: "为角色和场景寻找视觉方向", icon: IconPhoto, prompt: "帮我生成图片素材，先和我确认画面内容、风格和使用的模型。" },

@@ -17,12 +17,8 @@
         </div>
         <div class="promptArea">
           <el-card class="promptCard" shadow="never" :bodyStyle="{ padding: '20px' }" :footerStyle="{ padding: '12px 16px' }">
-            <div class="modePicker">
-              <span class="modeLabel">创作模式</span>
-              <el-segmented v-model="selectedMode" :options="modeOptions" :disabled="creating || opening" aria-label="创作模式" />
-            </div>
             <attachmentList v-if="promptAttachments.length" class="promptAttachments" :attachments="promptAttachments" removable restorable :disabled="creating || opening" @remove="promptAttachments.splice($event, 1)" @restore="restoreAttachment" />
-            <el-input ref="promptInput" v-model="prompt" type="textarea" :rows="4" resize="none" :disabled="creating || opening" aria-label="创作描述" @paste.capture="pasteText" />
+            <el-input ref="promptInput" v-model="prompt" type="textarea" :rows="4" resize="none" :disabled="creating || opening" aria-label="创作描述" :placeholder="promptPlaceholder" @paste.capture="pasteText" />
             <template #footer>
               <div class="composerFooter">
                 <workspacePicker ref="promptWorkspacePicker" v-model="workspaceDirectory" :disabled="creating || opening" />
@@ -117,8 +113,6 @@ import modelSetupDialog from "@/components/modelSetupDialog.vue";
 import assetLibrary from "@/pages/workspace/panels/canvas/components/assetLibrary.vue";
 import minimalBackground from "@/components/minimalBackground.vue";
 import workspacePicker from "./workspacePicker.vue";
-import { createModes } from "./createModes";
-
 const settingsVisible = ref(false);
 // 首页的素材库：素材库是全局的，不需要先打开项目就能管理素材。
 const assetsVisible = ref(false);
@@ -134,19 +128,15 @@ const attachmentInput = ref<HTMLInputElement>();
 const modelSetupDialogRef = ref<InstanceType<typeof modelSetupDialog>>();
 // 与 AI 助手对话的附件上限保持一致，避免进工作区后才发现超出。
 const maxAttachments = 20;
-// 创作模式：决定预置的提示词与画布节点。
-const modeOptions = createModes.map(({ id, label }) => ({ label, value: id }));
-const selectedMode = ref(createModes[0]!.id);
-const activeMode = computed(() => createModes.find(mode => mode.id === selectedMode.value) ?? createModes[0]!);
-// 记录上一次由模式填入的文本。切换模式时只替换这段文本，
-// 用户自己写过或改过的内容一律保留。
-let appliedModePrompt = activeMode.value.prompt;
-watch(selectedMode, () => {
-  const next = activeMode.value.prompt;
-  if (prompt.value === appliedModePrompt) prompt.value = next;
-  appliedModePrompt = next;
-});
+// ACT: 首页不再让用户选「创作模式」。
+// 原先要选模式（自由创作 / 营销推广 / 数字人口播 / 故事短剧）才建项目，模式决定预置画布与开场提示词；
+// 实测这套引导是**反的**：用户还不知道要做什么，就得先选一个模式，还容易被"必须输点东西"卡住。
+// 现在统一建空画布，进去之后由对话引导 —— 想做什么、有什么素材，在能看见画布的地方说更自然。
+// createModes.ts 仍然保留（模式定义与它的端口校验都还在），将来要恢复入口加回来即可。
 const workspaceStore = useWorkspaceStore();
+// ACT: 输入框改成「可留空」。用户还不知道要做什么时，逼他先写一段话是没必要的门槛 ——
+// 空着进去，在能看见画布的地方由对话引导更自然。
+const promptPlaceholder = "想做什么？（可以留空，进去后我们边聊边定）\n例如：给一款宠物用品做 15 秒竖版宣传片；或：我上传了三张实拍图，想让小狗开口说一句话。";
 const { project, projectList } = storeToRefs(workspaceStore);
 const workspaceDirectory = ref(project.value?.directory ?? "");
 
@@ -255,9 +245,9 @@ async function createProject(fromPrompt = true) {
     }
     const { directory, empty } = await useWorkspaceFiles(path).list();
     if (!empty) return ElMessage.warning("该文件夹不为空，请重新选择空文件夹；已有项目请使用“导入项目”或点击项目列表打开。");
-    // 按所选模式铺好画布。自由创作是空画布，与原先行为一致。
-    const { nodes, edges } = activeMode.value.build();
-    await useWorkspaceFiles(directory).writeJson("画布1.json", { toonflowCanvas: true, nodes, edges, viewport: { x: 0, y: 0, zoom: 1 } }, true);
+    // ACT: 新项目一律是**空画布** —— 不再按模式预铺节点。
+    // 进项目后由对话引导：先问清楚要做什么、有什么素材（参考图/视频），agent 再按需建画布。
+    await useWorkspaceFiles(directory).writeJson("画布1.json", { toonflowCanvas: true, nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } }, true);
     await workspaceStore.openProject(directory);
     if (fromPrompt && (prompt.value.trim() || promptAttachments.value.length)) {
       workspaceStore.pendingAgentMessage = { directory: workspaceStore.project!.directory, prompt: prompt.value, attachments: [...promptAttachments.value], model: selectedModel.value, reasoningEffort: reasoningEffort.value };
@@ -380,26 +370,6 @@ watch(settingsVisible, (open, wasOpen) => {
           }
 
           .attachmentInput { display: none; }
-
-          /* ACT: 模式决定画布内容，所以放在卡片内、输入框之上，
-             与"描述"同属"要创作什么"；工作目录与模型属于环境设置，留在底部。 */
-          .modePicker {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 14px;
-
-            .modeLabel {
-              flex-shrink: 0;
-              color: var(--el-text-color-secondary);
-              font-size: 13px;
-            }
-
-            .el-segmented {
-              --el-segmented-item-selected-bg-color: var(--el-color-primary);
-              --el-segmented-item-selected-color: #fff;
-            }
-          }
 
           .composerFooter {
             display: flex;
