@@ -54,49 +54,67 @@ textReady.value = true;   // ← 只有成功才置 true
 
 ---
 
-## BUG-2 画布图片节点「添加到素材库」按钮无反应 ★ 未查清
+## BUG-2 画布图片节点「添加到素材库」按钮无反应 ★ 未查清（有新线索）
 
 ### 现象
 
 选中画布上的图片节点后，上方工具条里的「添加到素材库」按钮**点了没反应**（旁边是「替换图片」「下载」，那些正常）。
-**未确认**：它是**灰的（禁用态）**还是**亮的但点了没反应** —— 这两者根因完全不同，下次先确认这一点。
+**未确认**：它是**灰的（禁用态）**还是**亮的但点了没反应**。
 
-### 按钮位置（已定位）
+### 新增线索（2026-10-07 用户补充）★
 
-`packages/nodeScaffold/src/nodeSkeleton.vue:36-42`（通用工具条，不是 imageNode 自己的）：
+1. **右键节点 → 菜单里的「保存到素材库」也没反应** —— 两个入口都坏。
+2. 控制台**没有**与素材库相关的报错。
+3. 运行在**端口 58944** → 是**桌面应用**，不是开发版（5173）。
+   ⚠ 下次先确认这个安装包是不是含最新代码（旧包会让整个排查建立在错代码上）。
+4. 控制台里确实有报错，但**与素材库无关**：`/api/desktop/update` 500（见 BUG-5）。
 
-```html
-<el-button :icon="IconFolderPlus"
-           :disabled="!assetOutputs.length || !saveNodeToAssets"
-           title="添加到素材库"
-           @click.stop="handleCommand('saveAsset')" />
-```
+### 两个入口都坏 ⇒ 排除了什么
 
-### 链路（已逐一读过，**每一环看起来都通**）
+- 工具栏按钮那条链不是独有的：`nodeSkeleton.vue:42` 的按钮和
+  `nodeSkeleton.vue:15` 的右键菜单项**都汇到同一处**
+  `handleCommand("saveAsset")`（L376）→ `saveNodeToAssets?.()`。
+- 右键菜单项带 `v-if="assetOutputs.length && saveNodeToAssets"`（L15）——
+  **它出现了**，说明 `assetOutputs.length` 与 `saveNodeToAssets` **都是真的**。
+  这一条同时排除了「注入缺失」和「无输出」两种猜测。
 
-```
-nodeSkeleton.vue:38   :disabled="!assetOutputs.length || !saveNodeToAssets"
-nodeSkeleton.vue:367  assetOutputs = handles 里 type==="source" 且有输出（IMAGE 有值 → 应有 1 项）
-nodeSkeleton.vue:363  saveNodeToAssets = inject("saveNodeToAssets", undefined)
-                      ⚠ 若为 undefined，则 L376 saveNodeToAssets?.(...) 是**静默 no-op**
-nodeSkeleton.vue:376  handleCommand("saveAsset") → saveNodeToAssets?.(label, assetOutputs)
-canvas/index.vue:252  provide("saveNodeToAssets", (label, outputs) => assetLibraryRef.value?.openSave(...))
-                      ⚠ 若 ref 为空，同样是**静默 no-op**（?.）
-assetLibrary.vue:382  openSave() 第一行：if (!canvasMode.value) return;   ← 又一处静默早退
-assetLibrary.vue:137  canvasMode = props.canvas !== false
-```
+### 剩下的强怀疑点：**静默早退**
+
+这条链上至少有 **3 处「什么都不做、也不报错」**，与用户观察完全一致：
+
+| # | 位置 | 条件 |
+|---|---|---|
+| 1 | `assetLibrary.vue:384` | `openSave` 第一行 `if (!canvasMode.value) return;` |
+| 2 | `assetLibrary.vue:402` | `saveAsset` 第一行 `if (!output \|\| !name \|\| ...) return;` |
+| 3 | `assetLibrary.vue:290` 附近 | `openSave` 里 `if (!directory.value) return;`（**未逐行确认**） |
+
+**下次最该先验的一条**：`saveAsset` 里 `outputs.value[selectedOutput.value]?.output` 是否为 undefined。
+若为 undefined，点「保存」就是**静默无效** —— 这与「对话框能打开但点了没反应」吻合。
+（同时注意 `saveAsset` 的早退条件里 `saveFolderName !== undefined` 也会导致静默无反应：
+用户在对话框里点了「新建文件夹」但没提交，保存就会被静默挡掉。）
 
 ### 已排除的推断（**别再按这两条查**）
 
 1. ~~「素材库浮层关闭导致对话框不存在」~~ —— **不成立**。虽然 `assetLibrary.vue:2` 的 `el-card` 带 `v-if="visible"`，但两个 `el-dialog`（L66/L73，含「保存到素材库」）是 `</el-card>`（L60）的**兄弟节点**，不受它影响。
 2. ~~「canvasMode 为 false 早退」~~ —— **不成立**。全仓库两处使用，只有 `pages/home/index.vue:84` 传了 `:canvas="false"`；画布那处（`canvas/index.vue:64`）没传，所以 `canvasMode` 为 true。
+3. ~~「注入缺失」/「节点无输出」~~ —— **不成立**（右键菜单项出现即证明两者都为真，见上）。
 
-### 下次该查
+### 按钮与链路位置（已定位）
 
-- 先确认按钮是否**禁用**（灰）→ 若是，查 `assetOutputs.length` 与 inject 是否拿到
-- 若按钮是亮的但无反应 → 在 `handleCommand` / `openSave` / `loadEntries` 各加一句 console 定位
-- 顺带注意：**这条链上有 3 处静默 no-op**（`?.`、`?.`、`if (!canvasMode) return`），
-  任何一环断掉都表现为「点了没反应」且**不报错** —— 这是它难查的根本原因
+`packages/nodeScaffold/src/nodeSkeleton.vue:36-42`（通用工具条，不是 imageNode 自己的）、L15（右键菜单项）、L376（handleCommand）。
+
+```
+nodeSkeleton.vue:38   :disabled="!assetOutputs.length || !saveNodeToAssets"
+nodeSkeleton.vue:363  saveNodeToAssets = inject("saveNodeToAssets", undefined)
+                      ⚠ 若为 undefined，则 L376 saveNodeToAssets?.(...) 是**静默 no-op**
+nodeSkeleton.vue:376  handleCommand("saveAsset") → saveNodeToAssets?.(label, assetOutputs)
+canvas/index.vue:252  provide("saveNodeToAssets", (label, outputs) => assetLibraryRef.value?.openSave(...))
+                      ⚠ 若 ref 为空，同样是**静默 no-op**（?.）
+assetLibrary.vue:382  openSave() → if (!canvasMode.value) return;  / if (!directory.value) return;
+assetLibrary.vue:105  「保存」按钮 → saveAsset()  → L402 静默早退
+assetLibrary.vue:258  loadEntries() → /api/assets/list（失败会弹 ElMessage，用户说没弹）
+```
+
 
 ---
 
@@ -140,7 +158,68 @@ F12 → Network → 点 409 请求 → 读响应体 `message`（前端只显示�
 
 ---
 
+## BUG-5 `/api/desktop/update` 在浏览器模式下返回 500 ★ 根因已确定（与素材库无关）
+
+### 现象
+
+控制台上反复出现：
+
+```
+Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+:58944/api/desktop/update:1        ×3
+```
+
+### 根因（已确定）
+
+`apps/server/src/utils/desktop/index.ts:116`
+
+```ts
+export function getDesktopRuntime(req: Request): DesktopRuntime {
+  return req.app.locals.desktop;          // 独立 server 下是 undefined
+}
+```
+
+`getDesktopUpdate`（L138）第一行就 `const { updater } = getDesktopRuntime(req);` →
+**解构 undefined 抛 TypeError** → 统一错误处理中间件当 500 返回。
+
+即：**在非桌面运行时（独立 server / 浏览器访问）调这个接口必然 500**，属既有缺陷。
+
+### 谁在调
+
+全仓库只有一处：`apps/web/src/components/settings/panels/developer/index.vue:148`
+（开发者面板里的更新检查）。它请求时 `timeout: 10000` 且会自动重试，所以一次打开会刷出多条。
+
+### 修法
+
+`getDesktopUpdate`（以及 `checkDesktopUpdate` / `downloadDesktopUpdate` / `applyDesktopUpdate`）
+应先判断 `req.app.locals.desktop` 是否存在，不存在就返回一个「无更新能力」的快照
+（`canUpdate: false`）而不是抛错；前端据此隐藏更新区。
+
+---
+
+## BUG-6 控制台可访问性提示：`<label for>` 不匹配表单元素 id ★ 轻微
+
+```
+Incorrect use of <label for=FORM_ELEMENT>
+The label's for attribute doesn't match any element id.
+2 个资源
+```
+
+不影响功能，只影响浏览器自动填充与读屏。下次在开发者面板表单里找那两个 `<label>`，
+给对应输入补 `id`（或改用包裹式 label）。
+
+---
+
 ## 顺带：仓库里已有两份可复用的经验文档
 
 - `构建笔记.md` —— 打包全流程与全部网络障碍（**打包前先读它**，能省掉一小时的盲试）
 - `docs/cardAuthoring.md` —— 卡开发方法与已知坑
+
+## 下次开工的建议顺序
+
+1. **BUG-4**（工具成功却回错误文案）—— 先修它，否则其余每条都被它的假提示带偏
+2. **BUG-1**（② 节点）—— 根因已确定，改动最小，且它真正卡住用户的进度
+3. **BUG-2**（素材库）—— 先验「`saveAsset` 里 output 是否为 undefined」这一个点
+4. **BUG-5**（desktop/update 500）—— 独立好修
+5. **BUG-3** / **BUG-6** —— 需要更多信息 / 轻微
+
