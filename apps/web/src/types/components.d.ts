@@ -98,6 +98,7 @@ declare module 'vue' {
     Settings: typeof import('./../components/settings/index.vue')['default']
     SkillMenu: typeof import('./../components/agent/skillMenu.vue')['default']
     ToolMessage: typeof import('./../components/agent/toolMessage.vue')['default']
+    Tools: typeof import('./../components/settings/panels/tools.vue')['default']
     Ui: typeof import('./../components/settings/panels/ui.vue')['default']
     UpdateBox: typeof import('./../components/updateBox.vue')['default']
     VoiceModel: typeof import('./../components/settings/panels/voiceModel/index.vue')['default']

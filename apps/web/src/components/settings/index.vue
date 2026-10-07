@@ -26,10 +26,14 @@
 
 <script setup lang="ts">
 import { defineAsyncComponent, shallowRef } from "vue";
-import { IconPhotoVideo, IconInfoCircle, IconMicrophone2, IconSubtitlesAi, IconTransform } from "@tabler/icons-vue";
+import { IconAdjustments, IconPhotoVideo, IconInfoCircle, IconMicrophone2, IconSubtitlesAi, IconTransform } from "@tabler/icons-vue";
 
-// ACT: 只保留模型配置、FFmpeg 与开源许可。界面设置、常规配置、MCP、隐私、开发者选项
+// ACT: 只保留模型配置、工具配置、FFmpeg 与开源许可。界面设置、常规配置、MCP、隐私、开发者选项
 // 已按产品要求隐藏（对应面板文件仍在，需要时把条目加回来即可）。
+//
+// 「工具配置」是补上的入口：在此之前 pluginConfigDialog 只有 agent 工具栏那一处引用、
+// 且写死只开 mediaGeneration —— 于是联网搜索等服务型工具的配置在界面上**根本没有入口**
+// （实测确认：全仓库 /api/tools/get 只有那一个调用方）。
 const settingsPanels = [
   {
     id: "languageModel",
@@ -40,6 +44,7 @@ const settingsPanels = [
   },
   { id: "mediaModel", label: "媒体模型", icon: IconPhotoVideo, component: defineAsyncComponent(() => import("./panels/mediaModel/index.vue")) },
   { id: "voiceModel", label: "语音模型", icon: IconMicrophone2, component: defineAsyncComponent(() => import("./panels/voiceModel/index.vue")) },
+  { id: "tools", label: "工具配置", icon: IconAdjustments, groupLabel: "其他", component: defineAsyncComponent(() => import("./panels/tools.vue")) },
   { id: "ffmpeg", label: "FFmpeg", icon: IconTransform, groupLabel: "其他", component: defineAsyncComponent(() => import("./panels/ffmpeg/index.vue")) },
   { id: "about", label: "关于", icon: IconInfoCircle, component: defineAsyncComponent(() => import("./panels/about.vue")) },
 ];
