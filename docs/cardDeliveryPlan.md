@@ -49,7 +49,7 @@ apps/server/src/routes/card/render.ts   HTTP 路由（SSE 进度 + 取消）
 packages/tools/postProduction     新增 renderCard op（薄代理）
 ```
 
-## 1–3：让打包后真能跑（底线）
+## 1–3：让打包后真能跑（底线）✅ 已完成
 
 ### 1. 把渲染逻辑移进安装边界内
 
@@ -77,7 +77,7 @@ packages/tools/postProduction     新增 renderCard op（薄代理）
 - **只能按 pid 杀自己起的实例，绝不按进程名杀**（这条是血的教训：按名杀
   `msedge.exe` 会打掉用户正在用的界面，因为 Electrobun 的界面就是 WebView2 = Edge）
 
-## A：让 Agent 真能把卡渲进成片
+## A：让 Agent 真能把卡渲进成片 ✅ 已完成
 
 - `packages/tools/postProduction` 新增 op：`renderCard`
   - 入参：`slug` / `frameSize` / `parameters` / 输出路径 / （叠加卡）目标视频
@@ -85,12 +85,37 @@ packages/tools/postProduction     新增 renderCard op（薄代理）
 - 工具侧只做参数校验 + 转交 server 服务（薄代理）
 - 叠加卡：渲出带 alpha 的视频再与 AI 视频 overlay；全屏卡：直接渲出整段
 
-## B：让卡在画布上可见可调
+## B：让卡在画布上可见可调（进行中）
 
-- 新增画布节点（照 `packages/nodes/videoGenerationNode` 的形态）：
-  选卡 → 调参数 → 选目标画幅 / 目标视频 → 渲预览 → 输出成片
-- 节点调 server 的 `/api/card/render` 拿进度与结果
-- 节点注册进 `packages/nodes` 与构建流程
+### 已查清的上线路径（照现有节点做）
+
+节点的形态与注册方式（实测，不是推测）：
+
+| 环节 | 事实 |
+|---|---|
+| 节点是一个包 | `packages/nodes/<name>Node/`，含 `package.json`、`vite.config.ts`、`src/index.vue` |
+| 构建 | `vite build --configLoader runner`，用 `createNodeConfig({ name, displayName, author, github }, import.meta.url)`（来自 `@toonflow/nodes-scaffold`） |
+| 产物 | `build/nodes/<name>.umd.js`。命名规则：`/^[a-z][a-zA-Z0-9]*\.umd\.js$/` |
+| 注册 | **不需要改任何注册表**。server 的 `routes/nodes/get.ts` 扫 `nodesDirectory` 下的 `*.umd.js`；web 侧 `loadNodeComponent` 用 `<script>` 加载该文件，组件从 `window.toonflowNodes[name]` 取 |
+| 画布 | `apps/web/src/pages/workspace/panels/canvas/index.vue`：`nodeTypes` 按需装载；`nodeMenu.vue` 读组件的 `handles` 与 `icon` 来画连线点与菜单图标 |
+| 打包 | `electrobun.config.ts` 已把 `build/nodes` 映射到 `nodes`，所以**新节点自动进安装包** |
+
+### 组件契约
+
+- 用 `@toonflow/nodes-scaffold` 的 `nodeSkeleton` + `useNode` + `useNodeEvent` 等组合式
+  （`textNode` 是最简单的参考：`packages/nodes/textNode/src/index.vue`）
+- `NodeHandle = { type, dataType }`，`dataType` 来自
+  `"STRING" | "INT" | "FLOAT" | "BOOLEAN" | "IMAGE" | "MASK" | ...`（见 `nodeScaffold/src/connection.ts`）
+- 节点数据由画布持久化（server 的 canvas 数据），节点本身只负责渲染与交互
+
+### 待做
+
+1. `packages/nodes/cardNode/`：选卡（走 `/api/card/*` 或直接读卡目录）→ 调参数 → 选画幅
+   → 选目标视频输入 → 触发 `/api/card/render` → 显示进度 → 输出成片
+2. 输入端口接上游视频（`overlay` 卡要目标视频；`fullscreen` 卡不需要）
+3. 渲出来的成片落到工作区，并作为节点输出
+4. 验证：`bun run build:nodes` 产出 `cardNode.umd.js`；在画布里能拖出来、选卡、跑通一次渲染
+
 
 ## 验证要求
 
@@ -102,6 +127,8 @@ packages/tools/postProduction     新增 renderCard op（薄代理）
 | 打包边界 | 确认内核随 server 进 `app/`；`scripts/` 的不再是依赖 |
 | 回归 | `bun run preflight`、相关包 typecheck、`bun run build` |
 
-## 顺序
+## 进度
 
-1–3（底线）→ A（工具）→ B（画布节点）。每步做完单独提交并汇报。
+- ✅ 1–3：渲染内核进 server 的安装边界；工作目录定在 `<data>/cardRender/`；进程清理按 pid 杀整棵树
+- ✅ A：`renderCard` 工具 op（宿主注入 cardRender 通道，工具侧薄代理）
+- ⏳ B：画布节点（契约已查清，见上）
