@@ -79,6 +79,8 @@ bun scripts/renderCard.mjs --print-chrome   # 打印确切命令
 | **绝对定位子元素影响 flex 居中** | 末尾一帧容器悄悄偏移 | 用 `margin:auto` 居中，不用 flex 居中 |
 | 逐字排版用变宽字体 | 逐帧重排抖动 | 打字/滚动类必须等宽 + `tabular-nums` |
 | 表达式里做算术 | 滤镜/样式静默算错 | 加括号（FFmpeg 卡那边踩过同一类） |
+| **叠加卡用 jpeg 中间帧** | alpha 被丢掉，叠上去是白框 | 叠加卡走 png 中间帧 + **ProRes 4444** |
+| **以为 libvpx-vp9 能保 alpha** | 喂 png 进去也输出 yuv420p，alpha 悄悄没了 | 实测只有 `prores_ks` / `qtrle` / `png` 三种保得住 |
 | **累加循环里的抖动写成 ±** | 步长可能变负 → 累加值不再增长 → **动画永久停在中途**，不报错 | 抖动**只加不减** |
 | **参数是「内容长度的镜像」** | 文案 19 字而参数默认 14 → 只显示前 14 字，看着像动画坏了 | 这类参数一律由内容本身推导，不手填 |
 
@@ -98,6 +100,21 @@ bun scripts/renderCard.mjs --print-chrome   # 打印确切命令
 
 另外：**边界不要用 `offsetParent`** —— 卡里常用零尺寸的定位锚点包一层，
 那会让边界退化成一条线。自检用的是显式声明的 `[data-check="舞台"]`。
+
+---
+
+## 四之二、全屏卡 vs 叠加卡（两条渲染路径）
+
+`shape` 字段决定渲染路径，不能混：
+
+| shape | 中间帧 | 合成 | 用途 |
+|---|---|---|---|
+| `fullscreen` | jpeg（快 3.4 倍） | H.264 / yuv420p | 替代这一段画面 |
+| `overlay` | png | **ProRes 4444 / yuva444p10le** | 叠在 AI 视频上（必须带 alpha） |
+
+踩过：叠加卡用 jpeg 中间帧 → alpha 丢失 → 叠上去是白框。
+又踩过：以为 `libvpx-vp9` 能保 alpha（体积更小）→ 喂 png 也输出 yuv420p。
+**实测只有 `prores_ks` / `qtrle` / `png` 三种保得住**，选 ProRes 4444（剪辑软件标准格式）。
 
 ---
 
@@ -147,7 +164,7 @@ bun scripts/renderCard.mjs --print-chrome   # 打印确切命令
 ```
 批次 1 数据类     ✅ digitRoll · ✅ counterConfetti · ✅ numberSlabPop
 批次 2 文字类     ✅ typewriterTerminal · ✅ typewriterReveal · ✅ perCharacterRise
-批次 3 口播语法   ⏳ keyword-pop-highlight · highlighter-sweep · focus-dim-spotlight
+批次 3 口播语法   ✅ keywordPopHighlight · ✅ highlighterSweep · ✅ focusDimSpotlight
 批次 4 叠加标注   ⏳ marker-underline-title · scanline-annotate-focus · hand-drawn-ellipse
 批次 5 图表       ⏳ chart-live-moves · gauge-readout-moves · bar-chart-growth
 批次 6 文字强化   ⏳ type-assembly-moves · soft-blur-in · word-slot-cycle
@@ -155,4 +172,4 @@ bun scripts/renderCard.mjs --print-chrome   # 打印确切命令
 批次 8 转场       ⏳ wipe-transitions · white-flash-logo-simplify-cut · scan-bracket-sweep
 ```
 
-**已完成 6/24。** 每完成一批就提交并汇报。
+**已完成 9/24。** 每完成一批就提交并汇报。

@@ -10,6 +10,9 @@ import { numberSlabPop } from "./numberSlabPop";
 import { typewriterTerminal } from "./typewriterTerminal";
 import { typewriterReveal } from "./typewriterReveal";
 import { perCharacterRise } from "./perCharacterRise";
+import { keywordPopHighlight } from "./keywordPopHighlight";
+import { highlighterSweep } from "./highlighterSweep";
+import { focusDimSpotlight } from "./focusDimSpotlight";
 
 export const htmlCards = [
   digitRoll,
@@ -18,6 +21,9 @@ export const htmlCards = [
   typewriterTerminal,
   typewriterReveal,
   perCharacterRise,
+  keywordPopHighlight,
+  highlighterSweep,
+  focusDimSpotlight,
 ];
 
 export function findHtmlCard(slug: string) {

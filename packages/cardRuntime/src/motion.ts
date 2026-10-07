@@ -19,6 +19,8 @@
 export function inQuad(t: number): number { return t * t; }
 /** 二次。上游 E.outQuad。 */
 export function outQuad(t: number): number { return t * (2 - t); }
+/** 二次（起收都缓）。上游 E.inOutQuad。 */
+export function inOutQuad(t: number): number { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
 /** 三次。上游 E.inCubic。 */
 export function inCubic(t: number): number { return t * t * t; }
 /** 三次。上游 E.outCubic。 */
@@ -82,7 +84,7 @@ export function normalizedT(frame: number, total: number): number {
 /** 会被内联进页面的公共动效函数。卡把它展开进自己的 helpers。 */
 export function motionHelpers(): Record<string, (...args: never[]) => unknown> {
   const table: Record<string, (...args: never[]) => unknown> = {
-    inQuad, outQuad, inCubic, outCubic, inOutCubic, outQuart, outQuint,
+    inQuad, outQuad, inOutQuad, inCubic, outCubic, inOutCubic, outQuart, outQuint,
     outExpo, inExpo, outBack, inBack, outElastic, spring,
     lerp, seg, linear, rand, normalizedT,
   };

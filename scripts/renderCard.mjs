@@ -79,6 +79,9 @@ for (const name of Object.keys(card.params ?? {})) {
 // 从卡参数里移除，于是 --width/--height 被**静默忽略**，输出永远是 1920×1080。
 const width = Number(value("width") ?? card.size.width);
 const height = Number(value("height") ?? card.size.height);
+// 叠加卡必须输出**带透明通道**的视频才能叠在 AI 视频上（jpeg 没有 alpha，
+// 用它渲叠加卡会得到白底，叠上去就是白框）。全屏卡走 jpeg 路径更快。
+const wantAlpha = card.meta.shape === "overlay" || argv.includes("--alpha");
 
 const ffmpeg = process.env.ZK_FFMPEG
   ?? "E:\\ffmpeg-2025-07-01-git-11d1b71c31-full_build\\bin\\ffmpeg.exe";
@@ -169,10 +172,11 @@ for (const frame of [0, 20, 40, 20, 0]) {
 // 确定性自检：同一帧渲染两次必须字节级一致，否则逐帧抓帧会闪
 await cdp.evaluate(`window.renderAt(7)`);
 await cdp.evaluate(awaitPaint);
-const first = await cdp.send("Page.captureScreenshot", { format: "jpeg", quality });
+const shotFormat = wantAlpha ? { format: "png" } : { format: "jpeg", quality };
+const first = await cdp.send("Page.captureScreenshot", shotFormat);
 await cdp.evaluate(`window.renderAt(7)`);
 await cdp.evaluate(awaitPaint);
-const second = await cdp.send("Page.captureScreenshot", { format: "jpeg", quality });
+const second = await cdp.send("Page.captureScreenshot", shotFormat);
 const deterministic = first.data === second.data;
 console.log(`确定性自检：同一帧两次截图 ${deterministic ? "一致 ✓" : "不一致 ✗（逐帧渲染会闪，先修卡）"}`);
 
@@ -182,8 +186,12 @@ const started = Date.now();
 for (let frame = 0; frame < total; frame++) {
   await cdp.evaluate(`window.renderAt(${frame})`);
   await cdp.evaluate(awaitPaint);
-  const shot = await cdp.send("Page.captureScreenshot", { format: "jpeg", quality, captureBeyondViewport: false });
-  writeFileSync(join(frameDirectory, `f${String(frame).padStart(5, "0")}.jpg`), Buffer.from(shot.data, "base64"));
+  const shot = await cdp.send("Page.captureScreenshot", {
+    ...(wantAlpha ? { format: "png" } : { format: "jpeg", quality }),
+    captureBeyondViewport: false,
+  });
+  const extension = wantAlpha ? "png" : "jpg";
+  writeFileSync(join(frameDirectory, `f${String(frame).padStart(5, "0")}.${extension}`), Buffer.from(shot.data, "base64"));
   if ((frame + 1) % 30 === 0 || frame === total - 1) {
     const elapsed = (Date.now() - started) / 1000;
     process.stdout.write(`\r  抓帧 ${frame + 1}/${total}  ${(elapsed / (frame + 1)).toFixed(2)}s/帧  预计剩 ${((total - frame - 1) * elapsed / (frame + 1)).toFixed(0)}s   `);
@@ -193,18 +201,29 @@ console.log("");
 const renderSeconds = (Date.now() - started) / 1000;
 
 mkdirSync(dirname(output), { recursive: true });
-// ACT: 中间帧用 jpeg（比 png 快 3.4 倍），再编成 H.264。
-// 代价是多一次有损压缩；q90 的损失远低于 H.264 自身的量化，成片看不出差别。
-const composed = spawnSync(ffmpeg, ["-y", "-hide_banner", "-loglevel", "error",
-  "-framerate", String(fps), "-i", join(frameDirectory, "f%05d.jpg"),
-  "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "medium", output], { encoding: "utf8" });
+
+// 叠加卡必须输出**带透明通道**的视频，否则没法叠在 AI 视频上。
+// ACT: 两条渲染路径 —— 全屏卡走 jpeg 中间帧 + H.264（快）；叠加卡走 png 中间帧 +
+// **ProRes 4444**（保 alpha）。jpeg 没有 alpha，用它渲叠加卡会得到白底，叠上去就是白框。
+//
+// 为什么不用 libvpx-vp9（体积更小）：实测本机的 libvpx-vp9 **不支持 alpha** ——
+// 喂 png 进去也输出 yuv420p，alpha 被悄悄丢掉。保得住 alpha 的是 prores_ks / qtrle / png。
+// 选 ProRes 4444：剪辑软件与 Final Cut 的标准带透明交付格式，体积也可控。
+const composed = wantAlpha
+  ? spawnSync(ffmpeg, ["-y", "-hide_banner", "-loglevel", "error",
+    "-framerate", String(fps), "-i", join(frameDirectory, "f%05d.png"),
+    "-c:v", "prores_ks", "-pix_fmt", "yuva444p10le", "-profile:v", "4444",
+    output], { encoding: "utf8" })
+  : spawnSync(ffmpeg, ["-y", "-hide_banner", "-loglevel", "error",
+    "-framerate", String(fps), "-i", join(frameDirectory, "f%05d.jpg"),
+    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "medium", output], { encoding: "utf8" });
 if (composed.status !== 0) {
   console.error("ffmpeg 合成失败：" + (composed.stderr ?? "").slice(-400));
   process.exit(1);
 }
 const frames = readdirSync(frameDirectory).length;
 console.log(`已完成：${output}`);
-console.log(`  抓帧 ${renderSeconds.toFixed(1)}s（${(total / renderSeconds).toFixed(1)} 帧/秒）· 合成 ${frames} 帧 · ${(total / fps).toFixed(2)}s @ ${fps}fps`);
+console.log(`  抓帧 ${renderSeconds.toFixed(1)}s（${(total / renderSeconds).toFixed(1)} 帧/秒）· 合成 ${frames} 帧 · ${(total / fps).toFixed(2)}s @ ${fps}fps${wantAlpha ? " · **带透明通道**（ProRes 4444）" : ""}`);
 
 // ACT: 显式退出。本机的 Bun 在跑完这类脚本后**偶发不退出**（stdio 句柄没收干净），
 // 会让外层 for 循环里的下一个渲染永远等下去。所有写入都是同步的，直接退出是安全的。
