@@ -79,6 +79,8 @@ bun scripts/renderCard.mjs --print-chrome   # 打印确切命令
 | **绝对定位子元素影响 flex 居中** | 末尾一帧容器悄悄偏移 | 用 `margin:auto` 居中，不用 flex 居中 |
 | 逐字排版用变宽字体 | 逐帧重排抖动 | 打字/滚动类必须等宽 + `tabular-nums` |
 | 表达式里做算术 | 滤镜/样式静默算错 | 加括号（FFmpeg 卡那边踩过同一类） |
+| **累加循环里的抖动写成 ±** | 步长可能变负 → 累加值不再增长 → **动画永久停在中途**，不报错 | 抖动**只加不减** |
+| **参数是「内容长度的镜像」** | 文案 19 字而参数默认 14 → 只显示前 14 字，看着像动画坏了 | 这类参数一律由内容本身推导，不手填 |
 
 ---
 
@@ -144,7 +146,7 @@ bun scripts/renderCard.mjs --print-chrome   # 打印确切命令
 
 ```
 批次 1 数据类     ✅ digitRoll · ✅ counterConfetti · ✅ numberSlabPop
-批次 2 文字类     ✅ typewriterTerminal · ⏳ typewriter-reveal · ⏳ per-character-rise
+批次 2 文字类     ✅ typewriterTerminal · ✅ typewriterReveal · ✅ perCharacterRise
 批次 3 口播语法   ⏳ keyword-pop-highlight · highlighter-sweep · focus-dim-spotlight
 批次 4 叠加标注   ⏳ marker-underline-title · scanline-annotate-focus · hand-drawn-ellipse
 批次 5 图表       ⏳ chart-live-moves · gauge-readout-moves · bar-chart-growth
@@ -153,4 +155,4 @@ bun scripts/renderCard.mjs --print-chrome   # 打印确切命令
 批次 8 转场       ⏳ wipe-transitions · white-flash-logo-simplify-cut · scan-bracket-sweep
 ```
 
-**已完成 4/24。** 每完成一批就提交并汇报。
+**已完成 6/24。** 每完成一批就提交并汇报。

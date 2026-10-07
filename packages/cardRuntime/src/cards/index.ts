@@ -8,8 +8,17 @@ import { digitRoll } from "./digitRoll";
 import { counterConfetti } from "./counterConfetti";
 import { numberSlabPop } from "./numberSlabPop";
 import { typewriterTerminal } from "./typewriterTerminal";
+import { typewriterReveal } from "./typewriterReveal";
+import { perCharacterRise } from "./perCharacterRise";
 
-export const htmlCards = [digitRoll, counterConfetti, numberSlabPop, typewriterTerminal];
+export const htmlCards = [
+  digitRoll,
+  counterConfetti,
+  numberSlabPop,
+  typewriterTerminal,
+  typewriterReveal,
+  perCharacterRise,
+];
 
 export function findHtmlCard(slug: string) {
   const card = htmlCards.find(item => item.meta.slug === slug);
