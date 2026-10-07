@@ -65,8 +65,20 @@
 
   <el-dialog :modelValue="previewAsset?.kind === 'video'" :title="previewAsset?.name" width="min(800px, calc(100vw - 32px))" alignCenter appendToBody destroyOnClose @update:modelValue="previewAsset = undefined">
     <div v-if="previewAsset?.kind === 'video'" class="assetPreview">
-      <el-alert v-if="previewError" :title="previewError" type="error" :closable="false" showIcon />
-      <video v-else :key="previewAsset.url" class="previewVideo" :src="previewAsset.url" :aria-label="previewAsset.name" controls playsinline preload="metadata" @error="previewError = '视频无法播放，文件可能已损坏或当前浏览器不支持其编码。'" />
+      <!-- ACT: 放不了的时候要说清**是什么问题、怎么办**。
+           原先只有一句「文件可能已损坏或当前浏览器不支持其编码」——
+           实测 ProRes(.mov) 会报 DEMUXER_ERROR_NO_SUPPORTED_STREAMS，
+           而用户从剪辑软件/相机拿到的往往正是 ProRes、DNxHD、MPEG-2 这类**浏览器永远解不了**的编码。
+           那时他最需要知道的是「这不是文件坏了，是浏览器放不了这种编码，请转码或下载」。
+           另外 previewError 有值时 video 会被 v-else 换掉（连画面都没了），所以这里额外给操作入口。 -->
+      <template v-if="previewError">
+        <el-alert :title="previewError" type="error" :closable="false" showIcon />
+        <div class="previewActions">
+          <el-button :icon="IconDownload" tag="a" :href="downloadUrl(previewAsset.path)" :download="previewAsset.name">下载原文件</el-button>
+          <el-button text :icon="IconRefresh" @click="retryPreview()">重试</el-button>
+        </div>
+      </template>
+      <video v-else :key="previewAsset.url" class="previewVideo" :src="previewAsset.url" :aria-label="previewAsset.name" controls playsinline preload="metadata" @loadeddata="onPreviewLoaded" @error="onPreviewError" />
     </div>
   </el-dialog>
 
@@ -111,7 +123,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import axios from "axios";
 import { ElMessage, ElTree, type InputInstance, type TreeNodeData } from "element-plus";
-import { IconDots, IconEye, IconFile, IconFolderFilled, IconFolderPlus, IconMusic, IconPhoto, IconSearch, IconUpload, IconVideo, IconX } from "@tabler/icons-vue";
+import { IconDots, IconDownload, IconEye, IconFile, IconFolderFilled, IconFolderPlus, IconMusic, IconPhoto, IconRefresh, IconSearch, IconUpload, IconVideo, IconX } from "@tabler/icons-vue";
 import type { NodeOutput } from "@toonflow/nodes-scaffold/values";
 import { startAssetDrag } from "../canvasDrop";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
@@ -158,7 +170,7 @@ const folderSaving = ref(false);
 const uploading = ref(false);
 const uploadInput = ref<HTMLInputElement>();
 const assetMenuRef = ref<InstanceType<typeof assetMenu>>();
-const previewAsset = ref<{ name: string; url: string; kind: "image" | "audio" | "video" }>();
+const previewAsset = ref<{ name: string; url: string; kind: "image" | "audio" | "video"; path: string }>();
 const previewError = ref("");
 let loadRequest = 0;
 onBeforeUnmount(() => { loadRequest++; });
@@ -167,18 +179,104 @@ function assetUrl(path: string) {
   return `/api/assets/read?path=${encodeURIComponent(path)}`;
 }
 
+/** 下载原文件（放不了时的兜底：至少能拿到文件）。 */
+function downloadUrl(path: string) {
+  return `/api/assets/read?path=${encodeURIComponent(path)}&download=true`;
+}
+
+/**
+ * 浏览器放不了的**常见编码/封装**。
+ *
+ * ACT: 这些不是「文件损坏」，是浏览器没有对应解码器。实测（Chrome，与本机 WebView2 同源）：
+ *   · mpeg4（MPEG-4 Part 2）→ readyState 一直 0、**有声音没画面**、play() 也不报错
+ *     —— 这正是 **ffmpeg 不带 -c:v 时的默认编码**，所以「随手导出的 mp4 打不开」多半是它
+ *   · prores(.mov)、mpeg2、mxf 等 → 直接 `DEMUXER_ERROR_NO_SUPPORTED_STREAMS`
+ *   · h264 / h265(部分环境) / vp9 正常
+ * 分开说清楚，用户才知道该转码，而不是以为素材坏了。
+ */
+const unplayableByExtension: Record<string, string> = {
+  mov: "ProRes / DNxHD 等剪辑编码",
+  mxf: "MXF（广播/相机封装）",
+  mts: "AVCHD",
+  m2ts: "AVCHD",
+  vob: "DVD (MPEG-2)",
+  mpg: "MPEG-2",
+  mpeg: "MPEG-2",
+  wmv: "Windows Media",
+  flv: "Flash Video",
+};
+
+/** 探测超时阈值：mpeg4 这种会让 video 既不 loadedmetadata 也不 error。 */
+const previewProbeTimeout = 6000;
+let previewProbeTimer: ReturnType<typeof setTimeout> | undefined;
+
+function clearPreviewProbeTimer() {
+  if (previewProbeTimer !== undefined) {
+    clearTimeout(previewProbeTimer);
+    previewProbeTimer = undefined;
+  }
+}
+
+/**
+ * 放不了时给出**能照着做**的说明。
+ * @param kind `error` = video 报了错；`stalled` = 一直读不出元数据（有声音没画面就是这种）
+ */
+function describePreviewFailure(kind: "error" | "stalled") {
+  const name = previewAsset.value?.name ?? "";
+  const extension = name.includes(".") ? name.split(".").at(-1)!.toLowerCase() : "";
+  const hint = unplayableByExtension[extension];
+  const because = hint ? `这种格式浏览器放不了：${hint}` : "浏览器解不了这个文件的编码";
+  const symptom = kind === "stalled" ? "（能听到声音、但画面出不来）" : "";
+  previewError.value = `${because}${symptom}。文件本身通常没坏，转成 H.264（.mp4）就能在这里预览 —— 可以先「下载原文件」，或让我把它转码。`;
+}
+
+function onPreviewError() {
+  clearPreviewProbeTimer();
+  const code = document.querySelector<HTMLVideoElement>(".previewVideo")?.error?.code;
+  if (code === MediaError.MEDIA_ERR_NETWORK) {
+    previewError.value = "读取视频时网络中断，请重试。";
+    return;
+  }
+  describePreviewFailure("error");
+}
+
+/** video 既没 loadedmetadata 也没 error 时（mpeg4 就是这种）兜住，别让它一直黑着。 */
+function onPreviewLoaded() {
+  clearPreviewProbeTimer();
+}
+
+function armPreviewProbe() {
+  clearPreviewProbeTimer();
+  previewProbeTimer = setTimeout(() => {
+    // 已经能读出画面尺寸就说明解出来了，不动
+    const video = document.querySelector<HTMLVideoElement>(".previewVideo");
+    if (!video || video.videoWidth > 0) return;
+    describePreviewFailure("stalled");
+  }, previewProbeTimeout);
+}
+
+function retryPreview() {
+  if (!previewAsset.value) return;
+  const { name, path, kind } = previewAsset.value;
+  previewError.value = "";
+  // 换一个 url 让 video 重新加载（同 url 会被浏览器沿用失败状态）
+  previewAsset.value = { name, path, kind, url: `${assetUrl(path)}&retry=${Date.now()}` };
+  armPreviewProbe();
+}
+
 function mediaKind(entry: AssetEntry) {
   if (entry.type !== "file" || entry.draft) return;
   if (/\.(avif|apng|bmp|gif|ico|jpe?g|png|svg|webp)$/i.test(entry.name)) return "image";
   if (/\.(mp3|wav|ogg|opus|flac|m4a|aac)$/i.test(entry.name)) return "audio";
-  if (/\.(mp4|m4v|webm|mov|mkv|avi|ogv)$/i.test(entry.name)) return "video";
+  if (/\.(mp4|m4v|webm|mov|mkv|avi|ogv|mxf|mts|m2ts|vob|mpg|mpeg|ts|wmv|flv)$/i.test(entry.name)) return "video";
 }
 
 function openPreview(entry: AssetEntry) {
   const kind = mediaKind(entry);
   if (!kind) return;
   previewError.value = "";
-  previewAsset.value = { name: entry.name, url: assetUrl(entry.path), kind };
+  previewAsset.value = { name: entry.name, path: entry.path, url: assetUrl(entry.path), kind };
+  if (kind === "video") armPreviewProbe();
 }
 
 function openItemMenu(event: MouseEvent, entry: AssetEntry) {
@@ -620,6 +718,13 @@ defineExpose({ openSave });
     background: #000;
   }
 
+  /* 放不了时的操作入口：至少能拿到原文件、或重试一次 */
+  .previewActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
 }
 
 .saveForm {
