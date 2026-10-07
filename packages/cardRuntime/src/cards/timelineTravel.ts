@@ -21,6 +21,8 @@ export const timelineTravel: CardDefinition = {
     title: "时间轴旅行",
     category: "数据",
     shape: "fullscreen",
+    semantics: ["过程演示", "时间地点"],
+    inputs: ["文"],
     oneliner: "镜头沿水平刻度轴缓起→冲刺→急刹横移，版本刻度依次掠过、卡片从刻度线上弹立，急停在「今天」并推近。",
     origin: "按上游 video-shotcraft（Apache-2.0）规格实现：gallery/source/timeline-travel.md",
   },

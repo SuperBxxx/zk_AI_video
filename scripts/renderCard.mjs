@@ -161,6 +161,27 @@ const awaitPaint = `new Promise(resolve => {
   }));
 })`;
 
+// ── 透明底：叠加卡的 alpha 全靠这一步 ────────────────────────────────
+//
+// 踩过的坑（这一条花了很久才定位）：Chrome 截图**默认把画面合成到不透明白底上**，
+// 即使页面自己写了 `html, body { background: transparent }`。结果是叠加卡渲出来
+// 一层不透明白，叠到 AI 视频上等于把视频整块盖掉 —— 而 ffprobe 却报告
+// `yuva444p12le`（ProRes 侧确实有 alpha 通道，只是通道里全是 255），
+// 所以「像素格式带 a」**不等于**「真的有透明区域」，必须量像素才能发现。
+//
+// Chrome 154 已不认启动参数 `--default-background-color`（传了会直接起不来），
+// 唯一有效的是 CDP 的 Emulation.setDefaultBackgroundColorOverride + 截图时
+// background: "transparent" —— 两者缺一，输出都退回 rgb24。
+//
+// 对全屏卡也设，无害：全屏卡自己会画满背景。
+const transparentOverride = await cdp.send("Emulation.setDefaultBackgroundColorOverride", {
+  color: { r: 0, g: 0, b: 0, a: 0 },
+});
+if (transparentOverride.error && wantAlpha) {
+  console.error(`设置透明底失败，叠加卡的 alpha 会丢失：${JSON.stringify(transparentOverride.error)}`);
+  process.exit(1);
+}
+
 // ACT: 页面导航后先**预热**：渲染几帧并等稳定，再开始正式抓帧。
 // 踩过：预热前偶发「同一帧两次截图不一致」—— 页面刚加载时合成器/字体光栅化
 // 还没进入稳态，第一次截图抓到的是过渡态。预热把这段不确定性挡在正式抓帧之外。
@@ -172,7 +193,7 @@ for (const frame of [0, 20, 40, 20, 0]) {
 // 确定性自检：同一帧渲染两次必须字节级一致，否则逐帧抓帧会闪
 await cdp.evaluate(`window.renderAt(7)`);
 await cdp.evaluate(awaitPaint);
-const shotFormat = wantAlpha ? { format: "png" } : { format: "jpeg", quality };
+const shotFormat = wantAlpha ? { format: "png", background: "transparent" } : { format: "jpeg", quality };
 const first = await cdp.send("Page.captureScreenshot", shotFormat);
 await cdp.evaluate(`window.renderAt(7)`);
 await cdp.evaluate(awaitPaint);
@@ -187,7 +208,7 @@ for (let frame = 0; frame < total; frame++) {
   await cdp.evaluate(`window.renderAt(${frame})`);
   await cdp.evaluate(awaitPaint);
   const shot = await cdp.send("Page.captureScreenshot", {
-    ...(wantAlpha ? { format: "png" } : { format: "jpeg", quality }),
+    ...(wantAlpha ? { format: "png", background: "transparent" } : { format: "jpeg", quality }),
     captureBeyondViewport: false,
   });
   const extension = wantAlpha ? "png" : "jpg";

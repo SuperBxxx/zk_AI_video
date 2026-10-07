@@ -22,6 +22,8 @@ export const metricWithSparkline: CardDefinition = {
     title: "指标迷你趋势线",
     category: "数据",
     shape: "fullscreen",
+    semantics: ["数据", "过程演示"],
+    inputs: ["文"],
     oneliner: "小标签先淡入，大数字从 0 滚到终值，下方小折线在同一刻起跑画完；数字定住那一帧单位与箭头才出现。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/metric-with-sparkline.md",
   },

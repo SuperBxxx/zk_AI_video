@@ -26,6 +26,8 @@ export const typewriterTerminal: CardDefinition = {
     title: "终端打字",
     category: "文字",
     shape: "fullscreen",
+    semantics: ["过程演示", "机制"],
+    inputs: ["文"],
     oneliner: "暗色终端逐字敲出命令、方块光标方波闪，回车帧镜头急推进命令行并加模糊——打字本身是节奏，命令行是场景的引信。",
     origin: "按上游 video-shotcraft（Apache-2.0）规格实现：gallery/source/typewriter-moves.md A 式",
   },

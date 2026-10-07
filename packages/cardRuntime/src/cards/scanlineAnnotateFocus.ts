@@ -38,6 +38,8 @@ export const scanlineAnnotateFocus: CardDefinition = {
     title: "扫描线标注聚焦",
     category: "强调",
     shape: "overlay",
+    semantics: ["强调", "机制"],
+    inputs: ["V"],
     oneliner: "亮扫描线匀速自上而下掠过，扫过之处依次弹出取景框并命名，状态行实时数已触发的框——像机器的视线在分析画面。",
     origin: "按上游 video-shotcraft（Apache-2.0）规格实现：gallery/source/scanline-annotate-focus.md",
   },

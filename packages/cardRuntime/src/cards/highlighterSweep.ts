@@ -22,6 +22,8 @@ export const highlighterSweep: CardDefinition = {
     title: "荧光笔高亮扫过",
     category: "强调",
     shape: "overlay",
+    semantics: ["引用", "强调"],
+    inputs: ["V"],
     oneliner: "半透明黄色荧光笔从左到右扫过引用文段的关键句，同帧其余文字压暗，扫完整句轻微浮起——替观众划重点。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/highlighter-sweep.md",
   },

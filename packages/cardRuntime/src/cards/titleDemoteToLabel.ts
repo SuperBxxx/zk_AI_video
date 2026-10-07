@@ -20,6 +20,8 @@ export const titleDemoteToLabel: CardDefinition = {
     title: "标题降格为标签",
     category: "文字",
     shape: "fullscreen",
+    semantics: ["标题", "步骤"],
+    inputs: ["文"],
     oneliner: "居中大标题站稳后降格——同一个小下来挪到左上角变成路标，三条要点在下方逐条长出。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/title-demote-to-label.md",
   },

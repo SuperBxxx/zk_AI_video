@@ -22,6 +22,8 @@ export const keywordPopHighlight: CardDefinition = {
     title: "关键词弹出强调",
     category: "文字",
     shape: "overlay",
+    semantics: ["强调", "钩子"],
+    inputs: ["V"],
     oneliner: "字幕念到关键词的瞬间，该词带色块底从 0 弹到 1.65 倍再回落定格 1.15 倍，画面跟着微震一下。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/keyword-pop-highlight.md",
   },
@@ -45,7 +47,11 @@ export const keywordPopHighlight: CardDefinition = {
     .plain { display: block; }
     /* 关键词：色块底 + 高饱和黄字。左右留 ≥0.3em 外边距 —— 1.15 倍定格 + skew
        会横向溢出，边距不够色块会压到相邻字（规格点名的坑）。 */
-    .kwWrap { display: block; position: relative; margin: 0 0.34em; }
+    // ACT: 外边距按**关键词放大后的溢出**给，不是按原尺寸。
+    // 踩过：写死 0.34em 时，竖屏合成后量到「换挡」的色块把旁边的「是」「本」压住了 ——
+    // 因为色块定格在 1.15 倍还带 skewX，横向溢出量 = 字宽 × (倍数-1) / 2，没算进去。
+    .kwWrap { display: block; position: relative; }
+    .kwFit { display: block; }
     .slab { position: absolute; inset: -0.08em -0.12em -0.1em -0.12em;
             background: #c81e3c; transform: skewX(-6deg); border-radius: 0.06em; }
     .kw { display: block; position: relative; color: #ffe949;
@@ -56,9 +62,20 @@ export const keywordPopHighlight: CardDefinition = {
     const lead = "今年真正变化的是";
     const keyword = "换挡";
     const tail = "本身";
-    // 字号：同时受宽与高约束
-    const units = (lead + keyword + tail).length + 2;
-    const fontSize = Math.round(Math.min(design.h * 0.115, (design.w * 0.86) / (units * 0.98)));
+    // ACT: 字号要按**关键词放大后的真实占位**算，否则色块会盖住相邻字。
+    // 估算口径（中文为主，字形宽≈1em）：
+    //   非关键词：每字 1.0em
+    //   关键词：每字 × 定格倍数，左右各留 0.3em（含 skewX 的横向偏移）
+    const settleRatio = params.settle;
+    const keywordEm = keyword.length * settleRatio + 0.6;
+    const totalEm = lead.length + keywordEm + tail.length;
+    const fontSize = Math.round(Math.min(design.h * 0.115, (design.w * 0.9) / totalEm));
+    // 关键词两侧的固定外边距（em）：按定格倍数留出最大横向溢出量 + skew 偏移
+    // 溢出量 = 字宽 × (倍数 − 1) / 2；skewX(−6°) 在字高范围内再加约 0.05em
+    const keywordMarginEm = (settleRatio - 1) / 2 + 0.1;
+    // 外层反向缩放：占位按 1 倍算，实际内容在中间放大（transform 不占布局空间，
+    // 不这样处理，放大的色块必然盖住邻字）
+    const fitScale = 1 / settleRatio;
 
     // 入场：0 → peak，规格用 power4.out（比 outQuart 更陡）
     const popIn = seg(frame, params.popFrame, params.popFrame + params.popFrames, outQuart);
@@ -85,9 +102,13 @@ export const keywordPopHighlight: CardDefinition = {
       <div style="transform:translateX(${shakeX.toFixed(2)}px)">
         <div class="row" data-check="整句" style="font-size:${fontSize}px">
           <span class="plain">${lead}</span>
-          <span class="kwWrap" data-check="关键词" style="transform-origin:50% 80%;transform:scale(${scale.toFixed(4)});opacity:${opacity.toFixed(3)}">
-            <span class="slab"></span>
-            <span class="kw">${keyword}</span>
+          <span class="kwWrap" style="margin:0 ${keywordMarginEm.toFixed(3)}em">
+            <span class="kwFit" style="transform:scale(${fitScale.toFixed(4)})">
+              <span class="kwPop" data-check="关键词" style="transform-origin:50% 80%;transform:scale(${scale.toFixed(4)});opacity:${opacity.toFixed(3)}">
+                <span class="slab"></span>
+                <span class="kw">${keyword}</span>
+              </span>
+            </span>
           </span>
           <span class="plain">${tail}</span>
         </div>

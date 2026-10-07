@@ -26,6 +26,8 @@ export const barChartGrowth: CardDefinition = {
     title: "柱状图增长",
     category: "数据",
     shape: "fullscreen",
+    semantics: ["数据", "对比"],
+    inputs: ["文"],
     oneliner: "七根柱以 0.06s 密错峰一次连续抬升、柱顶不带数值，结论收在一个 chip 上——读的是整体斜率。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/bar-chart-growth.md",
   },

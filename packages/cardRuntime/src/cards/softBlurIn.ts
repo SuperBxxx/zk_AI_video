@@ -25,6 +25,8 @@ export const softBlurIn: CardDefinition = {
     title: "对焦淡入",
     category: "文字",
     shape: "overlay",
+    semantics: ["金句", "论点"],
+    inputs: ["V"],
     oneliner: "一句话像被镜头对焦出来——整块从模糊起、边解糊边淡入，位移只占前 1/3 时长，逐字只错峰一帧。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/soft-blur-in.md",
   },

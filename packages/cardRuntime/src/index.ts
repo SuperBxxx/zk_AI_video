@@ -64,16 +64,13 @@ function resolveParams(card: CardDefinition, overrides: Record<string, number> =
  * 换画幅会变形。成片画幅不一定是 16:9，所以这里**把设计画布做成与输出同比例、
  * 短边固定**：输出 1080×1920 → 设计画布 270×480（scale 4）；
  * 输出 1920×1080 → 480×270（scale 4）。两种画幅下 scale 都是 4，参数完全通用。
+ *
+ * ACT: 算法本体住在 `@toonflow/post-production` 的 cardFrame（画幅契约 + 规则校验
+ * 放一起，且那一个包零依赖）。这里 import 进来自己用，同时也 re-export 给调用方，
+ * **算法只有一份**。
  */
-export const designShortSide = 270;
-export function designCanvasFor(width: number, height: number) {
-  const landscape = width >= height;
-  return {
-    w: landscape ? Math.round(designShortSide * (width / height)) : designShortSide,
-    h: landscape ? designShortSide : Math.round(designShortSide * (height / width)),
-    scale: landscape ? width / (designShortSide * (width / height)) : width / designShortSide,
-  };
-}
+import { designCanvasFor, designShortSide } from "@toonflow/post-production";
+export { designCanvasFor, designShortSide };
 
 /**
  * 组装一个自足的 HTML 页面：把卡与运行时内联进去，不依赖任何外部文件。

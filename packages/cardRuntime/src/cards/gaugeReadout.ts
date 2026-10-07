@@ -31,6 +31,8 @@ export const gaugeReadout: CardDefinition = {
     title: "仪表自检指针",
     category: "数据",
     shape: "fullscreen",
+    semantics: ["数据", "过程演示"],
+    inputs: ["文"],
     oneliner: "点火自检式仪表：指针先甩满 270° 全弧再带过冲回摆落定真实值，刻度随指针点亮，落定同帧数值弹出。",
     origin: "按上游 video-shotcraft（Apache-2.0）规格实现：gallery/source/gauge-readout-moves.md A 式",
   },

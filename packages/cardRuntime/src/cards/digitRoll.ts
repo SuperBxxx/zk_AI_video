@@ -87,6 +87,8 @@ export const digitRoll: CardDefinition = {
     title: "数字滚动大字报",
     category: "数据",
     shape: "fullscreen",
+    semantics: ["数据", "钩子"],
+    inputs: ["文"],
     oneliner: "王牌数字的全屏亮相：每位像老虎机滚轮独立减速、过冲半格后咔哒锁定，从左到右逐位落定，全体锁定时整体加深脉冲。",
     origin: "移植自上游 video-shotcraft（Apache-2.0）demos/data/odometer-digit-roll",
   },

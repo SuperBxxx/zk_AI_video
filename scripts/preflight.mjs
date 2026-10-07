@@ -264,6 +264,24 @@ function checkJianying() {
   console.log(`  ✓ 剪映草稿            ${count ? count + " 个字段与" : ""}结构不变量全部通过`);
 }
 
+// ── 9. 卡目录一致性 ──────────────────────────────────────────────────
+// 这一关守的是**静默失效**：语义没标、形态标错、画幅契约漂了，都不会有任何报错，
+// 只表现为 Agent 检索不到卡、或者把转场卡当全屏卡用。三种都实际发生过。
+// 不需要浏览器，纯读卡定义。
+function checkCardCatalog() {
+  const script = join(root, "scripts", "checkCardCatalog.mjs");
+  if (!existsSync(script)) return;
+  const result = Bun.spawnSync({ cmd: [process.execPath, script, "--quiet"], cwd: root, stdout: "pipe", stderr: "pipe" });
+  const output = result.stdout.toString() + result.stderr.toString();
+  if (result.exitCode !== 0) {
+    const lines = output.split("\n").filter(line => line.includes("✗")).slice(0, 10);
+    fail("卡目录", `一致性校验失败：\n      ${lines.join("\n      ") || output.slice(0, 500)}`);
+    return;
+  }
+  const summary = output.match(/卡目录自检通过（(.+?)）/)?.[1];
+  console.log(`  ✓ 卡目录              ${summary ?? "一致性通过"}`);
+}
+
 // ── 执行 ───────────────────────────────────────────────────────────
 console.log("开工断言 preflight\n");
 checkModes();
@@ -274,6 +292,7 @@ checkAudioFormats();
 checkDocLinks();
 checkProviderLiterals();
 checkCards();
+checkCardCatalog();
 checkJianying();
 
 console.log("");

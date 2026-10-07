@@ -28,6 +28,8 @@ export const numberSlabPop: CardDefinition = {
     title: "结论数字",
     category: "数据",
     shape: "overlay",
+    semantics: ["数据", "钩子"],
+    inputs: ["V"],
     oneliner: "色块先从上方落定、块稳住那一帧巨大整数一次弹出，小数与单位再延后 6 帧单独淡入——结论感，不给过程。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/number-slab-pop.md",
   },

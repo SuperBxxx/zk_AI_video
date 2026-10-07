@@ -20,6 +20,8 @@ export const chartLiveOscilloscope: CardDefinition = {
     title: "活体折线图",
     category: "数据",
     shape: "fullscreen",
+    semantics: ["数据", "过程演示"],
+    inputs: ["文"],
     oneliner: "示波流线：曲线写入点钉在右端起伏、旧数据左流出画，中途一次突发尖峰让读数跳变——把「系统活着」演出来。",
     origin: "按上游 video-shotcraft（Apache-2.0）规格实现：gallery/source/chart-live-moves.md A 式",
   },

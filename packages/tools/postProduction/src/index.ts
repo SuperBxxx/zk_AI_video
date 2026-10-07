@@ -3,11 +3,11 @@ import { executeRemoteFfmpeg } from "@toonflow/ffmpeg/remote";
 import {
   alignTiming,
   buildAss,
+  buildCardCatalog,
   buildEditList,
   buildJianyingDraft,
   buildSrt,
   builtInCards,
-  cardSummaries,
   checkAvDuration,
   checkEditList,
   checkFrameRate,
@@ -16,18 +16,28 @@ import {
   editListToCsv,
   editListToEdl,
   findCard,
+  fitCardToFrame,
   instantiateCard,
-  matchCards,
+  matchCatalogDetailed,
   parseFreezeSpans,
   resolveSoundCues,
   usToTimecode,
   type AlignWord,
+  type CardCatalogEntry,
   type CardEnergy,
   type CardInput,
   type CardPosition,
   type CardSemantic,
 } from "@toonflow/post-production";
+import { htmlCards } from "@toonflow/card-runtime/cards";
 import type { ToolContext, ToolDefinition, ToolPlugin } from "@toonflow/tools-scaffold/runtime";
+
+/**
+ * 两个卡库合成一份目录，供 useCard 检索。
+ *
+ * ACT: 放在模块顶层只算一次。两个卡库都是静态数组，没有 I/O，也没有运行时变化。
+ */
+const cardCatalog: CardCatalogEntry[] = buildCardCatalog(builtInCards, htmlCards);
 
 const configSchema = z.object({
   targetFps: z.number().min(1).max(240).default(30),
@@ -92,8 +102,12 @@ const cardQuerySchema = z.strictObject({
     .describe("这一句在做什么（用 semanticAnnotate 的词表：数据/对比/列举/强调/转场/金句…）"),
   position: z.enum(["开场", "中段", "收尾", "任意"]).optional(),
   energy: z.enum(["低", "中", "高"]).optional(),
-  slug: z.string().trim().max(64).optional().describe("直接取某一张卡的完整内容（滤镜与已知坑）"),
+  slug: z.string().trim().max(64).optional().describe("直接取某一张卡的完整内容（FFmpeg 卡给滤镜链；HTML 卡给画幅与参数）"),
   parameters: z.record(z.string(), z.number()).optional().describe("给某张卡传参数；越界或未知参数会被拒"),
+  frameSize: z.strictObject({
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+  }).optional().describe("目标成片画幅（成片的宽高，不是卡的）。取 HTML 卡时给出，能拿到该卡按这个画幅渲染后的设计画布尺寸与画幅提醒"),
 }).strict();
 
 // ACT: 这一份 JSON Schema 是**手写的字面量**，不调 z.toJSONSchema。
@@ -120,8 +134,18 @@ const cardQueryParameters = {
     },
     position: { type: "string", enum: ["开场", "中段", "收尾", "任意"] },
     energy: { type: "string", enum: ["低", "中", "高"] },
-    slug: { type: "string", maxLength: 64, description: "直接取某一张卡的完整内容（滤镜与已知坑）" },
+    slug: { type: "string", maxLength: 64, description: "直接取某一张卡的完整内容（FFmpeg 卡给滤镜链；HTML 卡给画幅与参数）" },
     parameters: { type: "object", additionalProperties: { type: "number" }, description: "给某张卡传参数；越界或未知参数会被拒" },
+    frameSize: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        width: { type: "integer", minimum: 1 },
+        height: { type: "integer", minimum: 1 },
+      },
+      required: ["width", "height"],
+      description: "目标成片画幅（成片的宽高，不是卡的）。取 HTML 卡时给出，能拿到该卡按这个画幅渲染后的设计画布尺寸与画幅提醒",
+    },
   },
 };
 
@@ -514,13 +538,15 @@ const plugin: ToolPlugin = {
       {
         name: "useCard",
         label: "查/用画面配方卡",
-        description: "查询内置的画面效果卡（按素材类型与语义检索），或取某一张卡的完整内容（FFmpeg 滤镜链、已知坑、落位自检）。取卡时可传参数，工具会校验范围并把滤镜链实例化好。",
-        promptSnippet: "做镜头效果前先 useCard 查有没有现成的卡；不要每次临场写滤镜。",
+        description: "查询内置的画面卡（按素材类型与语义检索），或取某一张的完整内容。库里有两类卡：FFmpeg 滤镜卡（给出滤镜链、已知坑、落位自检）与 HTML 画面卡（浏览器渲染的整段画面或透明叠加层，给出形态、时长、可调参数与按目标画幅渲染的设计画布尺寸）。",
+        promptSnippet: "做镜头效果前先 useCard 查有没有现成的卡；库里既有滤镜卡也有整段画面/叠加层卡，不要每次临场写滤镜或自己画。",
         promptGuidelines: [
           "先按素材类型与语义检索（inputs + semantics），再取具体卡 —— 卡是词汇表，不是关键词垃圾桶。",
           "卡上的「已知坑」必须逐条核，那些都是实际返工换来的；卡上的 checks 是做完要自检的项。",
           "实例化出的 filters 交给 ffmpeg 工具执行（按顺序接在 -vf 或 filter_complex 里）。参数越界会被拒，不要绕过校验自己拼字符串。",
           "没有合适的卡时可以自己写滤镜，但要说清楚「库里没有对应卡」而不是假装用了卡。",
+          "**先看 kind**：ffmpeg 卡给滤镜链（接在 -vf/filter_complex 里）；html 卡是浏览器渲染的整段画面（fullscreen，替代这一段）或透明叠加层（overlay，叠在视频上），**不能当滤镜用**。",
+          "取 html 卡时**必须给 frameSize**（成片的宽高）：卡按目标画幅等比渲染，给错画幅会得到错尺寸的画面；竖屏下长句卡会自动缩字，工具的提醒要如实转告用户。",
         ],
         parameters: cardQueryParameters,
         executionMode: "sequential",
@@ -528,15 +554,74 @@ const plugin: ToolPlugin = {
           signal?.throwIfAborted();
           const request = cardQuerySchema.parse(params);
 
-          // 取某一张卡：给完整内容（含滤镜实例化与坑）
+          // 取某一张卡：按 kind 分流 —— FFmpeg 卡给滤镜链，HTML 卡给页面生成方式
           if (request.slug) {
+            const entry = cardCatalog.find(item => item.slug === request.slug);
+            if (!entry) {
+              return {
+                content: [{ type: "text", text: `没有这张卡：${request.slug}\n现有：${cardCatalog.map(item => item.slug).join("、")}` }],
+                details: { available: cardCatalog.map(item => item.slug) },
+              };
+            }
+
+            // —— HTML 卡：不能当滤镜用，给的是「按目标画幅生成一段页面」的说明 ——
+            if (entry.kind === "html") {
+              const definition = htmlCards.find(item => item.meta.slug === entry.slug);
+              if (!definition) {
+                return { content: [{ type: "text", text: `目录与卡库不一致：${entry.slug} 在目录里但卡库里没有。` }], details: {} };
+              }
+              const frameSize = request.frameSize;
+              const fit = frameSize
+                ? fitCardToFrame(
+                  { slug: entry.slug, shape: definition.meta.shape, baseSize: definition.size },
+                  frameSize,
+                )
+                : undefined;
+              const params = Object.entries(definition.params ?? {})
+                .map(([name, spec]) => `${name}(${spec.min}~${spec.max}，默认 ${spec.value})`);
+              const shapeNote = definition.meta.shape === "fullscreen"
+                ? "全屏卡：它**替代这一段画面**，不叠在 AI 视频上。"
+                : definition.meta.shape === "overlay"
+                  ? "叠加卡：**透明背景**，叠在 AI 视频上（输出带 alpha 通道）。"
+                  : "转场卡：作用在**两个镜头之间**。";
+              const text = [
+                `${definition.meta.title}：${definition.meta.oneliner}`,
+                `形态：${definition.meta.shape} — ${shapeNote}`,
+                `时长：${definition.frames} 帧 @30fps（${(definition.frames / 30).toFixed(2)}s）`,
+                `可调参数：${params.join("、")}`,
+                `形状：${definition.meta.shape}`,
+                // ACT: 文案目前硬编码在卡里，如实告知 —— 不要让 Agent 以为它能改字
+                "**文案不可改**：这张卡的文案写在卡内（render 里），只能调上面那些数值参数。",
+                fit
+                  ? `按目标画幅 ${frameSize!.width}×${frameSize!.height} 渲染 → 设计画布 ${fit.design.w}×${fit.design.h}，缩放 ${fit.design.scale.toFixed(3)}`
+                    + (fit.warnings.length ? `\n提醒：\n${fit.warnings.map(w => "  · " + w).join("\n")}` : "")
+                  : "未给 frameSize：**必须按目标画幅渲染**（全屏卡替代这一段画面，叠加卡的画幅要与视频一致）。给 frameSize 可以拿到设计画布尺寸与该卡的画幅提醒。",
+                `来源：${definition.meta.origin ?? "（未标注）"}`,
+              ].join("\n");
+              return {
+                content: [{ type: "text", text }],
+                details: {
+                  kind: "html",
+                  slug: definition.meta.slug,
+                  shape: definition.meta.shape,
+                  frames: definition.frames,
+                  baseSize: definition.size,
+                  textLocked: true,
+                  parameters: definition.params,
+                  origin: definition.meta.origin,
+                  ...(fit ? { frameFit: fit } : {}),
+                },
+              };
+            }
+
+            // —— FFmpeg 卡：原有的滤镜实例化路径 ——
             let card;
             try {
               card = findCard(builtInCards, request.slug);
             } catch (error) {
               return {
-                content: [{ type: "text", text: `没有这张卡：${request.slug}\n现有：${builtInCards.map(item => item.slug).join("、")}` }],
-                details: { available: builtInCards.map(item => item.slug) },
+                content: [{ type: "text", text: `没有这张卡：${request.slug}\n现有：${cardCatalog.map(item => item.slug).join("、")}` }],
+                details: { available: cardCatalog.map(item => item.slug) },
               };
             }
             let filters: string[] = [];
@@ -571,29 +656,41 @@ const plugin: ToolPlugin = {
           }
 
           // 检索：给候选与排序理由，由 agent 决策（不替它选）
-          const matched = matchCards(builtInCards, {
+          // ACT: 走**统一目录**（FFmpeg 卡 + HTML 卡），否则 Agent 根本不知道
+          // cardRuntime 里那 24 张 HTML 卡存在 —— 那是本次接线前的实际状态。
+          const matched = matchCatalogDetailed(cardCatalog, builtInCards, {
             ...(request.inputs ? { inputs: request.inputs as CardInput[] } : {}),
             ...(request.semantics ? { semantics: request.semantics as CardSemantic[] } : {}),
             ...(request.position ? { position: request.position as CardPosition } : {}),
             ...(request.energy ? { energy: request.energy as CardEnergy } : {}),
           });
           if (!matched.length) {
-            const all = cardSummaries(builtInCards);
             return {
-              content: [{ type: "text", text: `没有匹配的卡（库共 ${all.length} 张）。这是真实缺口，不要假装用了卡——可以自己写滤镜，或列出可用卡让用户决定。\n可用：${all.map(c => c.slug).join("、")}` }],
-              details: { candidates: [], available: all.map(c => c.slug) },
+              content: [{ type: "text", text: `没有匹配的卡（库共 ${cardCatalog.length} 张：FFmpeg 滤镜卡 ${builtInCards.length} + HTML 画面卡 ${cardCatalog.length - builtInCards.length}）。这是真实缺口，不要假装用了卡——可以自己写滤镜，或列出可用卡让用户决定。\n可用：${cardCatalog.map(c => c.slug).join("、")}` }],
+              details: { candidates: [], available: cardCatalog.map(c => c.slug) },
             };
           }
-          const candidates = matched.map(item => ({
-            slug: item.card.slug,
-            title: item.card.title,
-            oneliner: item.card.oneliner,
-            score: item.score,
-            reasons: item.reasons,
-            parameters: item.card.parameters.map(p => `${p.name}(${p.min}~${p.max}，默认 ${p.value})`),
-          }));
+          const recipeBySlug = new Map(builtInCards.map(card => [card.slug, card]));
+          const candidates = matched.map(({ entry, score, reasons }) => {
+            const recipe = recipeBySlug.get(entry.slug);
+            return {
+              slug: entry.slug,
+              title: entry.title,
+              // kind 决定后续怎么用：ffmpeg 给滤镜链，html 给一段页面
+              kind: entry.kind,
+              ...(entry.shape ? { shape: entry.shape } : {}),
+              oneliner: entry.oneliner,
+              score,
+              reasons,
+              ...(entry.frames ? { frames: entry.frames } : {}),
+              ...(entry.textLocked ? { textLocked: true } : {}),
+              // FFmpeg 卡才有滤镜参数；HTML 卡的可调参数在取卡时单独给
+              ...(recipe ? { parameters: recipe.parameters.map(p => `${p.name}(${p.min}~${p.max}，默认 ${p.value})`) } : {}),
+            };
+          });
+          const htmlCount = candidates.filter(entry => entry.kind === "html").length;
           return {
-            content: [{ type: "text", text: `${candidates.length} 张候选（按分排序，理由已给）：\n${candidates.map(c => `  ${c.slug} [${c.score}] ${c.title} — ${c.reasons.join("；")}`).join("\n")}\n选定后用 slug 取卡的完整内容与滤镜链。` }],
+            content: [{ type: "text", text: `${candidates.length} 张候选（按分排序；HTML 画面卡 ${htmlCount} 张）：\n${candidates.map(c => `  ${c.slug} [${c.kind}${c.shape ? "·" + c.shape : ""}] ${c.score} ${c.title} — ${c.reasons.join("；")}`).join("\n")}\n\n**kind 决定怎么用**：ffmpeg 卡取出来是滤镜链，接在 ffmpeg 的 -vf/filter_complex 里；html 卡是浏览器渲染的整段画面（fullscreen）或透明叠加层（overlay），**不能当滤镜用**。选定后用 slug 取卡的完整内容。` }],
             details: { candidates },
           };
         },

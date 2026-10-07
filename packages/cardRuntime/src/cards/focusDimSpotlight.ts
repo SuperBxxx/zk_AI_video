@@ -23,6 +23,8 @@ export const focusDimSpotlight: CardDefinition = {
     title: "聚焦压暗切换",
     category: "强调",
     shape: "overlay",
+    semantics: ["强调", "列举"],
+    inputs: ["V"],
     oneliner: "讲到哪里哪里亮——目标行保持原亮，其余整屏压暗，焦点随口播 0.2s 滑到下一目标，讲完整体恢复。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/focus-dim-spotlight.md",
   },

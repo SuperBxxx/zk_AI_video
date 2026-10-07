@@ -52,6 +52,16 @@ export interface CardDefinition {
     title: string;
     category: string;
     shape: CardShape;
+    /**
+     * 语义词（与 FFmpeg 卡库的封闭词表一致，见 postProduction/cardLibrary 的 CardSemantic）。
+     *
+     * ACT: 这个字段是**显式标注**，不从文案里猜。踩过：先写过「从 oneliner 里查关键词」
+     * 的推导，结果 24 张卡里 23 张的语义是空数组 —— 文案里根本没有那些词，
+     * 于是 Agent 用语义检索时这些卡全部检索不到。词表是**封闭**的，就必须显式填。
+     */
+    semantics?: string[];
+    /** 这张卡吃什么素材（同 FFmpeg 卡的词表）。不填则由 shape 推。 */
+    inputs?: string[];
     oneliner: string;
     /** 移植来源（有的话），便于回溯上游组件。 */
     origin?: string;

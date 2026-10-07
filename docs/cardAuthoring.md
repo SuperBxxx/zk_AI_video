@@ -120,6 +120,56 @@ bun scripts/renderCard.mjs --print-chrome   # 打印确切命令
 又踩过：以为 `libvpx-vp9` 能保 alpha（体积更小）→ 喂 png 也输出 yuv420p。
 **实测只有 `prores_ks` / `qtrle` / `png` 三种保得住**，选 ProRes 4444（剪辑软件标准格式）。
 
+### 最隐蔽的一层：Chrome 截图默认合成到不透明白底
+
+即使编码格式选对了，**alpha 仍然是全 255**。原因是 Chrome 截图默认把画面合成到白底上，
+哪怕页面自己写了 `html, body { background: transparent }`。
+
+**这一层特别难发现，因为 ffprobe 会骗你**：它报告 `yuva444p12le`，
+像素格式确实带 alpha 通道 —— 但通道里全是 255。**「格式带 a」不等于「真有透明区域」**，
+必须**量像素**才能发现（`ffmpeg -i x.mov -frames:v 1 -pix_fmt rgba -f rawvideo` 后读第 4 字节）。
+
+修法（两条缺一不可）：
+
+1. CDP `Emulation.setDefaultBackgroundColorOverride` 设成 `{ r:0, g:0, b:0, a:0 }`
+2. `Page.captureScreenshot` 时传 `background: "transparent"`
+
+Chrome 154 已**不认**启动参数 `--default-background-color`（传了浏览器直接起不来），
+CDP 是唯一有效路径。
+
+### 验证 alpha 的最小判据
+
+```bash
+# 抽取一帧为 rgba，读左上角（该处应透明）的 alpha
+ffmpeg -y -i card.mov -frames:v 1 -pix_fmt rgba probe.png
+ffmpeg -y -i probe.png -f rawvideo -pix_fmt rgba probe.raw
+# probe.raw 第 4 个字节就是左上角的 alpha：≈0 才对，255 说明白底没去掉
+```
+
+---
+
+## 四之三、`transform: scale` 不占布局空间
+
+关键词弹出、色块定格这类**放大**动效，放大后的内容会**盖住邻字** ——
+因为 `scale` 只是绘制变换，布局宽度仍按原尺寸算。
+
+踩过：`keywordPopHighlight` 的关键词定格在 1.15 倍，色块把旁边的字压住了。
+肉眼在横屏下不明显，**竖屏合成后一眼看出**。
+
+修法是**预留固定空间 + 反向缩放**：
+
+```html
+<!-- 外层占比按 1 倍算（1/settle 的反向缩放抵消内层放大） -->
+<span style="margin:0 {溢出量}em">
+  <span style="transform:scale(1/settle)">
+    <span style="transform:scale({动画倍数})">关键词</span>
+  </span>
+</span>
+```
+
+溢出量 = 字宽 × (定格倍数 − 1) / 2，再加 skew 的横向偏移。
+**字号估算也必须按放大后的占位算**，否则窄画幅下整行会溢出。
+
 ---
 
 ## 五、逐帧渲染的确定性（这条是整条流水线的前提）
@@ -177,3 +227,29 @@ bun scripts/renderCard.mjs --print-chrome   # 打印确切命令
 ```
 
 **24 张全部完成（96/96 自检通过）。**
+
+---
+
+## 九、卡怎么被 Agent 用到（接线）
+
+做完卡只是第一步，**卡要被 Agent 看见才能用**。这条链路上有三个必须都通：
+
+| 环节 | 位置 | 不通的后果 |
+|---|---|---|
+| 卡进检索目录 | `postProduction/cardCatalog.ts` 合并两个卡库 | Agent 完全不知道这些卡存在 |
+| `useCard` 读目录 | `tools/postProduction` 的 `useCard` op | 同上（接线前就是这个状态：24 张卡全不可见） |
+| 帧渲染 + 合成 | `scripts/renderCard.mjs` + ffmpeg overlay | 卡查得到但用不到成片里 |
+
+**每张 HTML 卡必须显式标 `meta.semantics`**（封闭词表）。不要从文案里猜 ——
+踩过：写过「从 oneliner 查关键词」的推导，24 张卡里 23 张语义成了空数组，
+语义检索全军覆没。`scripts/checkCardCatalog.mjs` 现在会拦这一条。
+
+**画幅契约**（`postProduction/cardFrame.ts`）：
+
+- 卡是**分辨率无关**的：设计画布「短边恒为 270，长边按画幅比伸缩」，
+  所以竖屏视频渲竖屏卡，**不会出现横屏卡拼竖屏视频**
+- `fullscreen` / `transition` 按目标画幅渲染；`overlay` 的画幅必须与视频一致
+- 代价：竖屏可用宽度只有 270（横屏 480 量级），**长句卡会自动缩字**
+
+**合成的画幅必须与视频一致**：`renderCard.mjs --width --height` 要给成片的宽高。
+卡宽高与视频不一致时再缩放一次，字幕与描边会出现非整数像素抖动。

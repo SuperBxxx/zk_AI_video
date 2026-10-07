@@ -57,6 +57,8 @@ export const counterConfetti: CardDefinition = {
     title: "数字冲刺彩屑",
     category: "数据",
     shape: "fullscreen",
+    semantics: ["数据", "金句"],
+    inputs: ["文"],
     // 上游长度常量 COUNTER_CONFETTI_DURATION = 138
     oneliner: "里程碑数字的庆祝拍：大数字 easeOutQuart 冲刺计数并过冲放大，到位前 5 帧 52 片彩屑从两侧炸入，冲击环扩散、标签字距收紧。",
     origin: "移植自上游 video-shotcraft（Apache-2.0）demos/data/counter-confetti",

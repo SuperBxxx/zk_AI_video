@@ -17,6 +17,8 @@ export const scanBracketSweep: CardDefinition = {
     title: "扫描取景框",
     category: "强调",
     shape: "overlay",
+    semantics: ["强调", "机制"],
+    inputs: ["V"],
     oneliner: "四个直角框从画外滑入、收拢到目标上停住，锁定瞬间轻微一顿，附一行等宽状态标注。",
     origin: "按上游 video-shotcraft（Apache-2.0）规格实现：gallery/source/scan-bracket-sweep.md",
   },

@@ -19,6 +19,8 @@ export const typeAssembly: CardDefinition = {
     title: "文字集结",
     category: "文字",
     shape: "fullscreen",
+    semantics: ["论点", "标题"],
+    inputs: ["文"],
     oneliner: "琴键式裂升：每字在裁切盒内从下方 115% 升起带 10% 过冲，逐字错峰 2 帧，基线同步生长。",
     origin: "按上游 video-shotcraft（Apache-2.0）规格实现：gallery/source/type-assembly-moves.md A 式",
   },

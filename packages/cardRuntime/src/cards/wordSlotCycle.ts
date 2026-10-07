@@ -18,6 +18,8 @@ export const wordSlotCycle: CardDefinition = {
     title: "词槽轮换",
     category: "文字",
     shape: "overlay",
+    semantics: ["列举", "选择"],
+    inputs: ["V"],
     oneliner: "句干锚死不动，句尾胶囊每 0.7s 向上翻一格换一个短语，末词换成结论并转强调色。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/word-slot-cycle.md",
   },

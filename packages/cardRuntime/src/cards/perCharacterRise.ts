@@ -26,6 +26,8 @@ export const perCharacterRise: CardDefinition = {
     title: "逐字升起",
     category: "文字",
     shape: "overlay",
+    semantics: ["论点", "金句"],
+    inputs: ["V"],
     oneliner: "每字从自己位置下方升到位，位移与淡入走两条不同缓动、逐字只错峰一帧——整句读作「一股气顶上来」，不是一个个蹦。",
     origin: "按上游 video-talkcraft（PolyForm Noncommercial）规格独立实现：references/cards/per-character-rise.md",
   },

@@ -23,6 +23,8 @@ export const markerUnderlineTitle: CardDefinition = {
     title: "马克笔下划线",
     category: "文字",
     shape: "overlay",
+    semantics: ["标题", "强调"],
+    inputs: ["V"],
     oneliner: "大标题落定后，关键词下方马克笔从左到右一笔描画——变宽笔形、跟斜体字势微上斜、贴着字底。",
     origin: "按上游 video-shotcraft（Apache-2.0）规格实现：gallery/source/marker-underline-title.md",
   },

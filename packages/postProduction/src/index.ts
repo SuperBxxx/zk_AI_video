@@ -76,3 +76,23 @@ export {
   buildJianyingDraft,
   type JianyingOptions,
 } from "./jianying";
+
+export {
+  designCanvasFor,
+  designShortSide,
+  fitCardToFrame,
+  sameAspect,
+  type CardShape,
+  type FrameFit,
+  type FrameSize,
+} from "./cardFrame";
+
+export {
+  buildCardCatalog,
+  htmlCardToCatalogEntry,
+  matchCatalog,
+  matchCatalogDetailed,
+  recipeCardToCatalogEntry,
+  type CardCatalogEntry,
+  type CardKind,
+} from "./cardCatalog";
