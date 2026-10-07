@@ -22,6 +22,7 @@
     "@breezystack/lamejs": "^1.2.7",
     "@earendil-works/pi-ai": "0.85.1",
     "@earendil-works/pi-coding-agent": "^0.85.1",
+    "@toonflow/card-renderer": "workspace:*",
     "@toonflow/ffmpeg": "workspace:*",
     "@toonflow/file": "workspace:*",
     "@toonflow/mcp": "workspace:*",

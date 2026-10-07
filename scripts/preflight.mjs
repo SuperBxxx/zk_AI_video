@@ -282,6 +282,41 @@ function checkCardCatalog() {
   console.log(`  ✓ 卡目录              ${summary ?? "一致性通过"}`);
 }
 
+// ── 10. 卡渲染是否在安装边界内 ────────────────────────────────────────
+// 这一关守的是一个**曾经真实存在、而且完全静默**的问题：
+// 渲染逻辑原先只在 `scripts/renderCard.mjs` 里，而 `electrobun.config.ts` 的 copy 列表
+// 不含 `scripts/` —— 于是「代码能跑、装完就没有」：已安装版的 bun/index.js 里
+// `buildCardPage` 出现 0 次，卡渲染能力凭空消失，而且没有任何报错。
+//
+// 现在渲染内核做成 `@toonflow/card-renderer`，由 server 依赖并内联进 desktop 入口。
+// 这里不跑完整桌面构建（太慢），而是问 bun：从 desktop 入口出发，
+// 这张卡渲染独有的标记能不能到达。**注意标记要选字符串字面量**：
+// 函数名在 minify 后会被改写，只有字面量稳定（踩过：探 `buildCardPage` 得 0 次，
+// 一度以为没内联，其实是名字被改了）。
+function checkCardRenderBoundary() {
+  const entry = join(root, "apps", "desktop", "src", "index.ts");
+  if (!existsSync(entry)) return;
+  const result = Bun.spawnSync({
+    cmd: [process.execPath, "build", entry, "--target=bun", "--minify"],
+    cwd: root, stdout: "pipe", stderr: "pipe",
+  });
+  if (result.exitCode !== 0) {
+    warn("卡渲染边界", `打包 desktop 入口失败，无法确认渲染内核是否在安装边界内：${result.stderr.toString().slice(0, 300)}`);
+    return;
+  }
+  const bundle = result.stdout.toString();
+  // 这些是本项目渲染内核独有的字面量，出现即说明内核被内联
+  const markers = ["setDefaultBackgroundColorOverride", "prores_ks"];
+  const missing = markers.filter(marker => !bundle.includes(marker));
+  if (missing.length) {
+    fail("卡渲染边界", `渲染内核没有被内联进 desktop 产物（缺标记：${missing.join("、")}）。`
+      + `\n      后果与当年一样：开发环境能跑，打包安装后卡渲染能力凭空消失，且不报错。`
+      + `\n      检查：server 是否依赖 @toonflow/card-renderer、cardRender 是否挂进 utils 出口。`);
+    return;
+  }
+  console.log("  ✓ 卡渲染边界          渲染内核已内联进 desktop 产物（装完能用）");
+}
+
 // ── 执行 ───────────────────────────────────────────────────────────
 console.log("开工断言 preflight\n");
 checkModes();
@@ -293,6 +328,7 @@ checkDocLinks();
 checkProviderLiterals();
 checkCards();
 checkCardCatalog();
+checkCardRenderBoundary();
 checkJianying();
 
 console.log("");
