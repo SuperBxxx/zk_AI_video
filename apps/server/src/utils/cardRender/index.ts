@@ -88,15 +88,14 @@ export async function renderCardToVideo(
     ...(request.signal ? { signal: request.signal } : {}),
   };
 
+  // ACT: 这里**不推 done**。踩过：原先在这两处各推了一次 `stage:"done"`，但那一刻
+  // 还不知道输出路径（结果刚要 return），于是路由最后又推一次带 outputPath 的 done ——
+  // 订阅方（画布节点）拿到两个 done，前一个 message 为空，把真正的输出路径覆盖成空串。
+  // done 由**知道最终结果的那一层**（路由）发，才不会有这个二义性。
   if (!request.targetVideoPath) {
-    const result = await renderCard(common);
-    onProgress?.({ stage: "done" });
-    return result;
+    return await renderCard(common);
   }
-
-  const result = await renderCardOverVideo({ ...common, targetVideoPath: request.targetVideoPath });
-  onProgress?.({ stage: "done" });
-  return result;
+  return await renderCardOverVideo({ ...common, targetVideoPath: request.targetVideoPath });
 }
 
 /**

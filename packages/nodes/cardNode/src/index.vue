@@ -238,7 +238,10 @@ async function render() {
       }),
     });
     if (!response.ok || !response.body) {
-      throw new Error(`渲染请求失败（HTTP ${response.status}）`);
+      // 服务端的错误是 JSON（{code, message}），把它读出来再抛 —— 只报 HTTP 状态码
+      // 会让用户看不到真正的原因（例如「只允许住凯AI视频页面访问控制连接」）
+      const detail = await response.json().catch(() => undefined) as { message?: string } | undefined;
+      throw new Error(detail?.message || `渲染请求失败（HTTP ${response.status}）`);
     }
 
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -264,7 +267,13 @@ async function render() {
         else if (event.stage === "done") {
           progressPercent.value = 100;
           statusText.value = "完成";
-          if (event.message) finalOutput = (JSON.parse(event.message) as { outputPath?: string }).outputPath ?? "";
+          // ACT: 只认**带 message 的** done。真正的输出路径由路由在最后推；
+          // 早先服务端在中间也推过一次空的 done，会把路径覆盖成空串（已修服务端，
+          // 这里再稳一道，避免两个 done 的语义含糊）。
+          if (event.message) {
+            const parsed = JSON.parse(event.message) as { outputPath?: string };
+            if (parsed.outputPath) finalOutput = parsed.outputPath;
+          }
         }
       }
     }
