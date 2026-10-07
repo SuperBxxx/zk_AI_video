@@ -32,8 +32,15 @@
     <section class="settingSection" aria-labelledby="mcpEndpointTitle">
       <h3 id="mcpEndpointTitle">服务地址</h3>
       <div class="portSetting">
-        <label for="mcpPort">首选本地端口</label>
-        <el-input-number id="mcpPort" v-model="portDraft" :min="1" :max="65535" :precision="0" controlsPosition="right" size="small" :disabled="saving" />
+        <!-- ACT: 这里原先用 `<label for="mcpPort">` + `<el-input-number id="mcpPort">`。
+             Element Plus 的 el-input-number 把 id 落在**根 div** 上，真正接收输入的
+             <input> 是由 useFormItemInputId 生成的（不在表单里时是随机 id），
+             所以 for 永远匹配不到任何元素 —— 控制台每次都报
+             「Incorrect use of <label for=FORM_ELEMENT>」，读屏也读不到这个字段名。
+             该组件没有 inputId 这类透传属性，因此改用 aria-labelledby 建立显式关联：
+             不依赖第三方内部实现，语义也更准确。 -->
+        <span id="mcpPortLabel">首选本地端口</span>
+        <el-input-number v-model="portDraft" aria-labelledby="mcpPortLabel" :min="1" :max="65535" :precision="0" controlsPosition="right" size="small" :disabled="saving" />
         <el-button size="small" :loading="saving" :disabled="portDraft === undefined || portDraft === (status?.preferredPort ?? mcpSettings.port)" @click="savePort">保存</el-button>
       </div>
       <p class="description">默认 10588，占用时自动顺延。保存后自动切换 MCP 端口，地址变化后请重新复制客户端配置。</p>

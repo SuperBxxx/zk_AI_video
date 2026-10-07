@@ -13,7 +13,7 @@
 | BUG-3 | 营销模式创建项目连续 409 | ✅ **已修**（根因已复现并验证） |
 | BUG-4 | 画布工具成功也回错误文案 | ❌ 未修，需要一次现场证据 |
 | BUG-5 | `/api/desktop/update` 500 | ✅ **已修**（根因：去 Toonflow 化留下的 identifier 不一致） |
-| BUG-6 | `<label for>` 可访问性提示 | ❌ 未修（轻微） |
+| BUG-6 | `<label for>` 可访问性提示 | ✅ **已修**（el-input-number 的 id 落在根 div 上，for 永远匹配不到） |
 
 BUG-1 与 BUG-3 其实是**同一条链**：6 个 textNode 并发建 `assets` 目录 → 撞锁 409 / 父目录未就绪 404
 → `textPath` 读不到 → 载入失败且无重试 → `textReady` 永远 false → 工具写入报「文本尚未加载」。
@@ -349,8 +349,32 @@ The label's for attribute doesn't match any element id.
 2 个资源
 ```
 
-不影响功能，只影响浏览器自动填充与读屏。下次在开发者面板表单里找那两个 `<label>`，
-给对应输入补 `id`（或改用包裹式 label）。
+不影响功能，只影响浏览器自动填充与读屏。
+
+### 根因（已确定）
+
+全仓库只有一处原生 `<label>`：`apps/web/src/components/settings/panels/mcp/index.vue:35`
+
+```html
+<label for="mcpPort">首选本地端口</label>
+<el-input-number id="mcpPort" v-model="portDraft" ... />
+```
+
+**Element Plus 的 `el-input-number` 把 `id` 落在根 div 上**，真正接收输入的 `<input>`
+是内部用 `useFormItemInputId` 生成的（不在表单里时是随机 id）。所以 `for` 永远匹配不到
+任何元素 —— 每次渲染都报这条，读屏也读不到这个字段名。
+
+### 修法
+
+该组件**没有 `inputId` 之类的透传属性**（已核 `node_modules/element-plus` 源码），
+所以不靠 `for`，改用 `aria-labelledby` 建立显式关联：
+`<span id="mcpPortLabel">` + `el-input-number aria-labelledby="mcpPortLabel"`。
+不依赖第三方内部实现，语义也更准确。CSS 用 flex + `.el-input-number` 选择器，外观不变。
+
+### 验证
+
+web typecheck：仅 7 个**既有** TS7006（与我改的文件无关），无新增；
+全仓库已无 `for=` 形式的原生 label。
 
 ---
 
@@ -361,9 +385,17 @@ The label's for attribute doesn't match any element id.
 
 ## 下次开工的建议顺序
 
-1. **BUG-4**（工具成功却回错误文案）—— 先修它，否则其余每条都被它的假提示带偏
-2. **BUG-1**（② 节点）—— 根因已确定，改动最小，且它真正卡住用户的进度
-3. **BUG-2**（素材库）—— 先验「`saveAsset` 里 output 是否为 undefined」这一个点
-4. **BUG-5**（desktop/update 500）—— 独立好修
-5. **BUG-3** / **BUG-6** —— 需要更多信息 / 轻微
+**已修**：BUG-1、BUG-3、BUG-5、BUG-6，以及 BUG-2 的「禁用无提示」部分。
+
+**只剩两条**：
+
+1. **BUG-4**（工具成功却回错误文案）—— 优先级最高，因为它的假提示会污染其它所有排查。
+   **需要用户给一次现场证据**：哪次操作、工具回的原话。目前只查到
+   `packages/tools/canvas/src/index.ts:25` 是 `JSON.stringify(result ?? null)`，
+   抛错才会变成错误 —— 错误文案不是在这里拼的，需要定位真正的来源。
+2. **BUG-2 的剩余部分** —— 只有当「节点确实有图」时仍点不动才需要继续查，
+   怀疑点是 `assetLibrary.vue:384/402` 两处静默早退。
+
+**另外**：这些改动都在服务端路由与节点产物里，要装进应用需**重新打包**
+（按 `构建笔记.md` §7，不要直接跑 `package:desktop`）。
 
