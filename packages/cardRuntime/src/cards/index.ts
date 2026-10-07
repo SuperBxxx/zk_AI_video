@@ -25,6 +25,9 @@ import { wordSlotCycle } from "./wordSlotCycle";
 import { timelineTravel } from "./timelineTravel";
 import { metricWithSparkline } from "./metricWithSparkline";
 import { titleDemoteToLabel } from "./titleDemoteToLabel";
+import { wipeTransition } from "./wipeTransition";
+import { flashCutLogo } from "./flashCutLogo";
+import { scanBracketSweep } from "./scanBracketSweep";
 
 export const htmlCards = [
   digitRoll,
@@ -48,6 +51,9 @@ export const htmlCards = [
   timelineTravel,
   metricWithSparkline,
   titleDemoteToLabel,
+  wipeTransition,
+  flashCutLogo,
+  scanBracketSweep,
 ];
 
 export function findHtmlCard(slug: string) {

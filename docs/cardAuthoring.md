@@ -83,6 +83,8 @@ bun scripts/renderCard.mjs --print-chrome   # 打印确切命令
 | **以为 libvpx-vp9 能保 alpha** | 喂 png 进去也输出 yuv420p，alpha 悄悄没了 | 实测只有 `prores_ks` / `qtrle` / `png` 三种保得住 |
 | **render 引用了模块级函数却没进 helpers** | 页面报 `xxx is not defined`，渲染直接失败 | 每个 render 用到的模块级函数都要列进 helpers。**踩过 3 次**（bezierEase / scanTargets / polar）—— 浏览器自检的「页面没加载成功」会抓到 |
 | **SVG 宽高用百分比推导的表达式** | 椭圆被压扁成几条竖线 | SVG 宽高写成显式 px，并配同值 viewBox |
+| **转场卡的块色与舞台底色相同** | 极端状态下整张卡都是纯色，等于没转场；自检报「帧间无变化」 | 转场卡必须是实心可见的色，舞台底色用中性灰 |
+| **自检抽样点太稀疏** | 42 帧的转场卡只抽 0/15/41，动作集中在 6~18 帧 → 误报「动画没生效」 | 抽 6 帧按帧数均分（短卡逐帧） |
 | **累加循环里的抖动写成 ±** | 步长可能变负 → 累加值不再增长 → **动画永久停在中途**，不报错 | 抖动**只加不减** |
 | **参数是「内容长度的镜像」** | 文案 19 字而参数默认 14 → 只显示前 14 字，看着像动画坏了 | 这类参数一律由内容本身推导，不手填 |
 
@@ -171,7 +173,7 @@ bun scripts/renderCard.mjs --print-chrome   # 打印确切命令
 批次 5 图表       ✅ chartLiveOscilloscope · ✅ gaugeReadout · ✅ barChartGrowth
 批次 6 文字强化   ✅ typeAssembly · ✅ softBlurIn · ✅ wordSlotCycle
 批次 7 时间轴     ✅ timelineTravel · ✅ metricWithSparkline · ✅ titleDemoteToLabel
-批次 8 转场       ⏳ wipe-transitions · white-flash-logo-simplify-cut · scan-bracket-sweep
+批次 8 转场       ✅ wipeTransition · ✅ flashCutLogo · ✅ scanBracketSweep
 ```
 
-**已完成 21/24。** 每完成一批就提交并汇报。
+**24 张全部完成（96/96 自检通过）。**

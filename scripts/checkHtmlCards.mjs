@@ -70,8 +70,13 @@ mkdirSync(stage, { recursive: true });
 
 for (const card of cards) {
   const total = card.frames ?? 1;
-  // 抽 4 帧：起始、中段、落定、末帧 —— 既查同帧确定，也查帧间确实在动
-  const sampleFrames = [0, Math.round(total * 0.35), total - 1, total - 1];
+  // ACT: 抽样点要覆盖整条时间轴。早先只抽 4 帧（0 / 35% / 末两帧），
+  // 对**短卡**会漏掉动作：转场卡只有 42 帧、动作集中在 6~18 帧之间，
+  // 抽样点正好落在「块还在画外」和「块已经出画」两端，于是误报「帧间无变化」。
+  // 现在抽 6 帧并按帧数均分（末帧必定在内，因为动画末态也要被验）。
+  const sampleFrames = total <= 6
+    ? Array.from({ length: total }, (_, i) => i)
+    : Array.from({ length: 6 }, (_, i) => Math.round((i / 5) * (total - 1)));
   for (const [width, height] of aspects) {
     const name = `${card.meta.slug}-${width}x${height}`;
     writeFileSync(join(stage, `${name}.html`), buildCardPage(card, {}, { width, height }));
@@ -126,7 +131,7 @@ for (const card of cards) {
     const ok = sameFrame && framesDiffer && placement.bad.length === 0;
     console.log(`  ${ok ? "✓" : "✗"} ${name.padEnd(28)} 同帧一致=${sameFrame ? "✓" : "✗"} 帧间有变化=${framesDiffer ? "✓" : "✗"} 落位检查=${placement.checked}项${placement.bad.length ? " ✗" : ""}`);
     if (!sameFrame) failures.push(`${name}：同一帧两次截图不一致（逐帧渲染会闪）`);
-    if (!framesDiffer) failures.push(`${name}：各帧画面完全相同（动画没生效）`);
+    if (!framesDiffer) failures.push(`${name}：6 个抽样帧画面完全相同（动画没生效，或动作全落在抽样点之外）`);
     for (const item of placement.bad) {
       failures.push(`${name}：${item.check} 越出边界 box=${item.box} bounds=${item.bounds}`);
     }
