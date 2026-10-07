@@ -106,3 +106,14 @@ export {
   type AnalysisInput,
   type AnalysisEvidence,
 } from "./videoAnalysisCards";
+
+export {
+  storyAnchors,
+  storyAnchorKeys,
+  findStoryAnchor,
+  isStoryAnchor,
+  storyAnchorGuide,
+  storyAnchorGuideDetailed,
+  type StoryAnchorSpec,
+  type StoryAnchorGroup,
+} from "./storyAnchor";

@@ -29,6 +29,8 @@ import {
   type CardPosition,
   type CardSemantic,
   videoAnalysisCards,
+  storyAnchorKeys,
+  storyAnchorGuide,
 } from "@toonflow/post-production";
 import { htmlCards } from "@toonflow/card-runtime/cards";
 import type { ToolContext, ToolDefinition, ToolPlugin } from "@toonflow/tools-scaffold/runtime";
@@ -254,14 +256,22 @@ const plugin: ToolPlugin = {
             techniques: {
               type: "array", maxItems: 80,
               items: {
-                type: "object", additionalProperties: false, required: ["name", "when"],
+                type: "object", additionalProperties: false, required: ["name"],
                 properties: {
-                  name: { type: "string", minLength: 1, maxLength: 200, description: "手法名" },
-                  when: { type: "string", maxLength: 2000, description: "什么时候用、用在哪一段" },
+                  name: { type: "string", minLength: 1, maxLength: 200, description: "手法名（说清它是什么做法）" },
+                  respondsTo: {
+                    type: "string",
+                    enum: storyAnchorKeys,
+                    description: `它回应故事的哪一下。可选值：\n${storyAnchorGuide()}\n**这是复刻的关键** —— 写清关系而不是时刻，换个脚本它照样成立。`,
+                  },
+                  form: { type: "string", maxLength: 2000, description: "参考片里它长什么样（形式，不是要照抄的像素）" },
+                  atSeconds: { type: "number", minimum: 0, description: "参考片里的时点（仅作观察记录，不是新片的时间）" },
+                  role: { type: "string", maxLength: 2000, description: "它替观众做了什么 —— 这才是要保留的东西（例如：让价格可信、把注意力交给下一个想法）" },
+                  when: { type: "string", maxLength: 2000, description: "新片子里用什么形式完成同一件事（复刻时的落法）" },
                   evidence: { type: "string", maxLength: 4096, description: "支撑这条手法的证据（帧图路径或时刻）" },
                 },
               },
-              description: "值得复用的手法清单，每条都要引用证据",
+              description: "值得复用的手法清单。每条都要写 respondsTo（在回应什么）与 role（替观众做了什么），并引用证据",
             },
             evidence: {
               type: "array", maxItems: 200,

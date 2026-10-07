@@ -10,6 +10,7 @@
 // 用户能直接看到、备份、删掉单张，不需要动 settings.json）。
 import { mkdir, readFile, readdir, rm, writeAtomic, lstat } from "@toonflow/file";
 import { dirname, join } from "node:path";
+import { isStoryAnchor } from "@toonflow/post-production";
 import conf from "@/utils/conf";
 
 export interface AnalysisRecipe {
@@ -23,14 +24,53 @@ export interface AnalysisRecipe {
   pattern?: string;
   /** 意图与受众。 */
   intent?: string;
-  /** 值得复用的手法清单，每条都应引用证据。 */
-  techniques?: { name: string; when: string; evidence?: string }[];
+  /**
+   * 值得复用的手法清单。
+   *
+   * ACT: 这里记的是**关系**，不是时刻 —— 这是复刻路径的核心改造。
+   * 「第 4 秒有一个硬切」是观察，换个脚本就失效；真正可复用的是
+   * 「在抛出价格那一刻切硬切」。所以每条手法必须写清 `respondsTo`（在回应什么）
+   * 与 `role`（替观众做了什么），复刻时用**新脚本自己的时间**去实例化它。
+   */
+  techniques?: {
+    name: string;
+    /** 它回应故事的哪一下（storyAnchor 的 key）。 */
+    respondsTo?: string;
+    /** 参考片里它长什么样（形式，不是要照抄的像素）。 */
+    form?: string;
+    /** 参考片里的时点（仅作观察记录，**不是新片的时间**）。 */
+    atSeconds?: number;
+    /** 它替观众做了什么 —— 这才是要保留的东西。 */
+    role?: string;
+    /** 新片子里用什么形式完成同一件事（复刻时的落法）。 */
+    when?: string;
+    evidence?: string;
+  }[];
   /** 证据引用（帧图、网格、边界候选时刻、词级时间），指向工作区内的路径或时刻。 */
   evidence?: { kind: string; label: string; ref: string }[];
   /** 已知坑。 */
   pitfalls?: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * 把一张卡里的手法锚点规范化。
+ *
+ * ACT: 锚点写错会**静默毁掉检索能力** —— 「在回应什么」这一列的用处就是让下游按锚点找卡，
+ * 写一个不存在的标识，那条手法就再也搜不到了，而且没有任何报错。所以这里校验：
+ * 非法锚点**丢掉并在结果里报出来**（不整卡拒绝，否则一次笔误会让整次分析白做）。
+ */
+function normalizeAnchors(techniques: AnalysisRecipe["techniques"]) {
+  const dropped: { name: string; respondsTo: string }[] = [];
+  const kept = (techniques ?? []).map(technique => {
+    if (!technique.respondsTo) return technique;
+    if (isStoryAnchor(technique.respondsTo)) return technique;
+    dropped.push({ name: technique.name, respondsTo: technique.respondsTo });
+    const { respondsTo: _ignored, ...rest } = technique;
+    return rest;
+  });
+  return { techniques: kept, droppedAnchors: dropped };
 }
 
 export function recipesDirectory() {
@@ -106,7 +146,7 @@ export async function readRecipe(slug: string): Promise<AnalysisRecipe | undefin
  *
  * @param input 卡内容；给 `slug` 表示更新已有的（不存在则按新卡建）
  */
-export async function saveRecipe(input: Omit<AnalysisRecipe, "slug" | "createdAt" | "updatedAt"> & { slug?: string }): Promise<AnalysisRecipe> {
+export async function saveRecipe(input: Omit<AnalysisRecipe, "slug" | "createdAt" | "updatedAt"> & { slug?: string }): Promise<{ recipe: AnalysisRecipe; droppedAnchors: { name: string; respondsTo: string }[] }> {
   const name = input.name?.trim();
   if (!name) throw Object.assign(new Error("请给这张配方卡起一个名字"), { status: 400 });
   const directory = await ensureDirectory();
@@ -117,13 +157,14 @@ export async function saveRecipe(input: Omit<AnalysisRecipe, "slug" | "createdAt
     slug = slugFromName(name, names);
   }
   const now = new Date().toISOString();
+  const { techniques, droppedAnchors } = normalizeAnchors(input.techniques);
   const recipe: AnalysisRecipe = {
     slug,
     name,
     ...(input.source ? { source: input.source } : {}),
     ...(input.pattern?.trim() ? { pattern: input.pattern.trim() } : {}),
     ...(input.intent?.trim() ? { intent: input.intent.trim() } : {}),
-    ...(input.techniques?.length ? { techniques: input.techniques } : {}),
+    ...(techniques?.length ? { techniques } : {}),
     ...(input.evidence?.length ? { evidence: input.evidence } : {}),
     ...(input.pitfalls?.length ? { pitfalls: input.pitfalls } : {}),
     createdAt: existing?.createdAt ?? now,
@@ -131,7 +172,7 @@ export async function saveRecipe(input: Omit<AnalysisRecipe, "slug" | "createdAt
   };
   // ACT: 整卡覆盖写用 writeAtomic —— 用户可能在卡库里改过，半截 JSON 会让这张卡读不出来。
   await writeAtomic(join(directory, `${slug}.json`), `${JSON.stringify(recipe, null, 2)}\n`);
-  return recipe;
+  return { recipe, droppedAnchors };
 }
 
 export async function removeRecipe(slug: string) {

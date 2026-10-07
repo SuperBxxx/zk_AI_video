@@ -78,6 +78,14 @@
                 <el-tag size="small" type="success" effect="plain" disable-transitions>{{ recipe.techniques?.length ?? 0 }} 个手法</el-tag>
                 <el-tag size="small" effect="plain" disable-transitions>{{ recipe.evidence?.length ?? 0 }} 条证据</el-tag>
               </div>
+              <!-- 手法按「在回应什么」展示：这一列是复刻的关键 —— 关系而不是时刻。 -->
+              <ul v-if="recipe.techniques?.length" class="techniqueList">
+                <li v-for="(technique, index) in recipe.techniques" :key="index">
+                  <el-tag v-if="technique.respondsTo" size="small" type="primary" effect="plain" disable-transitions>{{ anchorLabel(technique.respondsTo) }}</el-tag>
+                  <el-text size="small">{{ technique.name }}</el-text>
+                  <el-text v-if="technique.role" size="small" type="info"> → {{ technique.role }}</el-text>
+                </li>
+              </ul>
               <el-text v-if="recipe.pitfalls?.length" class="cardWhy" size="small" type="warning">{{ recipe.pitfalls[0] }}</el-text>
             </div>
             <footer class="cardFooter">
@@ -119,16 +127,44 @@ type CardGroup = { kind: CardKind; label: string; description: string; cards: Ca
 type CardLibrary = { total: number; counts: Record<CardKind, number>; groups: CardGroup[] };
 
 /** 用户保存的「视频分析配方卡」—— 让 Agent 分析完一条视频后命名保存的成果。 */
+type RecipeTechnique = {
+  name: string;
+  /** 它回应故事的哪一下（叙事锚点的 key）。 */
+  respondsTo?: string;
+  /** 参考片里它长什么样。 */
+  form?: string;
+  /** 参考片里的时点（观察记录，不是新片的时间）。 */
+  atSeconds?: number;
+  /** 它替观众做了什么 —— 要保留的东西。 */
+  role?: string;
+  /** 新片子里用什么形式完成同一件事。 */
+  when?: string;
+  evidence?: string;
+};
 type RecipeCard = {
   slug: string;
   name: string;
   source?: { path?: string; url?: string; title?: string; durationSeconds?: number };
   pattern?: string;
   intent?: string;
-  techniques?: { name: string; when: string; evidence?: string }[];
+  techniques?: RecipeTechnique[];
   evidence?: { kind: string; label: string; ref: string }[];
   pitfalls?: string[];
   updatedAt: string;
+};
+
+/**
+ * 叙事锚点的中文名。
+ *
+ * ACT: 与 `@toonflow/post-production` 的 storyAnchors **同源但在这里复制了一份** ——
+ * 前端组件不该为了几个中文标签去拉整个后期制作包。两边漂移的风险由
+ * `scripts/checkCardCatalog.mjs` 之外的人工纪律兜着；改词表时两处都要改。
+ */
+const anchorLabels: Record<string, string> = {
+  hook: "钩子", background: "背景", problem: "问题", turn: "转折", climax: "高潮", ending: "收尾",
+  establish: "建立", compare: "对比", prove: "举证", amplify: "放大", explain: "说明", handoff: "交接",
+  onScreenText: "屏幕文字", graphicSystem: "图形系统", cut: "切点", cameraMove: "镜头运动", soundCue: "声音提示",
+  callToAction: "行动号召", reveal: "揭晓", askQuestion: "设问", recall: "回扣",
 };
 
 const visible = defineModel<boolean>({ required: true });
@@ -142,6 +178,11 @@ const keyword = ref("");
 const shapeLabels: Record<string, string> = { fullscreen: "全屏", overlay: "叠加", transition: "转场" };
 function shapeLabel(shape: string) {
   return shapeLabels[shape] ?? shape;
+}
+
+/** 锚点的中文名；未知 key 就原样显示，免得把数据问题藏起来。 */
+function anchorLabel(key: string) {
+  return anchorLabels[key] ?? key;
 }
 
 function previewUrl(slug: string) {
@@ -326,6 +367,20 @@ watch(visible, open => { if (open) void load(); }, { immediate: true });
 
   .cardWhy {
     line-height: 1.5;
+  }
+
+  .techniqueList {
+    margin: 2px 0 0;
+    padding-left: 0;
+    list-style: none;
+
+    li {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 4px;
+      line-height: 1.6;
+    }
   }
 
   .cardFooter {

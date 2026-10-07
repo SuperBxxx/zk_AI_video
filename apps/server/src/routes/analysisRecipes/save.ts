@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { storyAnchorKeys } from "@toonflow/post-production";
 import { validateFields } from "@/lib/middleware";
 import { success } from "@/lib/responseFormat";
 import u from "@/utils";
@@ -20,7 +21,16 @@ export default Router().post("/", validateFields({
   intent: z.string().max(4000).optional().describe("意图与受众"),
   techniques: z.array(z.object({
     name: z.string().min(1).max(200),
-    when: z.string().max(2000),
+    /** 它回应故事的哪一下。枚举限死 —— 写错的锚点会静默毁掉检索能力。 */
+    respondsTo: z.enum(storyAnchorKeys as [string, ...string[]]).optional(),
+    /** 参考片里它长什么样（形式，不是要照抄的像素）。 */
+    form: z.string().max(2000).optional(),
+    /** 参考片里的时点（仅观察记录，不是新片的时间）。 */
+    atSeconds: z.number().min(0).optional(),
+    /** 它替观众做了什么 —— 这才是要保留的东西。 */
+    role: z.string().max(2000).optional(),
+    /** 新片子里用什么形式完成同一件事。 */
+    when: z.string().max(2000).optional(),
     evidence: z.string().max(4096).optional(),
   })).max(80).optional(),
   evidence: z.array(z.object({
@@ -31,5 +41,10 @@ export default Router().post("/", validateFields({
   pitfalls: z.array(z.string().max(2000)).max(60).optional(),
 }), async (req, res) => {
   u.mcpControl.assertAppRequest(req);
-  res.json(success(await u.analysisRecipe.saveRecipe(req.body as never)));
+  const { recipe, droppedAnchors } = await u.analysisRecipe.saveRecipe(req.body as never);
+  res.json(success({
+    ...recipe,
+    // ACT: 把被丢掉的锚点回给调用方 —— 否则"这条手法以后搜不到了"是静默发生的。
+    ...(droppedAnchors.length ? { droppedAnchors } : {}),
+  }));
 });
