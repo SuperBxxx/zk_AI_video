@@ -28,6 +28,7 @@ import {
   type CardInput,
   type CardPosition,
   type CardSemantic,
+  videoAnalysisCards,
 } from "@toonflow/post-production";
 import { htmlCards } from "@toonflow/card-runtime/cards";
 import type { ToolContext, ToolDefinition, ToolPlugin } from "@toonflow/tools-scaffold/runtime";
@@ -37,7 +38,10 @@ import type { ToolContext, ToolDefinition, ToolPlugin } from "@toonflow/tools-sc
  *
  * ACT: 放在模块顶层只算一次。两个卡库都是静态数组，没有 I/O，也没有运行时变化。
  */
-const cardCatalog: CardCatalogEntry[] = buildCardCatalog(builtInCards, htmlCards);
+// ACT: 显式传三套卡（FFmpeg 滤镜卡 + HTML 画面卡 + **分析卡**）。
+// 分析卡以前完全不在 Agent 视野里 —— 它们描述的是"读素材"的动作，不是画面效果，
+// 但"要复刻一条参考片"的第一步恰恰是它。
+const cardCatalog: CardCatalogEntry[] = buildCardCatalog(builtInCards, htmlCards, videoAnalysisCards);
 
 /** 把占位区转成 Agent 好读的百分比描述（给提示词用，不是给程序用）。 */
 function formatOcclusion(occlusion: { x: number; y: number; w: number; h: number }) {
@@ -772,6 +776,16 @@ const buildTools = (context: ToolContext, config: ReturnType<typeof configSchema
               };
             }
 
+            // —— 分析卡：它**不产画面**，所以不能走滤镜实例化路径 ——
+            // 直接告诉 Agent 该用哪个工具，而不是抛"没有这张卡"或拼出一条空滤镜。
+            const analysisEntry = cardCatalog.find(item => item.slug === request.slug && item.kind === "analysis");
+            if (analysisEntry) {
+              return {
+                content: [{ type: "text", text: `${analysisEntry.title}：${analysisEntry.oneliner}\n产出证据：${(analysisEntry.evidence ?? []).join("、")}\n为什么必须用它：${analysisEntry.why ?? "（未写）"}\n这张卡**不产出画面**，不能用它当滤镜 —— 用 videoFetch 工具的 analyze_reference 或 mediaAnalysis 工具的 media_analyze 执行对应的取证动作。` }],
+                details: { slug: analysisEntry.slug, kind: "analysis", evidence: analysisEntry.evidence, why: analysisEntry.why },
+              };
+            }
+
             // —— FFmpeg 卡：原有的滤镜实例化路径 ——
             let card;
             try {
@@ -835,8 +849,9 @@ const buildTools = (context: ToolContext, config: ReturnType<typeof configSchema
           }
 
           // 检索：给候选与排序理由，由 agent 决策（不替它选）
-          // ACT: 走**统一目录**（FFmpeg 卡 + HTML 卡），否则 Agent 根本不知道
-          // cardRuntime 里那 24 张 HTML 卡存在 —— 那是本次接线前的实际状态。
+          // ACT: 走**统一目录**（FFmpeg 卡 + HTML 卡 + **分析卡**），否则 Agent 根本不知道
+          // cardRuntime 里那 24 张 HTML 卡、以及"读素材"那 6 张分析卡存在。
+          // 踩过两次：先漏了 HTML 卡，后漏了分析卡 —— 目录少了哪一套，Agent 就看不到哪一套。
           const matched = matchCatalogDetailed(cardCatalog, builtInCards, {
             ...(request.inputs ? { inputs: request.inputs as CardInput[] } : {}),
             ...(request.semantics ? { semantics: request.semantics as CardSemantic[] } : {}),
@@ -845,7 +860,7 @@ const buildTools = (context: ToolContext, config: ReturnType<typeof configSchema
           });
           if (!matched.length) {
             return {
-              content: [{ type: "text", text: `没有匹配的卡（库共 ${cardCatalog.length} 张：FFmpeg 滤镜卡 ${builtInCards.length} + HTML 画面卡 ${cardCatalog.length - builtInCards.length}）。这是真实缺口，不要假装用了卡——可以自己写滤镜，或列出可用卡让用户决定。\n可用：${cardCatalog.map(c => c.slug).join("、")}` }],
+              content: [{ type: "text", text: `没有匹配的卡（库共 ${cardCatalog.length} 张：FFmpeg 滤镜卡 ${builtInCards.length} + HTML 画面卡 ${cardCatalog.filter(c => c.kind === "html").length} + 分析卡 ${cardCatalog.filter(c => c.kind === "analysis").length}）。这是真实缺口，不要假装用了卡——可以自己写滤镜，或列出可用卡让用户决定。\n可用：${cardCatalog.map(c => c.slug).join("、")}` }],
               details: { candidates: [], available: cardCatalog.map(c => c.slug) },
             };
           }
