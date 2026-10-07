@@ -7,8 +7,9 @@
 import { digitRoll } from "./digitRoll";
 import { counterConfetti } from "./counterConfetti";
 import { numberSlabPop } from "./numberSlabPop";
+import { typewriterTerminal } from "./typewriterTerminal";
 
-export const htmlCards = [digitRoll, counterConfetti, numberSlabPop];
+export const htmlCards = [digitRoll, counterConfetti, numberSlabPop, typewriterTerminal];
 
 export function findHtmlCard(slug: string) {
   const card = htmlCards.find(item => item.meta.slug === slug);
