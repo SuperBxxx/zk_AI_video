@@ -13,6 +13,11 @@ export interface WorkspaceFiles {
   rename(path: string, target: string): Promise<void>;
   remove(path: string, recursive?: boolean): Promise<void>;
   mkdir(path: string): Promise<void>;
+  /**
+   * 把工作区里的视频转成通用可解码的 H.264，返回工作区相对路径。
+   * 用于「参考视频送进模型前先保证可解码」：微信/苹果导出的 mp4 多是 HEVC，桌面端解不了。
+   */
+  prepareVideo(path: string): Promise<string>;
 }
 
 function getNodeDirectory(nodeId: string) {

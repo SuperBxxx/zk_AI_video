@@ -65,17 +65,20 @@
 
   <el-dialog :modelValue="previewAsset?.kind === 'video'" :title="previewAsset?.name" width="min(800px, calc(100vw - 32px))" alignCenter appendToBody destroyOnClose @update:modelValue="previewAsset = undefined">
     <div v-if="previewAsset?.kind === 'video'" class="assetPreview">
-      <!-- ACT: 放不了的时候要说清**是什么问题、怎么办**。
-           原先只有一句「文件可能已损坏或当前浏览器不支持其编码」——
-           实测 ProRes(.mov) 会报 DEMUXER_ERROR_NO_SUPPORTED_STREAMS，
-           而用户从剪辑软件/相机拿到的往往正是 ProRes、DNxHD、MPEG-2 这类**浏览器永远解不了**的编码。
-           那时他最需要知道的是「这不是文件坏了，是浏览器放不了这种编码，请转码或下载」。
-           另外 previewError 有值时 video 会被 v-else 换掉（连画面都没了），所以这里额外给操作入口。 -->
-      <template v-if="previewError">
-        <el-alert :title="previewError" type="error" :closable="false" showIcon />
+      <!-- ACT: 放不了时**自动转一份 H.264 预览副本**再播，而不是只报错。
+           为什么是转码不是内置解码器：HEVC 是专利收费编码，随包分发解码器要商业许可
+           （微软的 HEVC 扩展卖 $0.99 就是替用户付这笔钱）；转码属于"我处理素材"，
+           用户端无感（实测 12.9s 素材 0.7 秒转完）。原始素材不动。
+           「有元数据但 videoWidth 为 0」正是 HEVC 在 WebView2 下的表现：有声音没画面。 -->
+      <template v-if="transcoding">
+        <el-alert :title="`这个视频的编码浏览器放不了，正在转成可播放的预览副本…`" type="info" :closable="false" show-icon />
+        <div class="previewActions"><el-text size="small" type="info">首次打开需要转码，之后同一文件会直接复用副本。也可以先 <el-link :href="downloadUrl(previewAsset.path)" :download="previewAsset.name">下载原文件</el-link>。</el-text></div>
+      </template>
+      <template v-else-if="previewError">
+        <el-alert :title="previewError" type="error" :closable="false" show-icon />
         <div class="previewActions">
+          <el-button :icon="IconRefresh" @click="retryPreview()">重试</el-button>
           <el-button :icon="IconDownload" tag="a" :href="downloadUrl(previewAsset.path)" :download="previewAsset.name">下载原文件</el-button>
-          <el-button text :icon="IconRefresh" @click="retryPreview()">重试</el-button>
         </div>
       </template>
       <video v-else :key="previewAsset.url" class="previewVideo" :src="previewAsset.url" :aria-label="previewAsset.name" controls playsinline preload="metadata" @loadeddata="onPreviewLoaded" @error="onPreviewError" />
@@ -172,8 +175,10 @@ const uploadInput = ref<HTMLInputElement>();
 const assetMenuRef = ref<InstanceType<typeof assetMenu>>();
 const previewAsset = ref<{ name: string; url: string; kind: "image" | "audio" | "video"; path: string }>();
 const previewError = ref("");
+/** 正在为这个视频生成 H.264 预览副本（HEVC 等浏览器放不了的编码）。 */
+const transcoding = ref(false);
 let loadRequest = 0;
-onBeforeUnmount(() => { loadRequest++; });
+onBeforeUnmount(() => { loadRequest++; clearPreviewProbeTimer(); });
 
 function assetUrl(path: string) {
   return `/api/assets/read?path=${encodeURIComponent(path)}`;
@@ -218,16 +223,34 @@ function clearPreviewProbeTimer() {
 }
 
 /**
- * 放不了时给出**能照着做**的说明。
- * @param kind `error` = video 报了错；`stalled` = 一直读不出元数据（有声音没画面就是这种）
+ * 自动生成 H.264 预览副本并改播副本。
+ *
+ * ACT: 这是 `videoWidth === 0`（有声音没画面）与解码报错的**主路径**，
+ * 不是"给用户一个按钮" —— 用户不该知道 HEVC 是什么。
  */
-function describePreviewFailure(kind: "error" | "stalled") {
-  const name = previewAsset.value?.name ?? "";
-  const extension = name.includes(".") ? name.split(".").at(-1)!.toLowerCase() : "";
-  const hint = unplayableByExtension[extension];
-  const because = hint ? `这种格式浏览器放不了：${hint}` : "浏览器解不了这个文件的编码";
-  const symptom = kind === "stalled" ? "（能听到声音、但画面出不来）" : "";
-  previewError.value = `${because}${symptom}。文件本身通常没坏，转成 H.264（.mp4）就能在这里预览 —— 可以先「下载原文件」，或让我把它转码。`;
+async function transcodePreview() {
+  const asset = previewAsset.value;
+  if (!asset || transcoding.value) return;
+  transcoding.value = true;
+  previewError.value = "";
+  clearPreviewProbeTimer();
+  try {
+    const { data } = await axios.post<{ code: number; data: { key: string; original: boolean }; message?: string }>(
+      "/api/assetPreviewCreate",
+      { path: asset.path },
+      { headers: { "x-toonflow-workspace": "1" }, timeout: 120000 },
+    );
+    if (data.code !== 200 || !data.data?.key) throw new Error(data.message || "生成预览副本失败");
+    if (previewAsset.value !== asset) return; // 用户已经切走了
+    previewAsset.value = { ...asset, url: `/api/assetPreviewRead?key=${encodeURIComponent(data.data.key)}` };
+    armPreviewProbe();
+  } catch (error) {
+    if (previewAsset.value !== asset) return;
+    const detail = axios.isAxiosError<{ message?: string }>(error) ? error.response?.data?.message : undefined;
+    previewError.value = `${detail || (error instanceof Error ? error.message : "生成预览副本失败")}。可以「重试」，或先下载原文件用其他播放器打开。`;
+  } finally {
+    transcoding.value = false;
+  }
 }
 
 function onPreviewError() {
@@ -237,10 +260,10 @@ function onPreviewError() {
     previewError.value = "读取视频时网络中断，请重试。";
     return;
   }
-  describePreviewFailure("error");
+  void transcodePreview();
 }
 
-/** video 既没 loadedmetadata 也没 error 时（mpeg4 就是这种）兜住，别让它一直黑着。 */
+/** video 既没 loadedmetadata 也没 error 时（HEVC 就是这种）兜住，别让它一直黑着。 */
 function onPreviewLoaded() {
   clearPreviewProbeTimer();
 }
@@ -251,7 +274,7 @@ function armPreviewProbe() {
     // 已经能读出画面尺寸就说明解出来了，不动
     const video = document.querySelector<HTMLVideoElement>(".previewVideo");
     if (!video || video.videoWidth > 0) return;
-    describePreviewFailure("stalled");
+    void transcodePreview();
   }, previewProbeTimeout);
 }
 
@@ -275,6 +298,7 @@ function openPreview(entry: AssetEntry) {
   const kind = mediaKind(entry);
   if (!kind) return;
   previewError.value = "";
+  transcoding.value = false;
   previewAsset.value = { name: entry.name, path: entry.path, url: assetUrl(entry.path), kind };
   if (kind === "video") armPreviewProbe();
 }

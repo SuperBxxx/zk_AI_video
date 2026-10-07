@@ -113,6 +113,24 @@ export default function useWorkspaceFiles(directory?: MaybeRefOrGetter<string | 
     await client.post("/mkdir", { directory: getDirectory(), path });
   }
 
+  /**
+   * 把工作区里的视频转成通用可解码的 H.264，返回**工作区相对路径**。
+   *
+   * ACT: 微信/苹果导出的 mp4 多是 HEVC，桌面端（WebView2）没有 HEVC 解码器 ——
+   * 素材库预览会「有声音没画面」，把参考视频送进模型同样不可用。
+   * 服务端探到通用编码（h264/vp8/vp9/av1）时直接返回原路径，不做无谓转码。
+   * 副本按原文件缓存，同一素材只转一次。
+   */
+  async function prepareVideo(path: string) {
+    const { data } = await client.post<{ code: number; data: { path: string; original: boolean; elapsedMs: number }; message?: string }>(
+      "/prepareVideo",
+      { directory: getDirectory(), path },
+      { timeout: 300000 },
+    );
+    if (data.code !== 200 || !data.data?.path) throw new Error(data.message || `参考视频处理失败：${path}`);
+    return data.data.path;
+  }
+
   // ACT: 当前目录逐次读取；跨 await 或防抖的操作传入目录字符串，固定本次目标。
-  return { list, read, acquireUrl, readText, readJson, write, writeJson, rename, remove, mkdir };
+  return { list, read, acquireUrl, readText, readJson, write, writeJson, rename, remove, mkdir, prepareVideo };
 }

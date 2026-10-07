@@ -258,6 +258,25 @@ function loadModels() {
   return modelsRequest;
 }
 
+/**
+ * 把参考视频转成通用可解码的 H.264 后再送给模型。
+ *
+ * ACT: 微信/苹果导出的 mp4 多是 HEVC，桌面端（WebView2）没有 HEVC 解码器 ——
+ * 同一个坑既让素材库预览"有声音没画面"，也会让送进模型的参考视频不可用。
+ * 节点里的素材都在素材库下（`assets/<nodeId>/…`），所以复用素材预览副本那条接口；
+ * 它是按原文件缓存的，同一个视频只转一次。已是 h264/vp8/vp9/av1 时直接返回原路径、不转码。
+ */
+async function prepareReferenceVideos(workspace: ReturnType<typeof files.getWorkspaceFiles>) {
+  const items = refList.value.flatMap((item) => item.dataType === "VIDEO" && item.value ? [item.value] : []);
+  if (!items.length) return [];
+  const prepared: { path: string; mimeType: string }[] = [];
+  for (const item of items) {
+    const copy = await workspace.prepareVideo(item.url);
+    prepared.push({ path: copy, mimeType: "video/mp4" });
+  }
+  return prepared;
+}
+
 async function startGeneration() {
   const choice = selectedModel.value;
   if (generating.value) throw new Error("视频正在生成，请等待完成");
@@ -269,6 +288,11 @@ async function startGeneration() {
   const images = refList.value.flatMap((item) => item.dataType === "IMAGE" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []);
   if (choice.mode?.length && !matchingModes.value.length) throw new Error("当前模型没有适合这些参考素材的生成模式，请更换模型或调整引用");
   const workspace = files.getWorkspaceFiles();
+  // ACT: 参考视频先转成通用可解码的 H.264。
+  // 踩过：微信/苹果导出的 mp4 多是 HEVC，桌面端（WebView2）没有 HEVC 解码器 ——
+  // 同一个坑既让素材库预览"有声音没画面"，也会让送进模型的参考视频不可用。
+  // 已是 h264/vp8/vp9/av1 时服务端直接返回原路径，不做无谓转码。
+  const videos = await prepareReferenceVideos(workspace);
   const controller = new AbortController();
   const input: Omit<NodeVideoRequest, "directory"> = {
     providerId: choice.providerId,
@@ -283,7 +307,7 @@ async function startGeneration() {
     images: frameMode.value ? undefined : images,
     firstFrame: frameMode.value && (selectedMode.value !== "startFrameOptional" || images.length > 1) ? images[0] : undefined,
     lastFrame: frameMode.value ? images[selectedMode.value === "startFrameOptional" && images.length === 1 ? 0 : 1] : undefined,
-    videos: refList.value.flatMap((item) => item.dataType === "VIDEO" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
+    videos,
     audios: refList.value.flatMap((item) => item.dataType === "AUDIO" && item.value ? [{ path: item.value.url, mimeType: item.value.mimeType }] : []),
   };
   generationController = controller;

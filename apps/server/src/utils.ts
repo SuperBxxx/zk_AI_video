@@ -5,6 +5,7 @@ import * as mediaGeneration from "@/utils/media/generation";
 import * as mediaProvider from "@/utils/media/provider";
 import * as ffmpeg from "@/utils/ffmpeg";
 import * as cardRender from "@/utils/cardRender";
+import * as assetPreview from "@/utils/assetPreview";
 import * as pluginInstall from "@/utils/plugins/install";
 import conf, { removeLegacySettings } from "@/utils/conf";
 import * as ai from "@/utils/ai";
@@ -31,6 +32,7 @@ export default {
   mediaProvider,
   ffmpeg,
   cardRender,
+  assetPreview,
   pluginInstall,
   conf,
   removeLegacySettings,
