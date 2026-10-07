@@ -2,11 +2,20 @@
 //
 // ACT: 不随包内置 yt-dlp（官方 Windows exe 是 PyInstaller 产物，成品按 GPLv3+ 分发），
 // 改为首次使用时按需下载并校验 sha256 后安装。安装位置与 ffmpeg 同级：数据目录下的 ytdlp/。
-import { lstat, mkdir } from "@toonflow/file";
+import { lstat, mkdir, rm } from "@toonflow/file";
 import { dirname, join, resolve } from "node:path";
 import { installYtDlp, getToolStatus, isVideoUrl, runYtDlp, executableName, type YtDlpMode } from "@toonflow/ytDlp";
 import conf from "@/utils/conf";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
+import { fetchDouyin, parseDouyinId } from "@/utils/douyin";
+
+/** 抖音取流用的调试端口。避开卡渲染与其它功能常用的端口。 */
+const douyinPort = 9334;
+
+/** 是不是抖音链接（含 v.douyin.com 短链与分享文本）。 */
+function isDouyinUrl(value: string) {
+  return /(^|\.)douyin\.com\//i.test(value) || /(^|\.)iesdouyin\.com\//i.test(value);
+}
 
 export function ytDlpDirectory() {
   return join(dirname(conf.path), "ytdlp");
@@ -62,11 +71,33 @@ export async function fetchVideo(options: { directory: string; url: string; name
   const { directory, url, onLine } = options;
   if (!isVideoUrl(url)) throw Object.assign(new Error("请填写 http/https 开头的视频链接；本地文件请直接上传"), { status: 400 });
 
+  const stem = options.name ? sanitizeName(options.name).replace(/\.[^.]+$/, "") : undefined;
+
+  // 抖音：yt-dlp 走不通（它的详情接口要签名，实测登录态也 403），所以走**尽力而为**的专用通道。
+  // 它失败时**明确失败**，让用户退回"手动另存为再上传"，而不是把一个笼统报错丢给他。
+  if (isDouyinUrl(url)) {
+    const target = join(directory, `${stem ?? "%(title).80B [%(id)s]"}.mp4`.replace(/[<>:"|?*]/g, ""));
+    const profile = join(ytDlpDirectory(), "douyin");
+    try {
+      const result = await fetchDouyin({ url, target, port: douyinPort, profileDirectory: profile, signal: options.signal, onLine });
+      const info = await probe(result.path);
+      return { path: result.path, ...info } satisfies FetchResult;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw Object.assign(new Error(
+        `抖音这条没能自动下载（${reason}）。这条通道是"尽力而为"，请你改用：在抖音里打开该视频 → 分享 → 复制链接后用浏览器打开 → 另存为文件 → 上传到素材库。`,
+      ), { status: 502, code: "DOUYIN_FALLBACK" });
+    } finally {
+      // ACT: 会话用完即弃 —— 里面是抖音下发的游客 cookie，没有留在磁盘上的必要。
+      await rm(profile, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 }).catch(() => undefined);
+    }
+  }
+
   const tool = await ensureTool(options.signal, onLine);
-  const stem = options.name ? sanitizeName(options.name).replace(/\.[^.]+$/, "") : "%(title).80B [%(id)s]";
+  const ytDlpStem = stem ?? "%(title).80B [%(id)s]";
   // ACT: 输出模板固定为 .mp4 —— yt-dlp 需要合并音视频时用 ffmpeg 输出 mp4；
   // 单一格式其实也可能是 webm，但 mp4 是最通用、也是客户端能直接预览的目标。
-  const target = join(directory, `${stem}.mp4`);
+  const target = join(directory, `${ytDlpStem}.mp4`);
 
   const result = await runYtDlp(tool, {
     cwd: directory,
@@ -97,7 +128,7 @@ export async function fetchVideo(options: { directory: string; url: string; name
     throw Object.assign(new Error(detail || "下载失败"), { status: 502, code: "YTDLP_FAILED" });
   }
 
-  const saved = await findOutput(directory, stem);
+  const saved = await findOutput(directory, ytDlpStem);
   if (!saved) throw Object.assign(new Error("下载完成但找不到输出文件"), { status: 502 });
 
   const info = await probe(saved);

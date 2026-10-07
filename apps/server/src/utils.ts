@@ -9,6 +9,7 @@ import * as assetPreview from "@/utils/assetPreview";
 import * as ytDlp from "@/utils/ytDlp";
 import * as cardLibrary from "@/utils/cardLibrary";
 import * as analysisRecipe from "@/utils/analysisRecipe";
+import * as douyin from "@/utils/douyin";
 import * as pluginInstall from "@/utils/plugins/install";
 import conf, { removeLegacySettings } from "@/utils/conf";
 import * as ai from "@/utils/ai";
@@ -39,6 +40,7 @@ export default {
   ytDlp,
   cardLibrary,
   analysisRecipe,
+  douyin,
   pluginInstall,
   conf,
   removeLegacySettings,
