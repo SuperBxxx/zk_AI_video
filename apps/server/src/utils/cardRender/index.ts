@@ -10,7 +10,7 @@
 // 浏览器 profile 留在工作目录里不删：省去每次冷启动的十几秒。
 // 帧文件渲完就删（一张卡 60~150 帧 PNG，不删会一直涨）。
 
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { mkdirSync } from "node:fs";
 import { renderCard, renderCardOverVideo } from "@toonflow/card-renderer";
 import type { RenderCardOptions, RenderCardResult } from "@toonflow/card-renderer";
@@ -97,4 +97,37 @@ export async function renderCardToVideo(
   const result = await renderCardOverVideo({ ...common, targetVideoPath: request.targetVideoPath });
   onProgress?.({ stage: "done" });
   return result;
+}
+
+/**
+ * 给工具用的宿主服务（挂到 `ToolContext.cardRender`）。
+ *
+ * 与 `createWorkspaceFfmpeg` 同一形状：工具侧只传参数，路径在这里被解析进工作区、
+ * ffmpeg 路径在这里取，工具拿不到任意路径的写权限。
+ */
+export function createCardRenderService(
+  cwd: string,
+  signal?: AbortSignal,
+): {
+  render: (request: {
+    slug: string; width: number; height: number; fps?: number;
+    parameters?: Record<string, number>; output: string; targetVideo?: string;
+  }, onProgress?: (event: CardRenderProgress) => void) => Promise<Awaited<ReturnType<typeof renderCardToVideo>>>;
+} {
+  return {
+    render: async (request, onProgress) => {
+      signal?.throwIfAborted();
+      return await renderCardToVideo({
+        slug: request.slug,
+        width: request.width,
+        height: request.height,
+        ...(request.fps ? { fps: request.fps } : {}),
+        ...(request.parameters ? { parameters: request.parameters } : {}),
+        // 输出与叠加视频都限定在工作区内
+        outputPath: resolve(cwd, request.output),
+        ...(request.targetVideo ? { targetVideoPath: resolve(cwd, request.targetVideo) } : {}),
+        ...(signal ? { signal } : {}),
+      }, onProgress);
+    },
+  };
 }

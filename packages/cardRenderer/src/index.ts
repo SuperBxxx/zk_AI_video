@@ -161,17 +161,25 @@ export async function renderCardOverVideo(options: RenderAndCompositeOptions): P
   if (card.meta.shape === "transition") {
     throw new Error(`转场卡 ${options.slug} 不能直接叠到一段视频上：它作用在两个镜头之间，请由调用方决定如何插入。`);
   }
-  // 先把卡渲成独立文件，再合成 —— 这样卡视频本身也能被复用（例如多处叠同一张）
-  const cardOutput = join(options.workDirectory, options.slug, "card." + (card.meta.shape === "overlay" ? "mov" : "mp4"));
-  const result = await renderCard({ ...options, outputPath: cardOutput });
-  await compositeOverVideo({
-    ffmpegPath: options.ffmpegPath,
-    targetVideoPath: options.targetVideoPath,
-    overlayVideoPath: cardOutput,
-    outputPath: options.outputPath,
-    width: options.width,
-    height: options.height,
-    ...(options.signal ? { signal: options.signal } : {}),
-  });
-  return { ...result, outputPath: options.outputPath, compositedPath: options.outputPath };
+  // 先把卡渲成独立文件，再合成 —— 这样卡视频本身也能被复用（例如多处叠同一张）。
+  // ACT: 中间产物放 temporary 子目录并在收尾时删掉。踩过：直接落在工作目录里，
+  // 一次渲染就在工作区留下二十多 MB 的中间文件，用户看不到也不会去清。
+  const scratchDirectory = join(options.workDirectory, options.slug, "intermediate");
+  mkdirSync(scratchDirectory, { recursive: true });
+  const cardOutput = join(scratchDirectory, card.meta.shape === "overlay" ? "card.mov" : "card.mp4");
+  try {
+    const result = await renderCard({ ...options, outputPath: cardOutput });
+    await compositeOverVideo({
+      ffmpegPath: options.ffmpegPath,
+      targetVideoPath: options.targetVideoPath,
+      overlayVideoPath: cardOutput,
+      outputPath: options.outputPath,
+      width: options.width,
+      height: options.height,
+      ...(options.signal ? { signal: options.signal } : {}),
+    });
+    return { ...result, outputPath: options.outputPath, compositedPath: options.outputPath };
+  } finally {
+    rmSync(scratchDirectory, { recursive: true, force: true });
+  }
 }

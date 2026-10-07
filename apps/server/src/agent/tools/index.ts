@@ -1,6 +1,7 @@
 import { t } from "@/lib/i18n";
 import { listMediaModels, generateMedia } from "@/utils/media/generation";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
+import { createCardRenderService } from "@/utils/cardRender";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { access, constants, copyFile, lstat, mkdir, readFile, readdir, rm, rmdir, stat, withFileAccess } from "@toonflow/file";
 import {
@@ -108,6 +109,7 @@ export function createAgentToolContext(cwd: string, config: Record<string, unkno
       },
     },
     ffmpeg: signal => createWorkspaceFfmpeg(cwd, signal),
+    cardRender: signal => createCardRenderService(cwd, signal),
     media: {
       listModels: listMediaModels,
       generateImage: (request, signal) => generateMedia(cwd, "image", request, signal),

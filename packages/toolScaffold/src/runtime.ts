@@ -226,6 +226,17 @@ export interface ToolFiles {
 
 export interface ToolContext {
   ffmpeg(signal?: AbortSignal): Promise<FfmpegFactory>;
+  /**
+   * 卡渲染服务。
+   *
+   * 与 `ffmpeg` 同一个道理：**重活由宿主做，工具侧只传参数**。
+   * HTML 卡要起无头浏览器逐帧截图再编码，这事不适合放在自包含的工具产物里
+   * （要管子进程、临时目录、浏览器 profile）。所以由 server 侧实现并通过这里注入。
+   *
+   * 缺省表示当前环境没有卡渲染能力（例如只跑工具的裸环境），工具要给出明确提示，
+   * 不要假装渲染成功。
+   */
+  cardRender?(signal?: AbortSignal): CardRenderContext;
   media?: MediaContext;
   canvas?: CanvasContext;
   question?: QuestionContext;
@@ -244,6 +255,38 @@ export interface ToolContext {
   sdk: Pick<typeof import("@earendil-works/pi-coding-agent"),
     "defineTool" | "createReadToolDefinition" | "createWriteToolDefinition" |
     "createEditToolDefinition" | "createLsToolDefinition" | "detectSupportedImageMimeTypeFromFile">;
+}
+
+/**
+ * 卡渲染的宿主服务。
+ *
+ * 只给一个方法：把一张 HTML 卡渲成视频（有 `targetVideo` 时顺带叠到该视频上）。
+ * 路径都是**工作区内相对路径**，与其它工具一致 —— 宿主负责解析与边界校验。
+ */
+export interface CardRenderContext {
+  render(request: {
+    /** 卡的 slug。 */
+    slug: string;
+    /** 目标成片画幅（不是卡的默认画幅）。 */
+    width: number;
+    height: number;
+    fps?: number;
+    parameters?: Record<string, number>;
+    /** 输出文件（工作区内相对路径）。 */
+    output: string;
+    /** 有值就走「渲染并叠到这段视频上」（工作区内相对路径）。 */
+    targetVideo?: string;
+  }, onProgress?: (event: { stage: string; frame?: number; total?: number; message?: string }) => void): Promise<{
+    outputPath: string;
+    slug: string;
+    shape: string;
+    width: number;
+    height: number;
+    fps: number;
+    frames: number;
+    durationSeconds: number;
+    hasAlpha: boolean;
+  }>;
 }
 
 export interface ToolPlugin {

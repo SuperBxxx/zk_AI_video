@@ -181,6 +181,35 @@ async function run(context: ToolContext, steps: unknown[], operation: unknown, s
   return result;
 }
 
+// ACT: 与 cardQueryParameters 同样的理由 —— **手写 JSON Schema 字面量**，不调 z.toJSONSchema。
+// 工具产物会被构建压缩，zod 的内部标记在产物里被抹掉，z.toJSONSchema 会在工具加载时直接抛错、
+// 整个工具起不来。手写字面量不依赖 zod 内部结构。代价：与下面的 zod schema 要同步维护。
+const renderCardSchema = z.strictObject({
+  slug: z.string().trim().min(1).max(64).describe("要渲染的 HTML 卡 slug（先用 useCard 检出来）"),
+  width: z.number().int().positive().max(8192).describe("目标成片宽度（不是卡的默认画幅）"),
+  height: z.number().int().positive().max(8192).describe("目标成片高度"),
+  fps: z.number().int().positive().max(120).optional(),
+  parameters: z.record(z.string(), z.number()).optional().describe("覆盖卡的参数；越界会被拒"),
+  output: z.string().trim().min(1).max(4096).describe("输出文件（工作区内相对路径）"),
+  targetVideo: z.string().trim().min(1).max(4096).optional()
+    .describe("有值就顺带把卡叠到这段视频上（工作区内相对路径）；会校验画幅一致"),
+}).strict();
+
+const renderCardParameters = {
+  type: "object",
+  additionalProperties: false,
+  required: ["slug", "width", "height", "output"],
+  properties: {
+    slug: { type: "string", minLength: 1, maxLength: 64, description: "要渲染的 HTML 卡 slug（先用 useCard 检出来）" },
+    width: { type: "integer", minimum: 1, maximum: 8192, description: "目标成片宽度（不是卡的默认画幅）" },
+    height: { type: "integer", minimum: 1, maximum: 8192, description: "目标成片高度" },
+    fps: { type: "integer", minimum: 1, maximum: 120 },
+    parameters: { type: "object", additionalProperties: { type: "number" }, description: "覆盖卡的参数；越界会被拒" },
+    output: { type: "string", minLength: 1, maxLength: 4096, description: "输出文件（工作区内相对路径）" },
+    targetVideo: { type: "string", minLength: 1, maxLength: 4096, description: "有值就顺带把卡叠到这段视频上（工作区内相对路径）；会校验画幅一致" },
+  },
+};
+
 const plugin: ToolPlugin = {
   validateConfig: config => configSchema.parse(config),
   createTools(context) {
@@ -693,6 +722,52 @@ const plugin: ToolPlugin = {
             content: [{ type: "text", text: `${candidates.length} 张候选（按分排序；HTML 画面卡 ${htmlCount} 张）：\n${candidates.map(c => `  ${c.slug} [${c.kind}${c.shape ? "·" + c.shape : ""}] ${c.score} ${c.title} — ${c.reasons.join("；")}`).join("\n")}\n\n**kind 决定怎么用**：ffmpeg 卡取出来是滤镜链，接在 ffmpeg 的 -vf/filter_complex 里；html 卡是浏览器渲染的整段画面（fullscreen）或透明叠加层（overlay），**不能当滤镜用**。选定后用 slug 取卡的完整内容。` }],
             details: { candidates },
           };
+        },
+      },
+
+      // ── 渲染 HTML 卡 ────────────────────────────────────────────────
+      {
+        name: "renderCard",
+        label: "渲染画面卡",
+        description: "把一张 HTML 画面卡渲成视频。给 frameSize（目标成片画幅）、参数与输出路径；叠加卡可同时给 targetVideo，工具会渲出带透明通道的视频并直接叠到该视频上。",
+        promptSnippet: "useCard 查到 html 卡之后，用 renderCard 把它渲出来；不要试图把 html 卡接进 filter_complex。",
+        promptGuidelines: [
+          "**frameSize 必须是成片画幅**，不是卡的默认画幅。卡是分辨率无关的，按目标画幅等比渲染；给错画幅会得到错尺寸的画面。",
+          "全屏卡（fullscreen）渲出的是替代这一段的整段画面；叠加卡（overlay）渲出的是带 alpha 的透明层。转场卡不能直接叠到一段视频上，要由调用方决定插在哪两镜之间。",
+          "给 targetVideo 时工具会顺带合成，并且**校验画幅一致** —— 不一致会明确报错，不要靠缩放绕过去（二次缩放会让字幕与描边抖动）。",
+          "卡自带文案，只能调数值参数；用户要改字时要如实说明。",
+        ] as const,
+        parameters: renderCardParameters,
+        executionMode: "sequential",
+        async execute(_id, params, signal) {
+          signal?.throwIfAborted();
+          const request = renderCardSchema.parse(params);
+          if (!context.cardRender) {
+            return {
+              content: [{ type: "text", text: "当前环境没有卡渲染能力（宿主没有注入 cardRender 服务）。请如实告诉用户这张卡无法在这里渲染，不要假装已经渲好。" }],
+              details: { available: false },
+            };
+          }
+          const entry = cardCatalog.find(item => item.slug === request.slug);
+          if (!entry || entry.kind !== "html") {
+            const htmlOnly = cardCatalog.filter(item => item.kind === "html").map(item => item.slug);
+            return {
+              content: [{ type: "text", text: `renderCard 只能渲染 HTML 画面卡；${request.slug} ${entry ? "是 FFmpeg 滤镜卡，请用 useCard 取滤镜链" : "不在卡库里"}。\n可渲染的卡：${htmlOnly.join("、")}` }],
+              details: { available: htmlOnly },
+            };
+          }
+          try {
+            const result = await context.cardRender(signal).render(request, () => {});
+            return {
+              content: [{ type: "text", text: `已渲染 ${result.slug}：${result.outputPath}\n${result.width}×${result.height} · ${result.frames} 帧 · ${result.durationSeconds}s @ ${result.fps}fps · ${result.shape}${result.hasAlpha ? " · 带透明通道" : ""}${request.targetVideo ? " · 已叠到目标视频" : ""}` }],
+              details: result,
+            };
+          } catch (error) {
+            return {
+              content: [{ type: "text", text: `渲染失败：${error instanceof Error ? error.message : "未知错误"}\n不要假装渲染成功 —— 如实告诉用户失败原因。` }],
+              details: { slug: request.slug },
+            };
+          }
         },
       },
     ];

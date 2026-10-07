@@ -2,7 +2,7 @@
 name: workflow
 description: 在住凯AI视频当前画布中把创意、小说或定稿剧本制作成可查看的文本、图片资产和视频片段，支持复用素材、续作与局部修改。用于实际制作或继续已有项目；明确只要对话文字时不操作画布，讨论或编辑技能本身时不启动制作。
 metadata:
-  version: "3.6.0"
+  version: "3.7.0"
   displayName: 视频制作工作流
   author: 住凯AI视频
   github: https://github.com/HBAI-Ltd/Toonflow-app
@@ -1412,6 +1412,7 @@ A12 只允许：
 | 交付可编辑的切段表与 SRT 字幕 | `postProduction.exportDelivery` | 产出 CSV（剪段表）+ EDL（仅单源）+ SRT；导出前会对账重叠/缝隙 |
 | 交付剪映工程（用户点名要剪映时） | `postProduction.exportDelivery` 传 `jianying` | 产出 draft_content.json + draft_meta_info.json；底片必须是无字幕无音效的干净成片 |
 | 查有没有现成的画面效果卡 | `postProduction.useCard` | 按素材类型与语义检索；库里有两类卡，见下节 |
+| 把 HTML 画面卡渲成视频 | `postProduction.renderCard` | 给成片画幅与输出路径；可顺带叠到目标视频上。**慢操作（6~15 秒）** |
 | 上游效果能不能直接用 | 先查卡库，没有就用滤镜自己写 | 上游的卡是 Remotion/React 逐帧组件，FFmpeg 表达不了。**但我们已按规格移植了 24 张**（见下节）；其余没有匹配卡时才自己写滤镜链 |
 | 取帧做人工复核 | `ffmpeg` 工具 | 用 `-ss` 抽指定时刻的帧 |
 | 读工作区文件、查素材库 | `workspace`、`assetLibrary` | — |
@@ -1452,10 +1453,22 @@ A12 只允许：
 4. **`html` 卡的文案不可改**。文案写在卡内，只能调工具返回的那些数值参数。
    用户要改字时，如实说明这一点，不要假装能改。
 
-**取到 `html` 卡之后**：它是「一段按帧渲染的视频」，不是滤镜。真正要落到成片里，
-需要按上面的画幅渲染成带 alpha 的视频（`overlay`）或不带 alpha 的视频（`fullscreen`），
-再用 ffmpeg 合成。**目前这条渲染链路还没有做成工具 op** —— 如果用到了 `html` 卡，
-要如实告诉用户「这张卡需要走 HTML 卡渲染流程」，不要声称已经接进成片。
+**取到 `html` 卡之后**：用 `postProduction.renderCard` 把它渲出来。
+**不要**试图把 html 卡接进 `filter_complex` —— 它不是滤镜。
+
+```
+renderCard({ slug, width, height, output, targetVideo?, parameters? })
+```
+
+- `width` / `height` 是**成片画幅**，不是卡的默认画幅
+- `output` 是工作区内相对路径；给 `targetVideo` 时顺带把卡叠到该视频上
+  （并**校验画幅一致**，不一致会明确报错，不要靠缩放绕过去）
+- `fullscreen` 渲出替代这一段的整段画面；`overlay` 渲出带 alpha 的透明层
+- **`transition` 卡不能直接叠到一段视频上** —— 它作用在两个镜头之间，
+  要由你决定插在哪两镜之间
+- 渲染要驱动无头浏览器逐帧截图，**一张卡 60~150 帧、约 6~15 秒**，属于慢操作：
+  先告诉用户再跑，不要让它看起来像卡住了
+- 卡自带文案，只能调数值参数；用户要改字时如实说明
 
 这些方法的结论只进入**Seedance 之前**的剧本/资产设计成果；进入 Seedance 提示词硬隔离后，任何方法结论都不能直接写入或改写最终 prompt，必须由 PART A 从已确认输入重新处理。方法示例、类型节奏和风格候选不能自动变成本项目事实。
 

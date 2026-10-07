@@ -9,7 +9,8 @@
 // prores_ks / qtrle / png 三种，选 ProRes 4444（剪辑软件与 Final Cut 的标准带透明格式）。
 
 import { spawn } from "node:child_process";
-import { join } from "node:path";
+import { mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { CardShape } from "@toonflow/post-production";
 
 /** 编码入参。 */
@@ -53,6 +54,11 @@ export async function encodeFrames(options: EncodeOptions): Promise<void> {
   const { ffmpegPath, frameDirectory, extension, fps, outputPath, shape, signal } = options;
   const input = join(frameDirectory, `f%05d.${extension}`);
   const base = ["-y", "-hide_banner", "-loglevel", "error", "-framerate", String(fps), "-i", input];
+
+  // ACT: 输出路径可能是嵌套的（例如 `cards/keyword.mov`），父目录不存在时 ffmpeg 会以
+  // 「No such file or directory」失败（退出码 254）。这里自己建，不让调用方去记得这件事 ——
+  // 踩过：server 服务传了带子目录的输出路径，渲染走到编码这步才炸。
+  mkdirSync(dirname(outputPath), { recursive: true });
 
   // 只有叠加卡需要 alpha；全屏卡与转场卡都是不透明的（转场卡要遮住接缝）
   const wantsAlpha = shape === "overlay";

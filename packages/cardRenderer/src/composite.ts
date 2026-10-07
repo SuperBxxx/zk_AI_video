@@ -5,6 +5,8 @@
 // 而那种抖动在预览里看不出来，只在成片里能看出来。
 
 import { spawn } from "node:child_process";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 
 /** 合成入参。 */
 export interface CompositeOptions {
@@ -76,6 +78,8 @@ export async function compositeOverVideo(
     );
   }
 
+  // 输出路径可能是嵌套的，父目录要先建（与 encode 同一个理由）
+  mkdirSync(dirname(options.outputPath), { recursive: true });
   await runFfmpeg(options.ffmpegPath, [
     "-y", "-hide_banner", "-loglevel", "error",
     "-i", options.targetVideoPath,
