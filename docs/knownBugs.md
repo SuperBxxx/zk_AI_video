@@ -11,7 +11,7 @@
 | BUG-1 | ② 节点写不进文本 | ✅ **已修**（文本载入兜底 + 路径缺失时落盘） |
 | BUG-2 | 素材库「添加到素材库」无反应 | 🟡 **已修「禁用无提示」**（用户看到的现象）；若仍无反应，按「新发现」一节继续查 |
 | BUG-3 | 营销模式创建项目连续 409 | ✅ **已修**（根因已复现并验证） |
-| BUG-4 | 画布工具成功也回错误文案 | ❌ 未修，需要一次现场证据 |
+| BUG-4 | 画布工具成功也回错误文案 | 🟡 **已修结构性根因**（操作已生效后的落盘失败不再让整次调用变成错误） |
 | BUG-5 | `/api/desktop/update` 500 | ✅ **已修**（根因：去 Toonflow 化留下的 identifier 不一致） |
 | BUG-6 | `<label for>` 可访问性提示 | ✅ **已修**（el-input-number 的 id 落在根 div 上，for 永远匹配不到） |
 
@@ -254,21 +254,65 @@ assetLibrary.vue:258  loadEntries() → /api/assets/list（失败会弹 ElMessag
 
 ---
 
-## BUG-4 画布工具把成功操作也回错误文案 ★ 未查清（用户补充）
+## BUG-4 画布工具把成功操作也回错误文案 🟡 已修结构性根因
 
 用户观察到：**画布工具经常对已经成功的操作，也回一句同样的错误提示**，所以它的提示不可信。
+这一条影响很大 —— 它让其它 bug 的排查都会被误导。
 
-这一条影响很大 —— 它让 BUG-1/2/3 的排查都会被误导。**优先级应该排在最前**，因为它污染了所有其它判断。
+### 根因（已定位到具体代码，是结构性的）
 
-### 下次该查
+`apps/web/src/pages/workspace/panels/canvas/useCanvasTools.ts` 的 `call()` 里，
+**操作执行完之后还有几步会抛错，而抛错会让整次调用变成「工具失败」**：
 
-- 画布工具（`packages/tools/canvas`）各 op 的返回值构造：是否存在「先按成功分支做完、但返回时走了错误文案模板」的路径
-- 重点看 `nodeTools` / `addNode` / `connectNodes` 这类会**批量执行、部分失败**的 op：
-  批量里只要有一个失败就整体回错误文案，而用户看到的是「操作其实成功了」
+```ts
+let result = await execute(request, callSignal, id);   // ① 操作已完成（节点改了、文字写了）
+callSignal.throwIfAborted();
+if (...) await options.flushSave();   // ② 落盘；saveCanvasState（index.vue:594）会 throw saveError
+callSignal.throwIfAborted();          // ③ 或这里（信号中止）
+canvasSignal.throwIfAborted();
+return result;
+```
+
+- ② 的 `flushSave` 最终走到 `apps/web/.../canvas/index.vue:569 flushCanvasSave` →
+  `saveCanvasState` → **`if (saveError) throw saveError`**（L594）→ 一路冒泡成工具错误。
+- ③ 的两处 `throwIfAborted` 同理：操作已完成，但信号恰好中止 → 工具报错。
+
+**为什么这条特别有害**：Agent 看到工具报错会**重试**，而操作已经生效 ——
+重试会重复建节点、重复连线、重复选卡。这类「假失败」最容易被重试放大成脏数据。
+
+### 修法（已实现并验证）
+
+`useCanvasTools.ts`：把 ② 的落盘失败**降级为结果里的警告**，而不是让整次调用失败：
+
+```ts
+let saveWarning: string | undefined;
+if (!isCanvasRead(request.name) && request.name !== "selectNodes") {
+  try { await options.flushSave(); }
+  catch (error) { saveWarning = error instanceof Error ? error.message : String(error); }
+}
+...
+if (!saveWarning) return result;
+return { result: result ?? null, completed: true, saveWarning,
+         note: "操作已经生效，不要重做；保存到磁盘失败，请提示用户后重试保存。" };
+```
+
+`CanvasContext.call` 的返回类型是 `Promise<unknown>`，所以这个形状不需要改契约。
+
+### 验证
+
+- web typecheck：仅 7 个**既有** TS7006，`useCanvasTools.ts` 不在其中（无新增）
+- 构建 web 通过，产物 `workspace-*.js` 含新文案「操作已经生效，不要重做」
+- preflight 全部通过
+
+### 仍需用户确认的一点
+
+这只是**结构性**根因（操作生效后的失败被当成操作失败）。如果用户见到的错误文案
+**不是**关于「保存 / 信号中止」而是别的具体话术，那还有第二个来源 ——
+请给出工具回的原话，可据此继续定位。
 
 ---
 
-## BUG-5 `/api/desktop/update` 在浏览器模式下返回 500 ★ 根因已确定（与素材库无关）
+## BUG-5 `/api/desktop/update` 返回 500 ✅ 已修
 
 ### 现象
 

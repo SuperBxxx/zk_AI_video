@@ -93,10 +93,28 @@ export function useCanvasTools(options: {
                 canvasSignal = binding.signal;
                 result = await execute({ name: "getCanvas", args: {} }, callSignal, id);
               }
-              if (!isCanvasRead(request.name) && request.name !== "selectNodes") await options.flushSave();
+              // ACT: 落盘失败**不能**让整次调用变成错误。
+              // 走到这里 execute 已经成功，节点/连线/文字都改完了；
+              // 若把 flushSave 的异常抛出去，工具会回「操作失败」，Agent 于是重试 ——
+              // 而操作已经生效，重试会重复建节点、重复连线（踩过：这类假失败最容易被重试放大）。
+              // 因此如实回报「已完成 + 保存失败」，让 Agent 知道不要重做、只提示用户。
+              let saveWarning: string | undefined;
+              if (!isCanvasRead(request.name) && request.name !== "selectNodes") {
+                try {
+                  await options.flushSave();
+                } catch (error) {
+                  saveWarning = error instanceof Error ? error.message : String(error);
+                }
+              }
               callSignal.throwIfAborted();
               canvasSignal.throwIfAborted();
-              return result;
+              if (!saveWarning) return result;
+              return {
+                result: result ?? null,
+                completed: true,
+                saveWarning,
+                note: "操作已经生效，不要重做；保存到磁盘失败，请提示用户后重试保存。",
+              };
             }),
             new Promise<never>((_resolve, reject) => {
               cancel = () => reject(callSignal.reason);
