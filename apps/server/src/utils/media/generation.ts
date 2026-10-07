@@ -28,14 +28,33 @@ function imageOptions(value: unknown, pattern: RegExp) {
   return Array.isArray(value) ? [...new Set(value.filter((item): item is string => typeof item === "string" && item.length <= 64 && item === item.trim() && pattern.test(item)))] : undefined;
 }
 
+/**
+ * 价格：可选字段，来自供应商适配文件（用户可安装 → 当不可信输入校验）。
+ * ACT: 仓库里没有价格数据、也不替平台编价格 —— 有就如实展示给用户做选择依据，没有就不带这个字段。
+ */
+function priceOption(value: unknown): { amount: number; per: "second" | "video" | "count"; currency?: string; note?: string } | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const candidate = value as { amount?: unknown; per?: unknown; currency?: unknown; note?: unknown };
+  if (typeof candidate.amount !== "number" || !Number.isFinite(candidate.amount) || candidate.amount < 0) return undefined;
+  if (candidate.per !== "second" && candidate.per !== "video" && candidate.per !== "count") return undefined;
+  return {
+    amount: candidate.amount,
+    per: candidate.per,
+    ...(typeof candidate.currency === "string" && candidate.currency.length <= 8 ? { currency: candidate.currency } : {}),
+    ...(typeof candidate.note === "string" && candidate.note.length <= 200 ? { note: candidate.note } : {}),
+  };
+}
+
 export async function listMediaModels(): Promise<MediaModel[]> {
   const installedProviders = await listMediaProviders();
   return installedProviders.flatMap(provider => provider.models.flatMap(model => {
     if (model.type !== "image" && model.type !== "video" && model.type !== "audio") return [];
     const builtIn = (mediaProviders as readonly Provider[]).find(item => item.id === provider.id)?.models.find(item => item.id === model.id);
+    const price = priceOption(model.price);
     return [{
       providerId: provider.id, providerLabel: provider.label, modelId: model.id, label: model.label, type: model.type,
       mode: model.mode, durationResolutionMap: model.durationResolutionMap, audio: model.audio,
+      ...(price ? { price } : {}),
       ...(model.type === "audio" ? { voices: model.voices } : {}),
       ...(model.type === "image" ? {
         imageSizes: imageOptions(Array.isArray(model.imageSizes) ? model.imageSizes : builtIn?.imageSizes, /^[^\u0000-\u001f\u007f]+$/),

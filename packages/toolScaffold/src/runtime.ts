@@ -111,6 +111,11 @@ export interface MediaModel {
   durationResolutionMap?: { duration: number[]; resolution: string[] }[];
   audio?: boolean | "optional";
   voices?: { title: string; voice: string }[];
+  /**
+   * 价格（可选）。来自供应商适配文件；**仓库里没有内置价格数据**，
+   * 没有这个字段就是「未提供」—— 不要替平台推算或编造。
+   */
+  price?: { amount: number; per: "second" | "video" | "count"; currency?: string; note?: string };
 }
 
 export interface MediaReference {

@@ -23,6 +23,14 @@ interface ProviderModel {
   imageRatios?: string[];
   durationResolutionMap?: { duration: number[]; resolution: string[] }[];
   voices?: { title: string; voice: string }[];
+  /**
+   * 价格（**可选，由供应商适配文件或用户自己填**）。
+   *
+   * ACT: 仓库里没有任何价格数据，也不能替平台编价格 —— 所以做成本字段：
+   * 填了就如实展示给用户做选择依据，没填就显示「未提供」，不猜。
+   * 单位用 `currency` 声明，避免不同平台币种混淆（如 "CNY" / "USD"）。
+   */
+  price?: { amount: number; per: "second" | "video" | "count"; currency?: string; note?: string };
 }
 
 interface ProviderFormRule {

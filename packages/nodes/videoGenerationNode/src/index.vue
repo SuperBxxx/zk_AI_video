@@ -176,6 +176,50 @@ function getResolutions(choice: NodeMediaModel, duration?: number) {
   return [...new Set((choice.durationResolutionMap ?? []).filter((item) => item.duration.includes(duration!)).flatMap((item) => item.resolution))]
     .sort((left, right) => (Number.parseFloat(left) || Infinity) - (Number.parseFloat(right) || Infinity));
 }
+
+/** 价格展示文案。**没有价格就如实说未提供** —— 仓库里没有价格数据，也不替平台推算。 */
+function priceText(choice: NodeMediaModel) {
+  const price = choice.price;
+  if (!price) return "未提供";
+  const unit = price.per === "second" ? "秒" : price.per === "video" ? "条" : "次";
+  return `${price.amount} ${price.currency ?? ""}/${unit}`.replace(/\s+/g, " ").trim() + (price.note ? `（${price.note}）` : "");
+}
+
+/**
+ * 给用户做选择用的模型对比表。
+ *
+ * ACT: 用户的诉求是「生成视频前列出可用模型、画幅与预计价钱，帮我选」。
+ * · 模型与能力（时长/分辨率/音频）来自供应商适配文件，可靠；
+ * · **价格是可选字段**：仓库里没有任何价格数据，也绝不替平台编价格 ——
+ *   有就展示，没有就写「未提供」，并提示用户可以在供应商适配文件里自己填 `price`。
+ * · 画幅：模型声明里没有"支持哪些比例"的信息，节点用的是通用列表，所以这里如实标注
+ *   「通用候选，模型是否全部支持未在适配文件里声明」，不假装精确。
+ */
+function listModelChoices() {
+  return {
+    current: { providerId: selectedModel.value?.providerId ?? "", modelId: selectedModel.value?.modelId ?? "" },
+    ratioCandidates: ratioOptions,
+    ratioNote: "这些是通用候选；模型声明里没有「支持哪些比例」的字段，所以哪个模型支持哪几个比例未经验证 —— 拿不准时问用户想要什么画幅，生成后核对成片。",
+    priceNote: "价格来自供应商适配文件的可选字段；没有就是「未提供」。仓库里没有内置价格，也不替平台推算。用户可以在自己的供应商适配文件里给模型加 price 字段。",
+    models: models.value.map((choice) => {
+      const durations = getDurations(choice);
+      return {
+        providerId: choice.providerId,
+        providerLabel: choice.providerLabel,
+        modelId: choice.modelId,
+        label: choice.label,
+        durations,
+        // 每个时长对应的分辨率档位
+        resolutionsByDuration: Object.fromEntries(durations.map((duration) => [duration, getResolutions(choice, duration)])),
+        audio: choice.audio === true ? "必带" : choice.audio === "optional" ? "可选" : "无",
+        modes: choice.mode ?? [],
+        price: priceText(choice),
+        ...(choice.price ? { priceRaw: choice.price } : {}),
+        isCurrent: choice.providerId === selectedModel.value?.providerId && choice.modelId === selectedModel.value?.modelId,
+      };
+    }),
+  };
+}
 // ACT: 引用改变时只替换不适用的模式；普通媒体优先作为参考，避免自动变成首尾帧。
 watch([selectedModel, matchingModes, () => data.value.mode], ([choice, matches]) => {
   if (!choice || matches.some((item) => JSON.stringify(item) === data.value.mode)) return;
@@ -369,6 +413,18 @@ function getConfig() {
     matchingModes: matchingModes.value,
   };
 }
+
+nodeTools.register({
+  name: "listModelChoices",
+  description: "列出可用的视频模型及其能力（时长、每个时长可选的分辨率、是否带音频、支持的模式）与价格，供**给用户做选择**。价格是供应商适配文件里的可选字段，没有就是「未提供」，不要替平台推算。先用它把选项摆给用户，问清想要的模型与画幅，再改配置或生成",
+  parameters: z.strictObject({}),
+  async execute(_args, { signal }) {
+    signal?.throwIfAborted();
+    await loadModels();
+    signal?.throwIfAborted();
+    return listModelChoices();
+  },
+});
 
 nodeTools.register({
   name: "getConfig",
