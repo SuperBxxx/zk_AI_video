@@ -88,13 +88,14 @@ import promptInput from "@toonflow/nodes-scaffold/promptInput";
 import videoPlayer from "@toonflow/nodes-scaffold/videoPlayer";
 import referenceItem from "@toonflow/nodes-scaffold/referenceItem";
 import mediaHistory from "@toonflow/nodes-scaffold/mediaHistory";
+import { describeMoments, resolveMomentTiming, type NodeSemanticValue } from "@toonflow/post-production";
 import generationSettings from "./components/generationSettings.vue";
 
 defineOptions({
   inheritAttrs: false,
   icon: IconCameraAi,
   handles: [
-    { id: "in", type: "target", dataType: ["IMAGE", "VIDEO", "AUDIO", "STRING"], label: "图片、视频、音频、文本输入" },
+    { id: "in", type: "target", dataType: ["IMAGE", "VIDEO", "AUDIO", "STRING", "SEMANTIC"], label: "图片、视频、音频、文本、叙事锚点输入" },
     { id: "video", type: "source", dataType: "VIDEO", label: "视频输出" },
   ] satisfies NodeHandle[],
 });
@@ -112,6 +113,19 @@ data.value.mode ??= "";
 data.value.generateAudio ??= true;
 data.value.ratio ??= "9:16";
 const { refList, referenceMentions, setReferencePreview, removeReference } = useNodeReferences();
+
+/**
+ * 接住的叙事锚点（`SEMANTIC` 输入）。
+ *
+ * ACT: 单独接而不是走 `useNodeReferences` —— 那套的白名单是素材类型
+ * （IMAGE/VIDEO/AUDIO/STRING），锚点进去会被当成"参考 1/2/3"占用编号，
+ * 而锚点不是素材、不该出现在 `{{ref N}}` 里。所以这里自己订阅输入事件。
+ */
+const semanticValue = ref<NodeSemanticValue>();
+nodeEvent.on("input:in", (values) => {
+  const semantic = values.find(item => item.dataType === "SEMANTIC" && item.value);
+  semanticValue.value = semantic?.dataType === "SEMANTIC" ? semantic.value : undefined;
+});
 const models = ref<NodeMediaModel[]>([]);
 const modelsLoading = ref(false);
 const uploading = ref(false);
@@ -413,6 +427,55 @@ function getConfig() {
     matchingModes: matchingModes.value,
   };
 }
+
+nodeTools.register({
+  name: "getAnchorTiming",
+  description: "读取接进来的叙事锚点，以及它们在**当前脚本**下解析出的时间。用它决定这一镜多长，而不是自己估。锚点还没为新脚本解析时，这里会如实说「未知」，不要拿参考片的秒数顶上",
+  parameters: z.strictObject({}),
+  async execute(_args, { signal }) {
+    signal?.throwIfAborted();
+    const value = semanticValue.value;
+    if (!value?.moments.length) {
+      return { text: "这个节点没有接进叙事锚点。可以用参考分析节点的 setReferenceMoments 写锚点、再连过来。" };
+    }
+    const choice = selectedModel.value;
+    const durations = choice ? getDurations(choice) : [];
+    const moments = value.moments.map(moment => {
+      const timing = resolveMomentTiming(value, moment.anchor);
+      const length = timing ? Number((timing.endSeconds - timing.startSeconds).toFixed(3)) : null;
+      // 建议时长：把解析出的长度**吸附到当前模型支持的档位**上，不足最小档就取最小档。
+      const suggested = length === null || !durations.length
+        ? null
+        : durations.find(duration => duration >= length && length > 0)
+          ?? durations[durations.length - 1]!;
+      return {
+        anchor: moment.anchor,
+        label: moment.label,
+        role: moment.role ?? null,
+        /** 已解析出的时间窗；null 表示"还没为新脚本解析"。 */
+        window: timing ? { startSeconds: timing.startSeconds, endSeconds: timing.endSeconds, scriptId: timing.scriptId } : null,
+        lengthSeconds: length,
+        /** 建议的镜头时长档位（当前模型支持的档位里最接近又够长的那个）。 */
+        suggestedDuration: suggested,
+        utterances: moment.utterances.map(utterance => utterance.text),
+      };
+    });
+    const unknown = moments.filter(moment => !moment.window).map(moment => moment.label);
+    return {
+      text: [
+        `脚本 ${value.scriptId} 下的叙事锚点：`,
+        describeMoments(value),
+        unknown.length
+          ? `**这些还没解出时间**：${unknown.join("、")} —— 要么先让参考分析节点用新脚本的词解析（resolveMomentsFromScript），要么把对应的话写进脚本。**不要给它们编时间。**`
+          : "",
+        choice
+          ? `当前模型支持的时长档位：${durations.join("、")} 秒；上表的 suggestedDuration 是按锚点长度吸附过来的建议值。`
+          : "还没选模型，拿不到时长档位；先选模型再回来看建议时长。",
+      ].filter(Boolean).join("\n"),
+      moments,
+    };
+  },
+});
 
 nodeTools.register({
   name: "listModelChoices",

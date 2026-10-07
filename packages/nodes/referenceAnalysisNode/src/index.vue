@@ -20,6 +20,14 @@ import { IconMicroscope } from "@tabler/icons-vue";
 import { ElText } from "element-plus";
 import { nodeSkeleton, nodeTools, useNode, z, type NodeHandle } from "@toonflow/nodes-scaffold/runtime";
 import { generateEvidence, probeMedia, type EvidenceFfmpeg, type EvidenceFiles, type EvidenceResult } from "@toonflow/tool-media-analysis/evidence";
+import {
+  checkSemanticMoment,
+  describeMoments,
+  resolveMomentFromScript,
+  storyAnchorKeys,
+  type NodeSemanticMoment,
+  type NodeSemanticValue,
+} from "@toonflow/post-production";
 
 /**
  * 参考分析节点：把一条参考视频摊成**证据**。
@@ -32,7 +40,10 @@ import { generateEvidence, probeMedia, type EvidenceFfmpeg, type EvidenceFiles, 
 defineOptions({
   inheritAttrs: false,
   icon: IconMicroscope,
-  handles: [{ id: "grid", type: "source", dataType: "IMAGE", label: "证据网格" }] satisfies NodeHandle[],
+  handles: [
+    { id: "grid", type: "source", dataType: "IMAGE", label: "证据网格" },
+    { id: "moments", type: "source", dataType: "SEMANTIC", label: "叙事锚点" },
+  ] satisfies NodeHandle[],
 });
 
 const { node, nodeProps, outputs, files, ffmpeg } = useNode({ label: "参考分析" });
@@ -96,6 +107,86 @@ nodeTools.register({
     } finally {
       running.value = false;
     }
+  },
+});
+
+nodeTools.register({
+  name: "setReferenceMoments",
+  description: "把分析出的叙事锚点写进这个节点的输出口，供下游按锚点排时间。每个锚点要给出：它在回应什么（anchor，用词表里的 key）、人看的名字、以及**它由哪些词构成**（utterances，这是以后为新脚本解析时间的唯一依据）。参考片的秒数只填 atSeconds 作为观察记录，不要拿它当新片的时间",
+  parameters: z.strictObject({
+    moments: z.array(z.strictObject({
+      anchor: z.string().min(1).max(64).describe(`锚点标识，可选值：${storyAnchorKeys.join("、")}`),
+      label: z.string().min(1).max(120).describe("人看的名字，例如「价格锚点」"),
+      utterances: z.array(z.strictObject({
+        text: z.string().min(1).max(2000).describe("这句话的原话（它构成这个锚点的时间依据）"),
+        durationSeconds: z.number().positive().max(600).describe("这句话说出来占多久"),
+      })).min(1).max(24),
+      role: z.string().max(2000).optional().describe("它替观众做什么 —— 这是复刻要保留的东西"),
+      atSeconds: z.number().min(0).optional().describe("参考片里的时点，仅作观察记录"),
+    })).min(1).max(40),
+  }),
+  async execute({ moments }, { signal }) {
+    signal?.throwIfAborted();
+    const scriptId = (node.data as { referenceScriptId?: string }).referenceScriptId ?? "reference";
+    const built: NodeSemanticMoment[] = moments.map(item => ({
+      anchor: item.anchor,
+      label: item.label,
+      utterances: item.utterances.map(utterance => ({ text: utterance.text, durationSeconds: utterance.durationSeconds })),
+      ...(item.role ? { role: item.role } : {}),
+    }));
+    // ACT: 逐个校验锚点 —— 写错的锚点会让下游按锚点找不到它，而且**没有任何报错**。
+    // 这里直接拒绝并列出合法值，比让它静默流到下游强。
+    const problems = built.flatMap(moment => checkSemanticMoment(moment).map(problem => `${moment.label || moment.anchor}：${problem}`));
+    if (problems.length) throw new Error(`锚点有问题：\n${problems.join("\n")}\n合法锚点：${storyAnchorKeys.join("、")}`);
+
+    const value: NodeSemanticValue = { scriptId, moments: built };
+    outputs.value.moments = { dataType: "SEMANTIC", value };
+    // 参考片的观察时点单独列出来 —— 提醒 Agent 这些**不是**新片的时间。
+    const observed = moments.filter(moment => moment.atSeconds !== undefined);
+    return {
+      text: [
+        `已写入 ${built.length} 个叙事锚点（脚本 ${scriptId}）：`,
+        describeMoments(value),
+        "时间还没解析：下游要用**新脚本自己的词**去解（resolveMomentsFromScript），不要拿参考片的秒数。",
+        observed.length
+          ? `参考片观察时点（仅供理解参考片）：${observed.map(moment => `${moment.label} ${moment.atSeconds}s`).join("、")}`
+          : "",
+      ].filter(Boolean).join("\n"),
+      moments: built,
+    };
+  },
+});
+
+nodeTools.register({
+  name: "resolveMomentsFromScript",
+  description: "用**新脚本自己的逐词时间**给已写入的锚点解出时间。传入一个脚本标识与它的词级时间，工具会把每个锚点的原话在词序列里找到并算成秒数。匹配不到的锚点会如实报出来（不猜）",
+  parameters: z.strictObject({
+    scriptId: z.string().min(1).max(64).describe("这个脚本的标识（同一份分析可以配多个脚本）"),
+    words: z.array(z.strictObject({
+      text: z.string().min(1).max(200),
+      beginMs: z.number().min(0),
+      endMs: z.number().min(0),
+    })).min(1).max(20000).describe("新脚本的逐词时间戳"),
+  }),
+  async execute({ scriptId, words }, { signal }) {
+    signal?.throwIfAborted();
+    const current = outputs.value.moments?.dataType === "SEMANTIC" ? outputs.value.moments.value : undefined;
+    if (!current) throw new Error("这个节点还没有锚点；先用 setReferenceMoments 写入");
+
+    const resolved = current.moments.map(moment => resolveMomentFromScript(moment, scriptId, words));
+    const value: NodeSemanticValue = { scriptId, moments: resolved };
+    outputs.value.moments = { dataType: "SEMANTIC", value };
+
+    const failed = resolved.filter(moment => !moment.resolved?.[scriptId]).map(moment => moment.label || moment.anchor);
+    return {
+      text: [
+        describeMoments(value),
+        failed.length
+          ? `**这些锚点在新脚本里没匹配到**，时间仍是未知：${failed.join("、")}。\n不要给它们编一个时间 —— 要么让用户确认原句，要么先把脚本改成含这句话的版本。`
+          : "全部锚点都解出了时间。",
+      ].join("\n"),
+      resolved: resolved.map(moment => ({ anchor: moment.anchor, window: moment.resolved?.[scriptId] ?? null })),
+    };
   },
 });
 
