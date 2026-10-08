@@ -87,6 +87,21 @@ export default {
         { title: "Chelsie（千雪·女声）", voice: "Chelsie" },
       ],
     },
+    {
+      // ACT: 声音复刻用的模型 —— 面板里**必须能选到它**，否则复刻完没有模型能用那个音色。
+      // 它既是 `qwen-voice-enrollment` 登记时的目标模型，也是复刻音色**唯一**被授权的合成模型
+      // （用 qwen3-tts-flash 合成复刻音色会报 Invalid voice specified，实测见 createVoice 的注释）。
+      // 内置音色（Cherry 等）仍走上面的 qwen3-tts-flash。
+      id: "qwen3-tts-vc-2026-01-22",
+      label: "Qwen3-TTS-VC（声音复刻）",
+      type: "audio",
+      voices: [
+        { title: "Cherry（芊悦·女声）", voice: "Cherry" },
+        { title: "Serena（苏瑶·女声）", voice: "Serena" },
+        { title: "Ethan（晨煦·男声）", voice: "Ethan" },
+        { title: "Chelsie（千雪·女声）", voice: "Chelsie" },
+      ],
+    },
   ] satisfies ProviderModel[],
   async generateAudio(request: AudioRequest): Promise<MediaAsset[]> {
     const apiKey = this.config.apiKey?.trim();
@@ -131,7 +146,21 @@ export default {
     const preferredName = name.replace(/[^0-9A-Za-z_]/g, "_").slice(0, 16);
     if (!preferredName) throw new Error("音色名称需包含字母、数字或下划线");
 
-    const input: Record<string, unknown> = { action: "create", preferred_name: preferredName };
+    // ACT: 声音复刻的登记目标**固定为 qwen3-tts-vc-2026-01-22**，不用调用方传来的模型。
+    //
+    // 实测（2026-10-08，真 Key）：
+    //   · 登记服务的 target_model 只认 `qwen3-tts-vc-*` 系列。
+    //     传 qwen3-tts-flash → `PipelineNotFound: No pipeline for: qwen3-tts-flash`
+    //     传 qwen3-tts / qwen-tts / cosyvoice-v1|v2 / qwen-audio-3.0-tts-plus → 同样 PipelineNotFound
+    //     传 qwen3-tts-vc（不带日期）→ 同样 PipelineNotFound，**必须带快照日期**。
+    //   · 复刻出来的音色**只被 qwen3-tts-vc-* 授权使用**：
+    //     用 qwen3-tts-flash 合成 → `InvalidParameter: Invalid voice specified, the requested voice
+    //     does not exist or is not licensed for use`；换成 qwen3-tts-vc-2026-01-22 才成功。
+    //
+    // 所以登记与合成两侧都必须是这个模型，任一侧用别的名字都会失败。
+    // 语音面板里的 targetModel 因此只影响"合成用哪个模型"，不影响登记 —— 见 models 里的说明。
+    const enrollmentTarget = "qwen3-tts-vc-2026-01-22";
+    const input: Record<string, unknown> = { action: "create", preferred_name: preferredName, target_model: enrollmentTarget };
     if (request.description?.trim()) {
       // 声音设计：用文字描述生成音色，不需要样本。
       input.text = request.description.trim();
@@ -140,8 +169,6 @@ export default {
       if (!sample) throw new Error("请提供用于复刻的音频样本");
       input.audio = { data: dataUrl(sample) };
     }
-    const targetModel = request.targetModel?.trim();
-    if (targetModel) input.target_model = targetModel;
 
     const signal = AbortSignal.any([AbortSignal.timeout(5 * 60_000), ...(this.signal ? [this.signal] : [])]);
     const response = await this.tool.fetch(`${baseUrl}${voicePath}`, {
