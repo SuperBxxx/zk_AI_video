@@ -337,6 +337,14 @@ async function previewVoice(item: VoiceAsset) {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  // ACT: 这是素材库里的窄分页（约 300px），内容却很长（表单 + 分隔线 + 音色列表 + 播放器）。
+  // 这里自立收缩与宽度约束，避免与父容器互相压缩后挤在一起。
+  // 踩过：`.voiceItemMain` 只写了 flex-direction、没写收缩下限，长音色名会把右侧按钮
+  // 挤出容器 —— 看起来就是"重叠"。
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 2px;
 
   .voiceHint { margin-bottom: 4px; }
 
@@ -346,12 +354,12 @@ async function previewVoice(item: VoiceAsset) {
   }
 
   .voiceField { width: 100%; }
-  .voiceNote { display: block; margin-top: 2px; line-height: 16px; }
+  .voiceNote { display: block; margin-top: 2px; line-height: 16px; overflow-wrap: anywhere; }
   .voiceDivider { margin: 6px 0; }
   .sampleRow { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
   .sampleInput { display: none; }
   .voiceAction { width: 100%; margin-top: 4px; }
-  .voiceAudio { width: 100%; margin-top: 6px; }
+  .voiceAudio { display: block; width: 100%; max-width: 100%; margin-top: 6px; }
 
   .voiceItem {
     display: flex;
@@ -366,10 +374,14 @@ async function previewVoice(item: VoiceAsset) {
     .voiceItemMain {
       display: flex;
       flex-direction: column;
+      // 必须允许收缩，否则长名字把右侧按钮挤出容器。
       min-width: 0;
+      flex: 1 1 auto;
     }
 
-    .voiceItemName { line-height: 18px; }
+    .voiceItemName { line-height: 18px; overflow-wrap: anywhere; }
+    // 按钮不参与收缩，也不会被长名字挤走。
+    .el-button { flex: 0 0 auto; }
   }
 }
 </style>
