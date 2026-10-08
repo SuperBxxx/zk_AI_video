@@ -4,13 +4,26 @@ import type { Request } from "express";
 import conf from "@/utils/conf";
 import type { DesktopRuntime, desktopUpdateAttempt, updateSnapshot } from "@/types/desktop";
 
-// ACT: 原先 official 指向上游的 api.toonflow.net 更新接口 —— 那是 Toonflow 的托管服务。
-// 改为只认自己的发布源：默认取 UPDATE_BASE_URL（发布时设置），用户也可以自己填更新地址。
+// ACT: 这里**不再回落到上游仓库**。
+//
+// 原先写的是 `process.env.UPDATE_BASE_URL ?? "https://github.com/HBAI-Ltd/Toonflow-app/releases/latest/download"`，
+// 而 UPDATE_BASE_URL 实际上从没设置过 —— 于是这个产品的自动更新一直在检查**上游那个仓库**。
+// 后果比"检查失败"严重：更新源与下载基址是同一个常量，一旦那个仓库有更高版本，
+// 它会下载**上游的安装包**把用户的「住凯AI视频」覆盖掉，而且两边 identifier 不同
+// （我们是 local.zhukai.desktop，上游是 local.toonflow.desktop）。
+//
+// 现在只认显式配置：发布时设 UPDATE_BASE_URL，或用户在设置里填自定义更新源。
+// 都没配就是"没有更新源"，getUpdateBaseUrl 返回空串，由调用方如实报错（见 noUpdateSource）。
 const updateBaseUrls = {
-  github: process.env.UPDATE_BASE_URL ?? "https://github.com/HBAI-Ltd/Toonflow-app/releases/latest/download",
+  github: process.env.UPDATE_BASE_URL?.trim() ?? "",
 };
 const updateRuntimeId = crypto.randomUUID();
 let cancelledUpdateAttempt: string | undefined;
+
+/** 没有配置更新源时的统一提示。 */
+function noUpdateSource() {
+  return Object.assign(new Error("没有配置更新源。这个版本不做在线更新；发布时请设置 UPDATE_BASE_URL，或在设置里填写自定义更新源。"), { status: 400 });
+}
 
 function getInstallFailure(local: Awaited<ReturnType<DesktopRuntime["updater"]["getLocalInfo"]>>, applyError?: string): updateSnapshot["installFailure"] {
   if (local.channel === "dev") return;
@@ -60,7 +73,10 @@ function getInstallFailure(local: Awaited<ReturnType<DesktopRuntime["updater"]["
     currentVersion: local.version,
     currentHash: local.hash,
     message,
-    downloadUrl: "https://github.com/HBAI-Ltd/Toonflow-app/releases/latest",
+    // ACT: 这里原先硬编码指向**上游 Toonflow 的发布页**，安装失败时界面就会把用户送到
+    // 上游去下载别人的安装包。改成指向当前配置的更新源；没有配置就留空，
+    // 界面只显示 message（提示重新安装），不再提供任何跨品牌的下载入口。
+    downloadUrl: getUpdateBaseUrl() || "",
   };
 }
 
@@ -81,6 +97,7 @@ export function isValidUpdateUrl(value: unknown): value is string {
   return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password && !url.search && !url.hash;
 }
 
+/** 当前的更新源基址；没有配置时返回空串（调用方负责如实报错）。 */
 function getUpdateBaseUrl(): string {
   const settings = conf.get("settings", {});
   if (settings.desktopUpdateSource === "github") return updateBaseUrls.github;
@@ -155,7 +172,13 @@ export async function getDesktopUpdate(req: Request): Promise<updateSnapshot> {
   const installFailure = getInstallFailure(local, applyError);
   if (applyError) state.applyingUpdate = false;
   // ACT: 安装失败跨重启保留，不被切换更新源或普通联网错误覆盖。
-  const error = installFailure?.message || (state.lastBaseUrl === updateBaseUrl ? state.updateError || (validUpdate ? update?.error || "" : "") : "") || update?.installError || "";
+  // 另外把"没有更新源"的原因写进 error —— 让设置面板能回答「为什么没有更新提示」，
+  // 而不是让用户面对一个永远不出现的提示去猜。
+  const error = installFailure?.message
+    || (state.lastBaseUrl === updateBaseUrl ? state.updateError || (validUpdate ? update?.error || "" : "") : "")
+    || update?.installError
+    || (!updateBaseUrl ? noUpdateSource().message : "")
+    || "";
   return {
     version, channel, hash,
     latestVersion: validUpdate ? update?.version || "" : "",
@@ -180,6 +203,10 @@ export async function checkDesktopUpdate(req: Request): Promise<void> {
   state.checkingUpdate = true;
   state.updateError = "";
   const updateBaseUrl = getUpdateBaseUrl();
+  if (!updateBaseUrl) {
+    state.checkingUpdate = false;
+    throw noUpdateSource();
+  }
   state.checkedBaseUrl = undefined;
   state.lastBaseUrl = updateBaseUrl;
   try {
@@ -203,6 +230,7 @@ export async function downloadDesktopUpdate(req: Request): Promise<void> {
   if (state.checkingUpdate || state.downloadingUpdate || state.applyingUpdate)
     throw Object.assign(new Error("更新操作正在执行，请稍后再试。"), { status: 409 });
   const updateBaseUrl = getUpdateBaseUrl();
+  if (!updateBaseUrl) throw noUpdateSource();
   if (state.checkedBaseUrl !== updateBaseUrl)
     throw Object.assign(new Error("更新源已切换，请重新检查更新。"), { status: 400 });
   if (!updater.updateInfo()?.updateAvailable)
@@ -230,6 +258,7 @@ export async function applyDesktopUpdate(req: Request): Promise<void> {
   if (state.checkingUpdate || state.downloadingUpdate || state.applyingUpdate)
     throw Object.assign(new Error("更新操作正在执行，请稍后再试。"), { status: 409 });
   const updateBaseUrl = getUpdateBaseUrl();
+  if (!updateBaseUrl) throw noUpdateSource();
   if (state.checkedBaseUrl !== updateBaseUrl)
     throw Object.assign(new Error("更新源已切换，请重新检查更新。"), { status: 400 });
   if (!updater.updateInfo()?.updateReady)

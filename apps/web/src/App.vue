@@ -24,11 +24,15 @@
               <dd><strong>{{ installFailure.targetVersion ? `v${installFailure.targetVersion}` : "未知版本" }}</strong><code>{{ installFailure.targetHash || "构建标识未知" }}</code></dd>
             </div>
           </dl>
-          <p class="failureHint">请前往 GitHub 最新发布页，选择适合当前系统的完整安装包，关闭客户端后重新安装。</p>
+          <!-- ACT: 没有配置更新源时 downloadUrl 是空串 —— 那时不显示下载按钮，
+               并说明为什么没有下载入口，免得用户点到一个跳回本页的空链接。
+               也不写死"前往 GitHub"：那是上游的发布页，本产品不做在线更新。 -->
+          <p v-if="installFailure.downloadUrl" class="failureHint">请在更新源下载适合当前系统的完整安装包，关闭客户端后重新安装。</p>
+          <p v-else class="failureHint">当前未配置更新源，无法提供下载地址。请向提供本软件的人索取完整安装包，关闭客户端后重新安装。</p>
         </div>
         <template #footer>
           <el-button @click="installFailureVisible = false">稍后</el-button>
-          <el-button tag="a" type="primary" :href="installFailure.downloadUrl" target="_blank" rel="noopener noreferrer">前往下载页</el-button>
+          <el-button v-if="installFailure.downloadUrl" tag="a" type="primary" :href="installFailure.downloadUrl" target="_blank" rel="noopener noreferrer">前往下载页</el-button>
         </template>
       </el-dialog>
     </config-provider>
