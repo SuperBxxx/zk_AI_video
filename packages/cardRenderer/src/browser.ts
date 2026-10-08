@@ -69,7 +69,21 @@ function killTree(child: ChildProcess) {
 }
 
 /** 起一个浏览器进程并等它的 CDP 就绪；失败返回 null。 */
-async function launchOnce(executable: string, options: BrowserOptions, extraArgs: string[]): Promise<ChildProcess | null> {
+/**
+ * 浏览器进程的退出信息。
+ *
+ * ACT: 由 `launchOnce` 通过参数回调上报，**不用模块级变量** ——
+ * 踩过：写成模块级 `let` 时，TS 的控制流分析看不到"函数内部通过回调写入"这件事，
+ * 在调用点之后仍按 `undefined` 收窄，读属性就报 `Property 'code' does not exist on type 'never'`。
+ */
+type LaunchExit = { code: number | null; signal: string | null; sandboxed: boolean };
+
+async function launchOnce(
+  executable: string,
+  options: BrowserOptions,
+  extraArgs: string[],
+  onExit?: (exit: LaunchExit) => void,
+): Promise<ChildProcess | null> {
   const child = spawn(executable, [
     "--headless=new",
     "--disable-gpu",
@@ -84,6 +98,16 @@ async function launchOnce(executable: string, options: BrowserOptions, extraArgs
   const deadline = Date.now() + (options.timeoutMs ?? defaultTimeoutMs);
   while (Date.now() < deadline) {
     await new Promise(resolve => setTimeout(resolve, 300));
+    // ACT: 进程已经退出就别再等满截止时间 —— 否则每次尝试都要白等一个 timeout。
+    // 踩过：带沙箱的 Chrome 在这台机器上**立刻**以退出码 3 结束（实测），
+    // 而这里原先照样等 12 秒，两次尝试共 24 秒；等在外层调用方超时后，
+    // 用户看到的是一句 "Unable to connect"（CDP 端口的原始错误），
+    // 完全看不出真正原因是"浏览器带沙箱起不来"。
+    // 退出码与信号一起报出去，让 fallback 的提示能说清是什么情况。
+    if (child.exitCode !== null || child.signalCode !== null) {
+      onExit?.({ code: child.exitCode, signal: child.signalCode, sandboxed: extraArgs.length > 0 });
+      return null;
+    }
     try {
       await (await fetch(`http://127.0.0.1:${options.port}/json/version`)).json();
       return child;
@@ -131,14 +155,24 @@ export async function ensureBrowser(
   }
   mkdirSync(options.profileDirectory, { recursive: true });
 
-  const sandboxed = await launchOnce(executable, options, []);
+  let exit: LaunchExit | undefined;
+  const sandboxed = await launchOnce(executable, options, [], value => { exit = value; });
   const child = sandboxed ?? await (async () => {
     onFallback?.(`带沙箱起不来（${executable}），降级为 --no-sandbox 重试`);
-    return await launchOnce(executable, options, ["--no-sandbox"]);
+    return await launchOnce(executable, options, ["--no-sandbox"], value => { exit = value; });
   })();
 
   if (!child) {
-    throw new Error(`起不了浏览器：${executable}（端口 ${options.port}）`);
+    // ACT: 把浏览器**为什么**起不来带进错误信息。以前只说"起不了浏览器"，
+    // 用户与我们都看不出是沙箱被拦、端口被占还是可执行文件不对。
+    const detail = exit
+      ? `最后一次退出码 ${exit.code ?? "-"}${exit.signal ? `、信号 ${exit.signal}` : ""}` +
+        `（${exit.sandboxed ? "已带 --no-sandbox" : "带沙箱"}）`
+      : "没有拿到退出信息";
+    throw new Error(
+      `起不了浏览器：${executable}（端口 ${options.port}；${detail}）。` +
+      "如果这是受限环境（沙箱、组策略或安全软件拦了 Chrome），请设 ZK_CHROME_PATH 指向一个可用的 Chrome/Edge，或改用不需要浏览器的取流方式。",
+    );
   }
 
   return {
