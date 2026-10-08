@@ -163,6 +163,24 @@ export function useNodeAi() {
     return readModels<NodeMediaModel>("/api/ai/media/models", requestSignal(signal));
   }
 
+  /**
+   * 用户在设置里指定的偏好模型（按 scope 取第一个当前可用的），没有则返回 undefined。
+   *
+   * ACT: 由服务端解析 —— 插件构建里不含 web 的 Pinia store，读不到设置；
+   * 偏好存在服务端 settings.json 里，让节点只问这一个接口即可。
+   */
+  async function getPreferredModel(scope: "text" | "video" | "audio", signal?: AbortSignal) {
+    try {
+      const response = await fetch(`/api/ai/media/preferred?scope=${scope}`, { signal: requestSignal(signal) });
+      if (!response.ok) return undefined;
+      const body = await response.json() as { data?: NodeMediaModel | null };
+      return body.data ?? undefined;
+    } catch {
+      // 取不到偏好不影响主流程：调用方会退回原本的默认选择。
+      return undefined;
+    }
+  }
+
   async function generateMedia<T extends "image" | "video">(mediaType: T, input: NodeImageRequest | NodeVideoRequest, signal?: AbortSignal) {
     return readResult<{ path: string; mimeType: string; mediaType: T }[]>(await fetch("/api/ai/media/generate", {
       method: "POST",
@@ -230,5 +248,5 @@ export function useNodeAi() {
     return { text, ...(reasoning ? { reasoning } : {}) };
   }
 
-  return { getModels, getMediaModels, generateImage, generateVideo, generate };
+  return { getModels, getMediaModels, getPreferredModel, generateImage, generateVideo, generate };
 }

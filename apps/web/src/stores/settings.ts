@@ -89,6 +89,20 @@ export const modelChoices = computed(() => customProviders.value.flatMap(provide
   value: JSON.stringify([provider.id, model.id]), providerId: provider.id, modelId: model.id, label: model.label, contextWindow: model.contextWindow,
 }))));
 
+export type PreferredModelScope = "text" | "video" | "audio";
+export type PreferredModel = { scope: PreferredModelScope; providerId: string; modelId: string };
+
+/** 已保存的偏好模型（数组顺序即优先级）。 */
+export const preferredModels = computed<PreferredModel[]>(() => {
+  const value = settings.value.preferredModels;
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is PreferredModel =>
+    !!item && typeof item === "object"
+    && ["text", "video", "audio"].includes(String((item as PreferredModel).scope))
+    && typeof (item as PreferredModel).providerId === "string"
+    && typeof (item as PreferredModel).modelId === "string");
+});
+
 export async function loadSettings() {
   if (settingsReady) return;
   const { data } = await axios.get("/api/settings/get", { headers: { "Cache-Control": "no-cache", "x-toonflow-workspace": "1" } });

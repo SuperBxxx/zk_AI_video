@@ -172,7 +172,7 @@ import attachmentList from "./attachmentList.vue";
 import { createPastedTextFile, readTextAttachment } from "./textAttachments";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import { writeClipboardText } from "@/lib/clipboard";
-import { modelChoices } from "@/stores/settings";
+import { modelChoices, preferredModels } from "@/stores/settings";
 import { useWorkspaceStore } from "@/stores/workspace";
 import type { AgentAttachment, AgentConversation, AgentMessage } from "./types";
 import type { AgentEvent, AgentMention } from "@toonflow/server/agent/types";
@@ -278,6 +278,29 @@ const selectedModel = ref(pendingMessage?.model ?? (props.initialSession?.provid
 const contextMenuVisible = ref(false);
 const reasoningEffort = ref(pendingMessage?.reasoningEffort ?? (props.initialSession?.thinkingLevel === "off" ? "" : props.initialSession?.thinkingLevel ?? ""));
 const selectedModelChoice = computed(() => modelChoices.value.find(item => item.value === selectedModel.value));
+
+/** 按偏好顺序挑出第一个当前可用的文本模型；没有偏好或全失效时返回 undefined。 */
+function resolvePreferredTextModel(available: readonly { value: string; providerId: string; modelId: string }[]) {
+  const pool = new Map(available.map(item => [`${item.providerId}::${item.modelId}`, item]));
+  for (const item of preferredModels.value) {
+    if (item.scope !== "text") continue;
+    const hit = pool.get(`${item.providerId}::${item.modelId}`);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+/**
+ * ACT: 套用用户在设置里的文本模型偏好 —— 仅在**当前没有选中模型**时生效。
+ *
+ * 刻意**不**退回"第一个可用模型"：对话原先就是空着等用户选（发送时才提示"请先选择模型"），
+ * 这里只补上偏好，不改变原有行为。偏好项失效（供应商/模型被删）时自动跳过。
+ */
+watch([modelChoices, preferredModels], () => {
+  if (selectedModel.value) return;
+  const wanted = resolvePreferredTextModel(modelChoices.value);
+  if (wanted) selectedModel.value = wanted.value;
+}, { immediate: true });
 const contextWindow = computed(() => contextUsage.value?.contextWindow ?? selectedModelChoice.value?.contextWindow ?? 262144);
 const contextPercent = computed(() => (contextUsage.value?.tokens ?? 0) / contextWindow.value * 100);
 const inputTokens = computed(() => stats.value ? stats.value.tokens.input + stats.value.tokens.cacheRead + stats.value.tokens.cacheWrite : 0);

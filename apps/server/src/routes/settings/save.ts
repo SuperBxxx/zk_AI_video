@@ -21,6 +21,15 @@ export default router.put("/", validateFields({ settings: z.record(z.string(), z
     source: z.string().max(64).refine(value => !value || downloadSources.some(source => source.id === value),
       "未知的 yt-dlp 下载线路").optional(),
   }).optional(),
+  // ACT: 用户偏好的模型，**数组顺序即优先级**（排在前面的先用）。
+  // scope 对应三处设置页面的用途：text 供对话选默认模型，video / audio 供节点与配音选默认模型。
+  // 只存标识（供应商 + 模型），**不缓存模型能力** —— 能力随供应商变化，使用时按当前列表核对，
+  // 找不到就跳过；这样卸载某个供应商不会让整份设置失效。
+  preferredModels: z.array(z.object({
+    scope: z.enum(["text", "video", "audio"]),
+    providerId: z.string().min(1).max(128),
+    modelId: z.string().min(1).max(256),
+  })).max(64).optional(),
 })).refine(value => value.desktopUpdateSource !== "custom" || !!value.desktopUpdateCustomUrl, {
   path: ["desktopUpdateCustomUrl"], message: "选择自定义更新源前，请先填写有效地址",
 }) }), async (req, res) => {

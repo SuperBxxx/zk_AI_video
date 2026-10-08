@@ -91,6 +91,7 @@ declare module 'vue' {
     ModelPopover: typeof import('./../components/modelPopover.vue')['default']
     ModelSetupDialog: typeof import('./../components/modelSetupDialog.vue')['default']
     Personalization: typeof import('./../components/settings/panels/personalization.vue')['default']
+    PreferredModels: typeof import('./../components/settings/panels/preferredModels.vue')['default']
     Privacy: typeof import('./../components/settings/panels/privacy.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

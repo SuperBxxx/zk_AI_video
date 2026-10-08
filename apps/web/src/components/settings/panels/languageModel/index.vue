@@ -1,5 +1,7 @@
 <template>
   <div class="providerList">
+    <!-- 偏好模型：文本模型用于对话里选默认模型，因此单独取一份 scope="text"。 -->
+    <preferredModels scope="text" :available="preferredChoices" />
     <div class="itemList">
       <el-card v-for="item in sortedProviders" :key="item.id" class="providerItem" shadow="never">
         <div class="providerHeader">
@@ -41,8 +43,19 @@ import { ElMessage } from "element-plus";
 import { customProviders, saveSettings, type CustomProvider, type CustomProviderModel } from "@/stores/settings";
 import { IconPlus, IconSettings, IconEdit, IconTrash, IconRefresh } from "@tabler/icons-vue";
 import { languageProviders } from "@toonflow/providers";
+import preferredModels from "../preferredModels.vue";
 
 const { visible = true } = defineProps<{ visible?: boolean }>();
+// ACT: 文本模型的可选项直接来自已配置的供应商（含各自已拉取的模型列表），
+// 与对话里的模型下拉同一数据源，保证"选了就能用"。
+const preferredChoices = computed(() =>
+  customProviders.value.flatMap(provider =>
+    (provider.models ?? []).map(model => ({
+      providerId: provider.id,
+      providerLabel: provider.label,
+      modelId: model.id,
+      modelLabel: model.label,
+    }))));
 const addProviderDialog = shallowRef<Component>();
 const addCustomProviderDialog = shallowRef<Component>();
 const providerDialogVisible = ref(false);

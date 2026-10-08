@@ -1,5 +1,8 @@
 <template>
   <div v-if="loaded" class="providerList">
+    <!-- 偏好模型：媒体模型与语音模型两个页面共用此实现（语音页传 kind="audio"），
+         因此放在这里一处即可覆盖两个页面。 -->
+    <preferredModels :scope="kind === 'audio' ? 'audio' : 'video'" :available="preferredChoices" />
     <div class="itemList">
       <el-card v-for="item in visibleProviders" :key="item.fileName" class="providerItem" shadow="never">
         <div class="providerHeader">
@@ -46,8 +49,13 @@ import { IconPlus, IconSettings, IconEdit, IconTrash, IconDownload } from "@tabl
 import type { MediaProvider } from "./types";
 import { settings, saveSettings } from "@/stores/settings";
 import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";
+import preferredModels from "../preferredModels.vue";
 
 const { visible = true, kind = "media" } = defineProps<{ visible?: boolean; kind?: "media" | "audio" }>();
+// ACT: 偏好模型的选择项直接复用 /api/ai/media/models（与视频生成节点同一数据源），
+// 只按当前页面的 kind 过滤：媒体页给图片/视频，语音页给音频。
+// 这样"可选项"与"节点真正能用的模型"必然一致，不会出现选了却用不上的项。
+const preferredChoices = ref<{ providerId: string; providerLabel: string; modelId: string; modelLabel: string }[]>([]);
 const mediaProviderDialog = shallowRef<Component>();
 const editProviderDialog = shallowRef<Component>();
 const providers = ref<MediaProvider[]>([]);
@@ -81,6 +89,7 @@ function refreshInstalled(event: WindowEventMap["toonflow:plugin-installed"]) {
 }
 onMounted(() => {
   void loadProviders();
+  void loadPreferredChoices();
   window.addEventListener("toonflow:plugin-installed", refreshInstalled);
 });
 onBeforeUnmount(() => {
@@ -98,6 +107,17 @@ async function loadProviders() {
   } finally {
     if (request === loadRequest) loaded.value = true;
   }
+}
+
+/** 偏好模型的可选项：与视频生成节点同一数据源，只按本页面的 kind 过滤类型。 */
+async function loadPreferredChoices() {
+  try {
+    const { data } = await axios.get<{ data: { providerId: string; providerLabel: string; modelId: string; label: string; type: string }[] }>("/api/ai/media/models");
+    const wantAudio = kind === "audio";
+    preferredChoices.value = (data.data ?? [])
+      .filter(item => (wantAudio ? item.type === "audio" : item.type === "image" || item.type === "video"))
+      .map(item => ({ providerId: item.providerId, providerLabel: item.providerLabel, modelId: item.modelId, modelLabel: item.label }));
+  } catch { /* 取不到就只显示已保存的偏好项，不影响供应商列表 */ }
 }
 
 function openAdd(mode: "builtin" | "custom") {

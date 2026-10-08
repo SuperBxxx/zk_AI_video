@@ -301,12 +301,16 @@ async function replaceOutput(event: Event) {
 function loadModels() {
   if (modelsRequest) return modelsRequest;
   modelsLoading.value = true;
-  modelsRequest = ai.getMediaModels().then((items) => {
+  modelsRequest = ai.getMediaModels().then(async (items) => {
     if (generating.value || deleting.value) return;
     models.value = items.filter((item) => item.type === "video");
     // ACT: 只给空配置选默认模型，保留暂时不可用的旧选择及其参数。
+    // 优先用用户在设置里指定的偏好（服务端按偏好顺序给出第一个当前可用的）；
+    // 没有偏好或偏好全失效时，才退回原来的"第一个可用模型"。
     if (!data.value.model) {
-      const first = models.value[0];
+      const preferred = await ai.getPreferredModel("video").catch(() => undefined);
+      const first = (preferred && models.value.find((item) => item.providerId === preferred.providerId && item.modelId === preferred.modelId)) ?? models.value[0];
+      if (generating.value || deleting.value) return;
       data.value.model = first ? JSON.stringify([first.providerId, first.modelId]) : "";
     }
   }).finally(() => {
