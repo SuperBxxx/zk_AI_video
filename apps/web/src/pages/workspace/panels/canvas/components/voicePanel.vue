@@ -337,10 +337,8 @@ async function previewVoice(item: VoiceAsset) {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  // ACT: 这是素材库里的窄分页（约 300px），内容却很长（表单 + 分隔线 + 音色列表 + 播放器）。
+  // ACT: 这一栏是素材库里的窄分页（约 300px），内容却很长（表单 + 分隔线 + 音色列表 + 播放器）。
   // 这里自立收缩与宽度约束，避免与父容器互相压缩后挤在一起。
-  // 踩过：`.voiceItemMain` 只写了 flex-direction、没写收缩下限，长音色名会把右侧按钮
-  // 挤出容器 —— 看起来就是"重叠"。
   min-width: 0;
   width: 100%;
   box-sizing: border-box;
@@ -355,7 +353,37 @@ async function previewVoice(item: VoiceAsset) {
 
   .voiceField { width: 100%; }
   .voiceNote { display: block; margin-top: 2px; line-height: 16px; overflow-wrap: anywhere; }
-  .voiceDivider { margin: 6px 0; }
+
+  // ACT: 分隔线必须显式给足垂直空间，并把标题钉在这条线上。
+  //
+  // 根因：Element Plus 的 `.el-divider--horizontal` 是 `height: 1px`，而它的标题
+  // `.el-divider__text` 是 `position: absolute` 且**只声明了 left、没有 top** ——
+  // 于是标题落在静态位置上、相对那条 1px 的线无法垂直居中，就压到相邻的按钮/输入框上，
+  // 表现为"标题浮在内容上面"（用户报的正是这个）。
+  //
+  // 不去改 Element Plus 的级联（那是全局影响），而是在这里把两件事写死：
+  //   1) 分隔线给足上下外边距，标题的半个行高有地方去；
+  //   2) 标题显式居中（top: 50% + translateY(-50%)），不再依赖缺失的 top。
+  .voiceDivider {
+    position: relative;
+    height: 1px;
+    margin: 16px 0 10px;
+
+    :deep(.el-divider__text) {
+      top: 50%;
+      transform: translateY(-50%);
+      padding: 0 8px;
+      // ACT: 与上面的表单标签（`el-form-item__label`，本组件覆盖为 12px）**对齐样式**。
+      // Element Plus 默认给分隔线标题 14px / 字重 500 / 主文字色，而表单标签是
+      // 12px / 常规字重 / `--el-text-color-regular` —— 同一栏里两套标题看着就是"不一样"。
+      // 这里显式写死，与 `.voiceForm :deep(.el-form-item__label)` 保持一致。
+      font-size: 12px;
+      font-weight: normal;
+      color: var(--el-text-color-regular);
+      line-height: 18px;
+    }
+  }
+
   .sampleRow { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
   .sampleInput { display: none; }
   .voiceAction { width: 100%; margin-top: 4px; }
