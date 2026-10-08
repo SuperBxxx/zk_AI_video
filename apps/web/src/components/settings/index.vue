@@ -2,8 +2,11 @@
   <el-dialog v-model="visible" title="设置" width="min(1080px, calc(100vw - 32px))" alignCenter appendToBody>
     <div class="settings">
       <aside class="sidebar" aria-label="设置分类">
-        <template v-for="item in settingsPanels" :key="item.id">
-          <h3 v-if="item.groupLabel" class="settingsGroupLabel">{{ item.groupLabel }}</h3>
+        <template v-for="(item, index) in settingsPanels" :key="item.id">
+          <!-- ACT: 分组标题只在**分组变化时**渲染一次。
+               原先写的是 `v-if="item.groupLabel"` —— 同组的每个条目都会各渲染一遍标题，
+               「其他」有三项就重复出现三次。 -->
+          <h3 v-if="startsNewGroup(index)" class="settingsGroupLabel">{{ item.groupLabel }}</h3>
           <button class="settingsItem" type="button" :aria-label="item.label" :aria-pressed="activePanel.id === item.id" @click="activePanel = item">
             <component :is="item.icon" :size="18" class="panelIcon" aria-hidden="true" />
             <span>{{ item.label }}</span>
@@ -51,6 +54,13 @@ const settingsPanels = [
 ];
 const activePanel = shallowRef(settingsPanels[0]!);
 const visible = defineModel<boolean>({ default: false });
+
+/** 当前位置是否该渲染分组标题：只有第一项、或分组与上一项不同时才算新分组。 */
+function startsNewGroup(index: number) {
+  const current = settingsPanels[index];
+  if (!current?.groupLabel) return false;
+  return index === 0 || settingsPanels[index - 1]?.groupLabel !== current.groupLabel;
+}
 </script>
 
 <style lang="scss" scoped>
