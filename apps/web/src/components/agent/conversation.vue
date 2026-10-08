@@ -6,7 +6,7 @@
           <template #content>
             <section class="welcomeMessage" aria-label="开始新对话">
               <div class="welcomeHeader">
-                <span class="welcomeIcon" aria-hidden="true"><span class="welcomeLogo" :style="{ maskImage: `url(${logoUrl})` }" /></span>
+                <span class="welcomeIcon"><img class="welcomeLogo" :src="logoUrl" alt="" aria-hidden="true" /></span>
                 <div>
                   <p class="welcomeLabel">你好，我是 住凯AI视频 助手</p>
                   <h3>从一个想法开始</h3>
@@ -864,15 +864,20 @@ watch(() => !props.initialSession?.parentFile && !!workspaceStore.pendingAgentMe
           height: 42px;
           border-radius: var(--ui-radius-large);
           background: var(--el-color-primary-light-9);
-          color: var(--el-color-primary);
 
+          // ACT: 这里原先用 CSS mask 把标志染成主题色（`background: currentColor` +
+          // 指向 logo data URL 的 mask-image）。实测该遮罩**没有生效**：元素的计算样式是
+          // `mask-image: none`、`style` 属性为空，于是整块只剩 `background: currentColor`，
+          // 表现为一个纯绿色方块而不是取景框标志。
+          // 改成直接显示 SVG：标志本身是单色近黑实心图形（#0E1110），落在浅绿底上
+          // 对比度约 14:1，本来就不需要染色，也少一层 URL 解析的依赖。
           .welcomeLogo {
+            // ACT: 必须写 display: block —— 这是 <img>（inline 替换元素），
+            // 在 display:grid 的容器里会被压成 0×0，标志就整个看不见。
+            display: block;
             width: 28px;
             height: 28px;
-            background: currentColor;
-            mask-size: contain;
-            mask-position: center;
-            mask-repeat: no-repeat;
+            object-fit: contain;
           }
         }
 
