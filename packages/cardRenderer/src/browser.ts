@@ -7,6 +7,7 @@
 //   · 「启动器已退出」不是跳过清理的理由，恰恰是最该清理的时刻
 
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { dirname } from "node:path";
 import { existsSync, mkdirSync } from "node:fs";
 
 /** 启动浏览器与连 CDP 的参数。 */
@@ -112,7 +113,7 @@ function killTree(child: ChildProcess) {
  * 踩过：写成模块级 `let` 时，TS 的控制流分析看不到"函数内部通过回调写入"这件事，
  * 在调用点之后仍按 `undefined` 收窄，读属性就报 `Property 'code' does not exist on type 'never'`。
  */
-type LaunchExit = { code: number | null; signal: string | null; sandboxed: boolean };
+type LaunchExit = { code: number | null; signal: string | null; sandboxed: boolean; stderr?: string };
 
 async function launchOnce(
   executable: string,
@@ -129,7 +130,29 @@ async function launchOnce(
     `--remote-debugging-port=${options.port}`,
     `--user-data-dir=${options.profileDirectory}`,
     "about:blank",
-  ], { stdio: "ignore" });
+  ], {
+    // ACT: **不能用 `stdio: "ignore"`** —— 那样会把 Chrome 自己打印的失败原因丢掉，
+    // 只剩一个退出码（用户报的 21 就是这种情况）。
+    // 接住 stderr，失败时把最后几行带进错误信息，才不用靠猜。
+    stdio: ["ignore", "ignore", "pipe"],
+    // ACT: 显式给子进程一个**可写的临时目录**，别继承宿主的环境。
+    //
+    // 依据：用户在 PowerShell 里手动启动同一个 Chrome（`$env:TEMP\zxtest` 作 profile）
+    // **能成功**，而应用自己启动同一个可执行文件就报 21（profile 目录创建失败）。
+    // 两者最可疑的差别就是环境变量 —— 应用跑在 Electrobun 宿主里，TEMP/TMP 未必指向
+    // 用户可写的目录；Chrome 建 profile 时会用它。
+    env: {
+      ...process.env,
+      TEMP: dirname(options.profileDirectory),
+      TMP: dirname(options.profileDirectory),
+    },
+  });
+
+  // 收集 stderr（有上限，避免异常输出把内存吃光）。
+  let stderr = "";
+  child.stderr?.on("data", chunk => {
+    if (stderr.length < 4000) stderr += String(chunk);
+  });
 
   const deadline = Date.now() + (options.timeoutMs ?? defaultTimeoutMs);
   while (Date.now() < deadline) {
@@ -141,7 +164,7 @@ async function launchOnce(
     // 完全看不出真正原因是"浏览器带沙箱起不来"。
     // 退出码与信号一起报出去，让 fallback 的提示能说清是什么情况。
     if (child.exitCode !== null || child.signalCode !== null) {
-      onExit?.({ code: child.exitCode, signal: child.signalCode, sandboxed: extraArgs.length > 0 });
+      onExit?.({ code: child.exitCode, signal: child.signalCode, sandboxed: extraArgs.length > 0, stderr });
       return null;
     }
     try {
@@ -205,9 +228,13 @@ export async function ensureBrowser(
       ? `最后一次退出码 ${exit.code ?? "-"}${exit.signal ? `、信号 ${exit.signal}` : ""}` +
         `（${exit.sandboxed ? "已带 --no-sandbox" : "带沙箱"}）`
       : "没有拿到退出信息";
+    // ACT: 把 Chrome 自己打印的原因带出来 —— 光有退出码无法定位
+    // （21 只说明"profile 目录创建失败"，真正的原因在它的 stderr 里）。
+    const chromeSaid = exit?.stderr?.trim().split(/\r?\n/).map(line => line.trim()).filter(Boolean).slice(-3).join(" / ");
     throw new Error(
       `起不了浏览器：${executable}（端口 ${options.port}；${detail}）。` +
-      "如果这是受限环境（沙箱、组策略或安全软件拦了 Chrome），请设 ZK_CHROME_PATH 指向一个可用的 Chrome/Edge，或改用不需要浏览器的取流方式。",
+      (chromeSaid ? `\n浏览器输出：${chromeSaid.slice(0, 500)}` : "") +
+      "\n如果这是受限环境（沙箱、组策略或安全软件拦了 Chrome），请设 ZK_CHROME_PATH 指向一个可用的 Chrome/Edge，或改用不需要浏览器的取流方式。",
     );
   }
 
