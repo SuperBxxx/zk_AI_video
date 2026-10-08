@@ -15,7 +15,7 @@
           <el-text class="voiceNote" size="small" type="info">名称只能用字母、数字、下划线，最多 16 位，其余字符会被替换为下划线。</el-text>
         </el-form-item>
 
-        <el-divider class="voiceDivider" contentPosition="left">声音复刻（需要样本）</el-divider>
+        <p class="voiceFieldLabel">声音复刻（需要样本）</p>
         <div class="sampleRow">
           <el-button :icon="IconUpload" :loading="reading" @click="sampleInput?.click()">上传样本</el-button>
           <el-button v-if="!recording" :icon="IconMicrophone" :disabled="reading" @click="startRecording">录制样本</el-button>
@@ -27,7 +27,7 @@
         <el-alert v-if="recordError" class="voiceHint" type="error" :closable="false" showIcon :title="recordError" />
         <el-button class="voiceAction" type="primary" :loading="creatingClone" :disabled="!canClone" @click="createVoice(false)">开始复刻</el-button>
 
-        <el-divider class="voiceDivider" contentPosition="left">声音设计（用文字描述）</el-divider>
+        <p class="voiceFieldLabel">声音设计（用文字描述）</p>
         <el-input v-model="description" class="voiceField" type="textarea" :rows="2" maxlength="200" showWordLimit placeholder="例如：温暖的低音女声，语速偏慢" />
         <el-button class="voiceAction" type="primary" :loading="creatingDesign" :disabled="!canDesign" @click="createVoice(true)">生成音色</el-button>
       </el-form>
@@ -35,14 +35,14 @@
       <el-alert v-if="createError" class="voiceHint" type="error" :closable="false" showIcon :title="createError" />
 
       <template v-if="directory">
-        <el-divider class="voiceDivider" contentPosition="left">试听（可选）</el-divider>
+        <p class="voiceFieldLabel">试听（可选）</p>
         <el-input v-model="previewText" class="voiceField" type="textarea" :rows="2" maxlength="500" showWordLimit placeholder="输入一小段文字，用上面创建的音色读一遍" />
         <el-button class="voiceAction" :loading="synthesizing" :disabled="!previewReady" @click="preview">合成试听</el-button>
         <audio v-if="previewUrl" class="voiceAudio" :src="previewUrl" controls preload="metadata" aria-label="试听结果" />
       </template>
       <el-text v-else class="voiceNote" size="small" type="info">打开一个项目后可以在此试听音色。</el-text>
 
-      <el-divider class="voiceDivider" contentPosition="left">已保存的音色</el-divider>
+      <p class="voiceFieldLabel">已保存的音色</p>
       <el-text v-if="!voices.length" class="voiceNote" size="small" type="info">素材库「{{ voiceFolder }}」里还没有音色。</el-text>
       <div v-for="item in voices" :key="item.path" class="voiceItem">
         <div class="voiceItemMain">
@@ -354,34 +354,19 @@ async function previewVoice(item: VoiceAsset) {
   .voiceField { width: 100%; }
   .voiceNote { display: block; margin-top: 2px; line-height: 16px; overflow-wrap: anywhere; }
 
-  // ACT: 分隔线必须显式给足垂直空间，并把标题钉在这条线上。
-  //
-  // 根因：Element Plus 的 `.el-divider--horizontal` 是 `height: 1px`，而它的标题
-  // `.el-divider__text` 是 `position: absolute` 且**只声明了 left、没有 top** ——
-  // 于是标题落在静态位置上、相对那条 1px 的线无法垂直居中，就压到相邻的按钮/输入框上，
-  // 表现为"标题浮在内容上面"（用户报的正是这个）。
-  //
-  // 不去改 Element Plus 的级联（那是全局影响），而是在这里把两件事写死：
-  //   1) 分隔线给足上下外边距，标题的半个行高有地方去；
-  //   2) 标题显式居中（top: 50% + translateY(-50%)），不再依赖缺失的 top。
-  .voiceDivider {
-    position: relative;
-    height: 1px;
-    margin: 16px 0 10px;
-
-    :deep(.el-divider__text) {
-      top: 50%;
-      transform: translateY(-50%);
-      padding: 0 8px;
-      // ACT: 与上面的表单标签（`el-form-item__label`，本组件覆盖为 12px）**对齐样式**。
-      // Element Plus 默认给分隔线标题 14px / 字重 500 / 主文字色，而表单标签是
-      // 12px / 常规字重 / `--el-text-color-regular` —— 同一栏里两套标题看着就是"不一样"。
-      // 这里显式写死，与 `.voiceForm :deep(.el-form-item__label)` 保持一致。
-      font-size: 12px;
-      font-weight: normal;
-      color: var(--el-text-color-regular);
-      line-height: 18px;
-    }
+  // ACT: 区块标题与上面的表单标签（`el-form-item__label` 在 labelPosition="top" 下的形态）
+  // **逐条对齐**，不再用分隔线：同一栏里两套标题看着就是"不一样"。
+  // 对齐依据是 Element Plus 的真实规则：
+  //   height:auto; margin-bottom:8px; line-height:22px; display:block;
+  //   color:var(--el-text-color-regular); font-size:var(--el-form-label-font-size)
+  // 而本组件把表单标签的字号压到 12px，这里同样用 12px。
+  .voiceFieldLabel {
+    display: block;
+    margin: 12px 0 8px;
+    font-size: 12px;
+    font-weight: normal;
+    line-height: 22px;
+    color: var(--el-text-color-regular);
   }
 
   .sampleRow { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
