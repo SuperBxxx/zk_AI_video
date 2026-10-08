@@ -126,7 +126,7 @@ type CardEntry = {
 type CardGroup = { kind: CardKind; label: string; description: string; cards: CardEntry[] };
 type CardLibrary = { total: number; counts: Record<CardKind, number>; groups: CardGroup[] };
 
-/** 用户保存的「视频分析配方卡」—— 让 Agent 分析完一条视频后命名保存的成果。 */
+/** 用户保存的成果卡 —— 让 Agent 分析完一条视频后命名保存，下次做同类视频时取用。 */
 type RecipeTechnique = {
   name: string;
   /** 它回应故事的哪一下（叙事锚点的 key）。 */

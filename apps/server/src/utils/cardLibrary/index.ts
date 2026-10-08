@@ -33,8 +33,11 @@ export function getCardLibrary() {
   const groups: CardLibraryGroup[] = [
     {
       kind: "analysis",
-      label: "视频分析配方卡",
-      description: "读一条参考视频、把它拆成可核对的证据。不产出画面 —— 先用它们看清现有素材里发生了什么，再去生成。",
+      // ACT: 这一栏是**内置手法说明**（产品自带、不可删），与用户在卡库里保存的
+      // 「我的配方卡」不是一回事。原先这里也叫「视频分析配方卡」，与用户保存的成果卡
+      // **撞名** —— 同一屏出现两栏同名的东西，用户会以为数据错了。名字必须区分开。
+      label: "分析手法（内置）",
+      description: "产品自带的读素材手法：探测、取帧、网格、边界、词级时间、短语定位。它们不产出画面，只帮你把一条参考视频拆成可核对的证据 —— 用哪一手由你挑，不在卡库里保存或删除。",
       cards: catalog.filter(entry => entry.kind === "analysis"),
     },
     {

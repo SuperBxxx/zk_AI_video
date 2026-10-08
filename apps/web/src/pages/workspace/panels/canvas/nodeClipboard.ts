@@ -1,5 +1,5 @@
 import type { Edge, GraphEdge, GraphNode, Node } from "@vue-flow/core";
-import { isNodeOutput } from "@toonflow/nodes-scaffold/values";
+import { isNodeOutput, mediaUrl } from "@toonflow/nodes-scaffold/values";
 import { writeClipboardText } from "@/lib/clipboard";
 
 export const nodeClipboardCommand = /^toonflow:paste-node:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -89,8 +89,13 @@ export async function readClipboardNodes(command: string, directory: string) {
     }
     path.forEach(id => checked.add(id));
   }
-  const hasWorkspaceFile = nodes.some(node => Object.values(node.data.outputs ?? {}).some(output => isNodeOutput(output)
-    && typeof output.value === "object" && !/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(output.value.url)));
+  // ACT: 用 mediaUrl 收窄 —— 只有素材值才可能引用工作区文件；
+  // SEMANTIC 之类的对象值没有 url，跨项目粘贴时不需要工作目录。
+  const hasWorkspaceFile = nodes.some(node => Object.values(node.data.outputs ?? {}).some(output => {
+    if (!isNodeOutput(output)) return false;
+    const url = mediaUrl(output);
+    return !!url && !/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(url);
+  }));
   if (hasWorkspaceFile && entry.directory !== directory) {
     throw new Error(entry.directory ? "此节点引用工作区文件，不能跨项目粘贴" : "节点剪贴数据缺少工作目录，请重新复制");
   }

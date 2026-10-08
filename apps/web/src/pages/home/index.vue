@@ -119,7 +119,7 @@ import workspacePicker from "./workspacePicker.vue";
 const settingsVisible = ref(false);
 // 首页的素材库：素材库是全局的，不需要先打开项目就能管理素材。
 const assetsVisible = ref(false);
-// 配方卡片库：浏览现有卡（分析卡 / HTML 卡 / FFmpeg 配方卡），不依赖当前项目。
+// 配方卡片库：浏览现有卡（内置分析手法 / HTML 卡 / FFmpeg 卡），不依赖当前项目。
 const cardLibraryVisible = ref(false);
 const router = useRouter();
 const creating = ref(false);

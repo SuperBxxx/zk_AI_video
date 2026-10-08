@@ -17,7 +17,6 @@ import router from "@/router";
 import { registerDesktopProtocol } from "@/lib/desktopProtocol";
 import { registerDesktopDownloads } from "@/lib/saveFile";
 import { loadSettings, settingsStorage } from "@/stores/settings";
-import { checkDesktopUpdate } from "@/stores/desktopUpdate";
 import { registerLanguage } from "@/lib/i18n";
 import { locale, translate } from "@toonflow/i18n/vue";
 
@@ -56,8 +55,10 @@ async function notifyDesktopReady(failed = false) {
     await new Promise<void>((resolve) => window.addEventListener("load", () => resolve(), { once: true }));
   }
   await notifyDesktopReady();
-  // ACT: 桌面启动后只静默检查一次；失败留待用户手动重试，不阻塞启动或自动下载。
-  void checkDesktopUpdate(true).catch(() => {});
+  // ACT: 原先这里在桌面启动时静默检查一次更新。**已移除** —— 本产品暂不做在线更新，
+  // 而那次检查的地址默认指向上游仓库：这台机器打不通 GitHub，失败又被 `.catch(() => {})`
+  // 吞掉，表现为"什么反应都没有"。设置里的「检查更新」按钮仍然保留，需要时手动用。
+  // 以后恢复在线更新：在这里加回调用，并把 UPDATE_BASE_URL 指到我们自己的发布地址。
 }).catch(async (error) => {
   console.error("页面初始化失败：", error);
   if (isMounted) app.unmount();

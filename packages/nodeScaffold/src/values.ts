@@ -31,8 +31,7 @@ export type NodeOutput = {
 export type NodeOutputs = Record<string, NodeOutput | undefined>;
 export type NodeInputValue = (NodeOutput | { dataType: string | string[]; value: undefined }) & { source: string; sourceHandle: string };
 
-export function isNodeOutput(output: unknown): output is NodeOutput {
-  if (!output || typeof output !== "object" || !("dataType" in output) || !("value" in output)) return false;
+export function isNodeOutput(output: unknown): output is NodeOutput {  if (!output || typeof output !== "object" || !("dataType" in output) || !("value" in output)) return false;
   const { dataType, value } = output;
   switch (dataType) {
     case "STRING": return typeof value === "string";
@@ -60,4 +59,17 @@ export function isNodeOutput(output: unknown): output is NodeOutput {
     }
     default: return false;
   }
+}
+
+/**
+ * 取节点值里的**工作区文件路径**（`url`），非素材值返回 undefined。
+ *
+ * ACT: 不能只写 `typeof value === "object"` 就取 `.url` —— `SEMANTIC` 值也是对象，
+ * 但它没有 url（它不是素材）。踩过：加 `SEMANTIC` 之后，资产面板与剪贴板三处
+ * 「所有对象值都有 url」的假设全部报错。凡是要读 `url`，都用这个函数收窄。
+ */
+export function mediaUrl(output: NodeOutput | undefined): string | undefined {
+  if (!output || typeof output.value !== "object" || output.value === null) return undefined;
+  const url = (output.value as { url?: unknown }).url;
+  return typeof url === "string" && url ? url : undefined;
 }

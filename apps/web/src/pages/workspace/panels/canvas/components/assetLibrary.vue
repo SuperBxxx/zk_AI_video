@@ -127,7 +127,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import axios from "axios";
 import { ElMessage, ElTree, type InputInstance, type TreeNodeData } from "element-plus";
 import { IconDots, IconDownload, IconEye, IconFile, IconFolderFilled, IconFolderPlus, IconMusic, IconPhoto, IconRefresh, IconSearch, IconUpload, IconVideo, IconX } from "@tabler/icons-vue";
-import type { NodeOutput } from "@toonflow/nodes-scaffold/values";
+import { mediaUrl, type NodeOutput } from "@toonflow/nodes-scaffold/values";
 import { startAssetDrag } from "../canvasDrop";
 import useWorkspaceFiles from "@/lib/workspaceFiles";
 import assetMenu from "./assetMenu.vue";
@@ -373,7 +373,8 @@ const extension = computed(() => {
   const output = outputs.value[selectedOutput.value]?.output;
   if (!output) return "";
   if (typeof output.value !== "object") return output.dataType === "STRING" ? ".txt" : ".json";
-  return output.value.url.match(/\.[^./\\]+$/)?.[0] ?? "";
+  // ACT: 用 mediaUrl 收窄 —— SEMANTIC 值也是对象，但它没有 url（不是素材）。
+  return mediaUrl(output)?.match(/\.[^./\\]+$/)?.[0] ?? "";
 });
 
 function directoryEntries(items: AssetEntry[]): AssetEntry[] {
@@ -539,9 +540,12 @@ async function saveAsset() {
   const path = saveDirectory.value === "." ? name : `${saveDirectory.value}/${name}`;
   saving.value = true;
   try {
-    const content = typeof output.value === "object"
-      ? await useWorkspaceFiles(() => sourceDirectory).read(output.value.url)
-      : new Blob([String(output.value)]);
+    // ACT: 只有素材值才有工作区文件可读；SEMANTIC 之类的对象值走后面的字符串分支
+    // （它们本来就该序列化成 JSON 存，而不是当文件复制）。
+    const mediaPath = mediaUrl(output);
+    const content = mediaPath
+      ? await useWorkspaceFiles(() => sourceDirectory).read(mediaPath)
+      : new Blob([typeof output.value === "object" ? JSON.stringify(output.value, null, 2) : String(output.value)]);
     await axios.put("/api/assets/save", content, { params: { path }, headers: { "Content-Type": "application/octet-stream" } });
     saveVisible.value = false;
     ElMessage.success("已保存到素材库");
