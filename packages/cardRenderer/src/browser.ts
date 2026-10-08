@@ -46,14 +46,50 @@ const defaultTimeoutMs = 12000;
  * 不需要随包分发 Chromium（那要多 150MB+）。
  */
 export function resolveBrowserPath(explicit?: string): string | undefined {
-  return [
+  const local = process.env.LOCALAPPDATA ?? "";
+  const candidates = [
     explicit,
     process.env.ZK_CHROME_PATH,
     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+    // ACT: 补上容易被漏掉的两类位置 —— 用户级安装（无需管理员权限，很常见）与
+    // 系统盘不是 C: 的情况。踩过：这台机器的 Edge 恰好在 Program Files (x86) 被探测到，
+    // 但真实用户机器上会出现在下面这些位置，原先只查 4 个固定路径找不到就报"找不到浏览器"。
+    local ? `${local}\\Google\\Chrome\\Application\\chrome.exe` : "",
     "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
     "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-  ].filter(Boolean).find(candidate => existsSync(candidate as string)) as string | undefined;
+    local ? `${local}\\Microsoft\\Edge\\Application\\msedge.exe` : "",
+  ].filter(Boolean) as string[];
+
+  const found = candidates.find(candidate => existsSync(candidate));
+  if (found) return found;
+  // 最后一招：问注册表（App Paths 是 Chrome/Edge 安装时都会写的标准位置）。
+  return resolveBrowserFromRegistry();
+}
+
+/**
+ * 从注册表读浏览器的安装路径。
+ *
+ * ACT: 只在固定路径都没命中时才走 —— 它会起一次 `reg.exe`（几十毫秒），
+ * 不该在每次渲染时都付这个成本。查不到就返回 undefined，由调用方给出可执行的提示。
+ */
+function resolveBrowserFromRegistry(): string | undefined {
+  const keys = [
+    "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\chrome.exe",
+    "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\msedge.exe",
+    "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\chrome.exe",
+    "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\msedge.exe",
+  ];
+  for (const key of keys) {
+    try {
+      const result = spawnSync("reg", ["query", key, "/ve"], { encoding: "utf8", timeout: 5000, windowsHide: true });
+      // 形如：    (默认)    REG_SZ    C:\Program Files\...\chrome.exe
+      const match = /REG_SZ\s+(.+\.exe)\s*$/im.exec(result.stdout ?? "");
+      const path = match?.[1]?.trim();
+      if (path && existsSync(path)) return path;
+    } catch { /* 这一项没有就试下一项 */ }
+  }
+  return undefined;
 }
 
 /** 按 pid 结束整棵进程树。 */

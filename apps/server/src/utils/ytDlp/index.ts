@@ -3,6 +3,7 @@
 // ACT: 不随包内置 yt-dlp（官方 Windows exe 是 PyInstaller 产物，成品按 GPLv3+ 分发），
 // 改为首次使用时按需下载并校验 sha256 后安装。安装位置与 ffmpeg 同级：数据目录下的 ytdlp/。
 import { lstat, mkdir, rm } from "@toonflow/file";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { installYtDlp, getToolStatus, isVideoUrl, runYtDlp, executableName, downloadSources, version as toolVersion, type YtDlpMode } from "@toonflow/ytDlp";
 import conf from "@/utils/conf";
@@ -138,7 +139,15 @@ export async function fetchVideo(options: { directory: string; url: string; name
   // 它失败时**明确失败**，让用户退回"手动另存为再上传"，而不是把一个笼统报错丢给他。
   if (isDouyinUrl(url)) {
     const target = join(directory, `${stem ?? "%(title).80B [%(id)s]"}.mp4`.replace(/[<>:"|?*]/g, ""));
-    const profile = join(ytDlpDirectory(), "douyin");
+    // ACT: 临时浏览器的 profile 放在**系统临时目录**，不放数据目录。
+    //
+    // 为什么改：用户的机器上报 `Chrome 起不来（退出码 21）`，而 21 的含义正是
+    // **"创建 profile 目录失败"**。原先这个目录在**安装目录**下
+    // （`<安装目录>/data/ytdlp/douyin`）—— 那里恰恰是安全软件与目录 ACL 最常拦的地方，
+    // 而 Chrome 建 profile 会大量创建子目录/文件，比我们自己 mkdir 一个目录的权限要求高得多。
+    //
+    // 这是一次性的游客会话（用完即删、不承载用户数据），放系统临时目录既更稳，也更符合它的性质。
+    const profile = join(tmpdir(), `zhukai-douyin-${crypto.randomUUID().slice(0, 8)}`);
     try {
       const result = await fetchDouyin({ url, target, port: douyinPort, profileDirectory: profile, signal: options.signal, onLine });
       const info = await probe(result.path);
