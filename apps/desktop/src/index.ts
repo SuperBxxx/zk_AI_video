@@ -125,6 +125,18 @@ async function start() {
     await once(server, "listening");
     if (isClosing) return;
     const address = server.address() as AddressInfo;
+    // ACT: **必须把实际端口回写到环境变量**。
+    //
+    // 这里用 `listen(0)` 取随机端口（正确做法：避免与用户机器上别的服务冲突），
+    // 但插件工具（videoFetch / postProduction 等）是**通过 HTTP 回调本服务**的，
+    // 它们读的是 `process.env.TOONFLOW_PORT ?? process.env.PORT ?? "3000"`。
+    // 原先这两个变量都没设，于是桌面上所有工具都会去打 `127.0.0.1:3000` —— 那里没有服务，
+    // 报 `Unable to connect. Is the computer able to access the url?`。
+    //
+    // 症状极具误导性：WebView 里一切正常（它用的是 address.port），只有"工具发起的那次请求"
+    // 连不上 —— 看起来像"本机出不去外网"，实际是**打错了自己的端口**。B站/抖音一样失败，
+    // 因为与站点无关。
+    process.env.TOONFLOW_PORT = String(address.port);
     const { initializeMcpRuntime } = await import("@toonflow/server/mcp");
     await initializeMcpRuntime(app, `http://127.0.0.1:${address.port}`, resolve(PATHS.VIEWS_FOLDER, "../mcp/stdio.js"));
     console.log(`桌面服务：http://127.0.0.1:${address.port}`);
