@@ -4,7 +4,8 @@
 // 先看数据目录里下载好的，再回退到系统 PATH（`Bun.which`）；
 // 安装必须经过 sha256 校验与版本核验，再原子替换。
 import { createHash } from "node:crypto";
-import { createWriteStream, chmod, lstat, mkdir, mkdtemp, realpath, rename, rm, unlink, withFileAccess } from "@toonflow/file";
+import { promises as nativeFs } from "node:fs";
+import { createWriteStream, chmod, lstat, mkdir, mkdtemp, realpath, rm, withFileAccess } from "@toonflow/file";
 import { file } from "@toonflow/file/bun";
 import { basename, dirname, join, resolve } from "node:path";
 import { Readable, Transform } from "node:stream";
@@ -32,8 +33,25 @@ export type DownloadState = {
 
 export const executableName = process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
 
-async function readVersion(path: string, signal?: AbortSignal) {
-  const child = Bun.spawn([path, "--version"], {
+/**
+ * 在写租约内把临时文件改名到目标。
+ *
+ * ACT: 自己实现重试而不是复用 `@toonflow/file` 的 `rename` —— 那个包装会再取一次租约，
+ * 与外层已持有的同一个租约形成自锁（详见调用点的说明）。这里照它的口径重试
+ * Windows 上常见的瞬时失败（文件刚被写、或正被扫描）。
+ */
+async function renameWithRetry(source: string, target: string, attempt = 1): Promise<void> {
+  try {
+    await nativeFs.rename(source, target);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (attempt >= 10 || (code !== "EPERM" && code !== "EACCES" && code !== "EBUSY")) throw error;
+    await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+    return renameWithRetry(source, target, attempt + 1);
+  }
+}
+
+async function readVersion(path: string, signal?: AbortSignal) {  const child = Bun.spawn([path, "--version"], {
     stdin: "ignore", stdout: "pipe", stderr: "ignore", windowsHide: true, timeout: 60000, signal,
   });
   const [output, code] = await Promise.all([child.stdout.text(), child.exited]);
@@ -150,10 +168,20 @@ export async function installYtDlp(
 
     report({ phase: "installing", received: 0 });
     const target = join(destination, executableName);
+    // ACT: 这里**必须用原生 fs**，不能用 `@toonflow/file` 的 `unlink` / `rename`。
+    //
+    // 踩过的死锁：那两个包装内部各自会再取一次 `[target]` 的写租约
+    // （见 packages/file/src/index.ts 的 `withFileAccess([path], "write", ...)`），
+    // 而外层这里**已经持有**同一个 `[target]` 的写租约 —— 写租约占满信号量的全部许可，
+    // 嵌套那次只能排队等外层释放，外层却在等嵌套返回 → 永久自锁，
+    // 直到 30 秒超时才报出「文件正在使用，等待操作超时」。
+    // 现象很像"文件被别的进程占用"，实际是我们自己在等自己。
+    //
+    // 所以：租约由外层负责，块内只做纯粹的文件操作（原子的 `rename` 依旧，重试自己补）。
     await withFileAccess([target], "write", async () => {
-      // Windows 上 rename 不能覆盖已存在文件，先删目标再改名
-      await unlink(target).catch(() => {});
-      await rename(staged, target);
+      // Windows 上 rename 不能覆盖已存在文件，先删目标再改名。
+      await nativeFs.unlink(target).catch(() => {});
+      await renameWithRetry(staged, target);
     });
     report({ phase: "completed", received, total });
     return target;
