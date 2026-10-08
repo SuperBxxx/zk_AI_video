@@ -4,7 +4,7 @@
 // 改为首次使用时按需下载并校验 sha256 后安装。安装位置与 ffmpeg 同级：数据目录下的 ytdlp/。
 import { lstat, mkdir, rm } from "@toonflow/file";
 import { dirname, join, resolve } from "node:path";
-import { installYtDlp, getToolStatus, isVideoUrl, runYtDlp, executableName, type YtDlpMode } from "@toonflow/ytDlp";
+import { installYtDlp, getToolStatus, isVideoUrl, runYtDlp, executableName, downloadSources, version as toolVersion, type YtDlpMode } from "@toonflow/ytDlp";
 import conf from "@/utils/conf";
 import { createWorkspaceFfmpeg } from "@/utils/ffmpeg";
 import { fetchDouyin, parseDouyinId } from "@/utils/douyin";
@@ -27,10 +27,24 @@ function mode(): YtDlpMode {
   return value.mode === "download" || value.mode === "system" ? value.mode : "auto";
 }
 
+/** 用户选定的下载源 id（未设置则 undefined，交由 ensureTool 依次尝试）。 */
+function preferredSource(): string | undefined {
+  const raw = conf.get("settings", {}).ytdlp;
+  const value = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+  return typeof value.source === "string" && value.source ? value.source : undefined;
+}
+
 export async function getStatus() {
   const directory = ytDlpDirectory();
   const status = await getToolStatus(directory, mode());
-  return { ...status, directory, platform: process.platform, arch: process.arch, executable: executableName };
+  // 面板要展示可选线路；available:false 的也会返回，由界面标注为不可选。
+  return {
+    ...status,
+    directory, platform: process.platform, arch: process.arch, executable: executableName,
+    sources: downloadSources,
+    source: preferredSource() ?? downloadSources.find(source => source.available)?.id,
+    version: toolVersion,
+  };
 }
 
 /**
@@ -42,13 +56,53 @@ export async function ensureTool(signal?: AbortSignal, report?: (line: string) =
   if (current.path && !current.error) return current.path;
   await mkdir(directory, { recursive: true });
   report?.("未检测到 yt-dlp，正在下载并校验…");
-  const installed = await installYtDlp(directory, "ghProxy", signal ?? new AbortController().signal, state => {
-    if (state.phase === "downloading" && state.total) {
-      const percent = Math.floor((state.received / state.total) * 100);
-      if (percent % 10 === 0) report?.(`正在下载 yt-dlp ${percent}%`);
+
+  // ACT: **依次尝试多条线路**，而不是只打第一个。
+  // 踩过：原先硬编码只用 ghProxy 一个源，那一条不通就把 Bun fetch 的原始错误
+  // （"Unable to connect. Is the computer able to access the url?"）直接抛给用户 ——
+  // 既看不出是哪一步失败，也不知道换个源就能成。
+  // 顺序：用户选定的源优先，然后是源表里 available 的（国内可达的排在前面）。
+  const chosen = preferredSource();
+  const ordered = [
+    ...downloadSources.filter(source => source.available && source.id === chosen),
+    ...downloadSources.filter(source => source.available && source.id !== chosen),
+  ];
+  if (!ordered.length) throw new Error("没有可用的 yt-dlp 下载线路，请检查源表配置");
+
+  const failures: string[] = [];
+  // ACT: 每条线路单独限时 + 总体预算。
+  // 踩过：不设限时的时候，一条连不上的线路会白等 ~83 秒（Windows 的文件占用超时），
+  // 7 条就是 585 秒 —— 用户盯着一个必然失败的下载等十分钟，这比直接失败更糟。
+  const perSourceMs = 90_000;
+  const totalBudgetMs = 5 * 60_000;
+  const startedAt = Date.now();
+  for (const [index, source] of ordered.entries()) {
+    signal?.throwIfAborted();
+    if (Date.now() - startedAt > totalBudgetMs) {
+      failures.push(`（已用满 ${Math.round(totalBudgetMs / 60_000)} 分钟总预算，剩下 ${ordered.length - index} 条线路未尝试）`);
+      break;
     }
-  });
-  return installed;
+    report?.(`正在从「${source.label}」下载 yt-dlp（第 ${index + 1}/${ordered.length} 条线路）…`);
+    try {
+      return await installYtDlp(directory, source.id, signal ?? new AbortController().signal, state => {
+        if (state.phase === "downloading" && state.total) {
+          const percent = Math.floor((state.received / state.total) * 100);
+          if (percent % 10 === 0) report?.(`正在下载 yt-dlp ${percent}%（${source.label}）`);
+        }
+      }, perSourceMs);
+    } catch (error) {
+      // 用户主动取消要立刻停下，不要当成"这个源不行"继续换源。
+      signal?.throwIfAborted();
+      const reason = error instanceof Error ? error.message : String(error);
+      failures.push(`${source.label}：${reason}`);
+      report?.(`「${source.label}」失败（${reason}），换下一条线路…`);
+    }
+  }
+
+  throw Object.assign(new Error(
+    `所有 yt-dlp 下载线路都失败了。逐条结果：\n${failures.map(item => `  · ${item}`).join("\n")}\n` +
+    "可以在「设置 → 取流工具」里换一条线路重试；仍不行时说明当前网络到这些镜像都不通。",
+  ), { status: 502, code: "YTDLP_SOURCES_FAILED" });
 }
 
 export type FetchResult = { path: string; duration: number | null; width: number | null; height: number | null; hasAudio: boolean };

@@ -77,10 +77,17 @@ async function checkDirectory(path: string) {
  * ACT: 与 ffmpeg 的分阶段替换不同 —— yt-dlp 只有一个文件，
  * 先下到临时目录校验，通过后 `rename` 覆盖即可，不需要备份旧版本目录。
  */
-export async function installYtDlp(directory: string, sourceId: string, signal: AbortSignal, report: (state: DownloadState) => void) {
+export async function installYtDlp(
+  directory: string,
+  sourceId: string,
+  signal: AbortSignal,
+  report: (state: DownloadState) => void,
+  /** 单条线路的超时（毫秒）。ACT: 必须有 —— 见 ensureTool 里对 83 秒白等的说明。 */
+  timeoutMs = 90_000,
+) {
   const source = downloadSourcesById[sourceId as keyof typeof downloadSourcesById];
   if (!source?.available) throw new Error("此下载源暂不可用，请选择其他下载源");
-  signal = AbortSignal.any([signal, AbortSignal.timeout(15 * 60 * 1000)]);
+  signal = AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]);
   signal.throwIfAborted();
   const parent = dirname(resolve(directory));
   await checkDirectory(parent);

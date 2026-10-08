@@ -26,7 +26,7 @@
 
 <script setup lang="ts">
 import { defineAsyncComponent, shallowRef } from "vue";
-import { IconAdjustments, IconPhotoVideo, IconInfoCircle, IconMicrophone2, IconSubtitlesAi, IconTransform } from "@tabler/icons-vue";
+import { IconAdjustments, IconCloudDownload, IconPhotoVideo, IconInfoCircle, IconMicrophone2, IconSubtitlesAi, IconTransform } from "@tabler/icons-vue";
 
 // ACT: 只保留模型配置、工具配置、FFmpeg 与开源许可。界面设置、常规配置、MCP、隐私、开发者选项
 // 已按产品要求隐藏（对应面板文件仍在，需要时把条目加回来即可）。
@@ -46,6 +46,7 @@ const settingsPanels = [
   { id: "voiceModel", label: "语音模型", icon: IconMicrophone2, component: defineAsyncComponent(() => import("./panels/voiceModel/index.vue")) },
   { id: "tools", label: "工具配置", icon: IconAdjustments, groupLabel: "其他", component: defineAsyncComponent(() => import("./panels/tools.vue")) },
   { id: "ffmpeg", label: "FFmpeg", icon: IconTransform, groupLabel: "其他", component: defineAsyncComponent(() => import("./panels/ffmpeg/index.vue")) },
+  { id: "ytDlp", label: "取流工具", icon: IconCloudDownload, groupLabel: "其他", component: defineAsyncComponent(() => import("./panels/ytDlp/index.vue")) },
   { id: "about", label: "关于", icon: IconInfoCircle, component: defineAsyncComponent(() => import("./panels/about.vue")) },
 ];
 const activePanel = shallowRef(settingsPanels[0]!);
