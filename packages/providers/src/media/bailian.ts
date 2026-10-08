@@ -30,6 +30,10 @@ const version = "2.1.0";
 const generatePath = "/services/aigc/multimodal-generation/generation";
 // 音色创建（声音复刻 / 声音设计）端点，与合成分开。
 const voicePath = "/services/audio/tts/customization";
+// 声音复刻（voice cloning）与声音设计（voice design）是两个不同的目标模型，
+// 且登记与合成都必须用同一个 —— 见 createVoice 里的实测记录。
+const enrollmentTarget = "qwen3-tts-vc-2026-01-22";
+const voiceDesignTarget = "qwen3-tts-vd-2026-01-26";
 
 // 把 MediaInput 转成 Data URL，供需要 Base64 的接口使用。
 function dataUrl(input: MediaInput) {
@@ -102,6 +106,19 @@ export default {
         { title: "Chelsie（千雪·女声）", voice: "Chelsie" },
       ],
     },
+    {
+      // ACT: 声音设计用的模型 —— 与 qwen3-tts-vc 同理，**面板里必须能选到它**，
+      // 否则设计完没有模型能用那个音色（设计音色只被 qwen3-tts-vd-* 授权合成）。
+      id: "qwen3-tts-vd-2026-01-26",
+      label: "Qwen3-TTS-VD（声音设计）",
+      type: "audio",
+      voices: [
+        { title: "Cherry（芊悦·女声）", voice: "Cherry" },
+        { title: "Serena（苏瑶·女声）", voice: "Serena" },
+        { title: "Ethan（晨煦·男声）", voice: "Ethan" },
+        { title: "Chelsie（千雪·女声）", voice: "Chelsie" },
+      ],
+    },
   ] satisfies ProviderModel[],
   async generateAudio(request: AudioRequest): Promise<MediaAsset[]> {
     const apiKey = this.config.apiKey?.trim();
@@ -158,12 +175,30 @@ export default {
     //     does not exist or is not licensed for use`；换成 qwen3-tts-vc-2026-01-22 才成功。
     //
     // 所以登记与合成两侧都必须是这个模型，任一侧用别的名字都会失败。
-    // 语音面板里的 targetModel 因此只影响"合成用哪个模型"，不影响登记 —— 见 models 里的说明。
-    const enrollmentTarget = "qwen3-tts-vc-2026-01-22";
-    const input: Record<string, unknown> = { action: "create", preferred_name: preferredName, target_model: enrollmentTarget };
-    if (request.description?.trim()) {
-      // 声音设计：用文字描述生成音色，不需要样本。
-      input.text = request.description.trim();
+    // （模型名见文件顶部的 enrollmentTarget / voiceDesignTarget 常量。）
+
+    // ACT: 声音设计走**另一个服务** `qwen-voice-design`，不是 voice-enrollment。
+    //
+    // 原先的实现是把描述填进 enrollment 的 `input.text` —— 实测（2026-10-08，真 Key）：
+    //   · enrollment + 只传 text（无 audio）→ `InvalidParameter: Required input 'audio.data' is invalid`
+    //   · 官方文档里 enrollment 的 `text` 含义是"**样本音频对应的文本**，用于辅助提升复刻效果"，
+    //     根本不是音色描述 —— 也就是说这条路从语义上就不成立。
+    //
+    // 官方「声音设计」文档：https://help.aliyun.com/zh/model-studio/voice-design-user-guide
+    //   model        = qwen-voice-design
+    //   input.action = create
+    //   voice_prompt = 声音描述（如"沉稳的中年男性，音色低沉有磁性"）
+    //   preview_text = 预览音频要朗读的文本（必填）
+    //   target_model = qwen3-tts-vd-2026-01-26（vd = voice design；合成也必须用它）
+    // 实测该契约可用：登记返回 voice + base64 预览音频，再用 qwen3-tts-vd-2026-01-26 合成成功。
+    const byDesign = !!request.description?.trim();
+    const targetModel = byDesign ? voiceDesignTarget : enrollmentTarget;
+    const input: Record<string, unknown> = { action: "create", preferred_name: preferredName, target_model: targetModel };
+    if (byDesign) {
+      input.voice_prompt = request.description!.trim();
+      // ACT: 预览文本由我们给一句通用中文 —— 面板没有这个输入框，
+      // 而它只是"生成音色时用来试听的那句话"，不影响音色本身。
+      input.preview_text = "你好，这是用这段描述生成的音色，请试听确认效果。";
     } else {
       const sample = request.sample;
       if (!sample) throw new Error("请提供用于复刻的音频样本");
@@ -174,11 +209,11 @@ export default {
     const response = await this.tool.fetch(`${baseUrl}${voicePath}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "qwen-voice-enrollment", input }),
+      body: JSON.stringify({ model: byDesign ? "qwen-voice-design" : "qwen-voice-enrollment", input }),
       signal,
     });
     const data = await response.json().catch(() => undefined) as
-      { output?: { voice?: string }; message?: string; code?: string } | undefined;
+      { output?: { voice?: string; preview_audio?: { data?: string } }; message?: string; code?: string } | undefined;
     if (!response.ok) throw new Error(this.tool.errorMessage(data) || `音色创建失败：HTTP ${response.status}`);
     const voice = data?.output?.voice;
     if (!voice) throw new Error(this.tool.errorMessage(data) || "供应商未返回音色标识");
