@@ -30,6 +30,8 @@ declare module 'vue' {
     ElCollapseItem: typeof import('element-plus/es')['ElCollapseItem']
     ElConfigProvider: typeof import('element-plus/es')['ElConfigProvider']
     ElContainer: typeof import('element-plus/es')['ElContainer']
+    ElDescriptions: typeof import('element-plus/es')['ElDescriptions']
+    ElDescriptionsItem: typeof import('element-plus/es')['ElDescriptionsItem']
     ElDialog: typeof import('element-plus/es')['ElDialog']
     ElDivider: typeof import('element-plus/es')['ElDivider']
     ElDropdown: typeof import('element-plus/es')['ElDropdown']
@@ -101,6 +103,7 @@ declare module 'vue' {
     Ui: typeof import('./../components/settings/panels/ui.vue')['default']
     UpdateBox: typeof import('./../components/updateBox.vue')['default']
     VoiceModel: typeof import('./../components/settings/panels/voiceModel/index.vue')['default']
+    YtDlp: typeof import('./../components/settings/panels/ytDlp/index.vue')['default']
   }
   export interface GlobalDirectives {
     vLoading: typeof import('element-plus/es')['ElLoadingDirective']
