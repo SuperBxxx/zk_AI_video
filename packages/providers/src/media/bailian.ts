@@ -217,7 +217,9 @@ export default {
     if (!response.ok) throw new Error(this.tool.errorMessage(data) || `音色创建失败：HTTP ${response.status}`);
     const voice = data?.output?.voice;
     if (!voice) throw new Error(this.tool.errorMessage(data) || "供应商未返回音色标识");
-    return { voice, label: preferredName };
+    // ACT: 一并回传**实际使用的合成模型** —— 复刻与设计是两个不同模型，
+    // 调用方（面板）无从知道内部选了哪个，只有这里知道。见 VoiceResult.targetModel 的说明。
+    return { voice, label: preferredName, targetModel };
   },
   async transcribe(request: TranscribeRequest): Promise<TranscriptResult> {
     const apiKey = this.config.apiKey?.trim();

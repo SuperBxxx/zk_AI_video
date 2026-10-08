@@ -142,12 +142,20 @@ async function loadVoices() {
         const { data: content } = await axios.get<Record<string, unknown>>("/api/assets/read", { params: { path: file.path } });
         const voice = typeof content.voice === "string" ? content.voice : "";
         if (!voice) continue;
+        // ACT: 按音色 ID 的前缀**自愈模型字段**。
+        // 百炼把模型编进了音色 ID（`qwen-tts-vc-…` / `qwen-tts-vd-…`），而早期版本把用户选中的
+        // 模型名存进了 model 字段 —— 复刻与设计是两个不同模型，于是设计音色被存成 vc，
+        // 直接回放会 400。这里以 ID 为准纠正，老音色不必重新创建。
+        const storedModel = typeof content.model === "string" ? content.model : "";
+        const model = voice.startsWith("qwen-tts-vd") ? "qwen3-tts-vd-2026-01-26"
+          : voice.startsWith("qwen-tts-vc") ? "qwen3-tts-vc-2026-01-22"
+            : storedModel;
         loaded.push({
           name: typeof content.name === "string" ? content.name : file.name,
           path: file.path,
           voice,
           providerId: typeof content.providerId === "string" ? content.providerId : "",
-          model: typeof content.model === "string" ? content.model : "",
+          model,
           source: content.source === "design" ? "design" : "clone",
         });
       } catch {
@@ -265,8 +273,11 @@ async function createVoice(byDesign: boolean) {
     const payload = byDesign
       ? { providerId: target.providerId, modelId: target.modelId, name, description: description.value.trim(), targetModel: target.modelId }
       : { providerId: target.providerId, modelId: target.modelId, name, targetModel: target.modelId, sample: { type: "base64", data: await blobToDataUrl(sample.value!.blob), mimeType: voiceMimeTypes.includes(sample.value!.mimeType) ? sample.value!.mimeType : "audio/wav" } };
-    const { data } = await axios.post<{ data: { voice: string; label?: string } }>("/api/ai/voices/create", payload);
-    await saveVoice(data.data.voice, name, target.providerId, target.modelId, byDesign ? "design" : "clone");
+    const { data } = await axios.post<{ data: { voice: string; label?: string; targetModel?: string } }>("/api/ai/voices/create", payload);
+    // ACT: 存**供应商回传的实际合成模型**，不用 target.modelId ——
+    // 百炼的复刻与设计是两个不同模型（vc / vd），而登记时内部只用其中一个，
+    // 存错模型会导致回放 400（实测）。供应商没回传时才回退到用户选中的那个。
+    await saveVoice(data.data.voice, name, target.providerId, data.data.targetModel?.trim() || target.modelId, byDesign ? "design" : "clone");
     ElMessage.success(byDesign ? "音色已生成并保存" : "音色复刻完成并保存");
   } catch (error) {
     showError(error);
@@ -311,7 +322,22 @@ async function preview() {
   synthesizing.value = true;
   createError.value = "";
   try {
-    previewUrl.value = await synthesize(previewText.value.trim(), "", target.providerId, target.modelId);
+    // ACT: 原先这里传 voice: ""，被服务端 schema（voice 最小长度 1）拒成「参数错误」，
+    // 所以"合成试听"从来没能用过。现在按语义挑一个**真的能用**的音色：
+    //
+    //   · 优先用与当前模型匹配的已保存音色 —— 这正是用户刚复刻/设计出来想听的那个；
+    //     必须匹配模型，因为复刻音色只能被 vc 模型合成、设计音色只能被 vd 模型合成。
+    //   · 没有匹配的，只有 qwen3-tts-flash 能用内置音色 Cherry
+    //     （实测：qwen3-tts-vc / qwen3-tts-vd / qwen-audio-3.0-tts-plus 用 Cherry 都 400 ——
+    //      它们是"专属音色"模型，只认自己创建的 voice）。
+    //   · 两者都不满足时**明确说明**，而不是发一个注定失败的请求。
+    const matched = [...voices.value].reverse().find(item => item.providerId === target.providerId && item.model === target.modelId);
+    const voice = matched?.voice ?? (target.modelId === "qwen3-tts-flash" ? "Cherry" : "");
+    if (!voice) {
+      createError.value = "这个模型只支持它自己创建的音色：请先用「声音复刻」或「声音设计」创建一个音色，再用播放按钮试听。";
+      return;
+    }
+    previewUrl.value = await synthesize(previewText.value.trim(), voice, target.providerId, target.modelId);
   } catch (error) {
     showError(error);
   } finally {

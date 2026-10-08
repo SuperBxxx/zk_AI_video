@@ -271,4 +271,13 @@ interface VoiceResult {
   voice: string;
   /** 供应商返回的展示名，可能与请求的 name 不同。 */
   label?: string;
+  /**
+   * 供应商**实际**用到的合成模型 —— 合成该音色时必须用它，否则会失败。
+   *
+   * ACT: 由供应商回传而不是调用方自己推断。踩过：面板把用户选中的模型当成这个值存下来，
+   * 而百炼的声音复刻与声音设计用的是**两个不同模型**（qwen3-tts-vc-* / qwen3-tts-vd-*），
+   * 于是设计出来的音色带着 vc 的模型名，回放时 400（InvalidParameter）。
+   * 不返回时由调用方回退到请求里的模型。
+   */
+  targetModel?: string;
 }
