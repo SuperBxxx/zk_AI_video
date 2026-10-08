@@ -127,8 +127,18 @@ export async function extractDouyinUri(videoId: string, options: { port: number;
 /**
  * 用 uri 换直链并下载。
  *
- * ACT: 让 fetch **自己跟随 302**（默认行为）。实测手动分两步也能成，
- * 但跟随跳转更省事，而且**不要加 Range 头** —— 实测带 Range 会被签名 URL 拒成 403。
+ * ACT: **绝对不要带 `Referer`** —— 这条是踩出来的确定性结论。
+ *
+ * 实测（2026-10-08，同一条视频、同一个已签名 location、交替跑两轮）：
+ *   带 `referer: https://www.douyin.com/` → **HTTP 403，0 字节**（两轮都是）
+ *   不带 referer                        → **HTTP 200，2.22 MB**（两轮都是）
+ * 所以 CDN 会因为 Referer 反过来拒绝这个请求。
+ *
+ * 这个头原先是被一路留着的（早期调试时的猜测），代价是**部分视频必然失败**：
+ * 我先前测的那条恰好不受影响，换一条就稳定 403，很容易误判成"平台风控"。
+ *
+ * 另外两条同源经验：让 fetch **在一个请求里跟随 302**（默认行为），
+ * 以及**不要加 Range** —— 两者都会让签名校验失败。
  */
 export async function downloadDouyinVideo(options: {
   uri: string;
@@ -140,7 +150,7 @@ export async function downloadDouyinVideo(options: {
   const endpoint = `https://aweme.snssdk.com/aweme/v1/play/?video_id=${encodeURIComponent(options.uri)}&ratio=${ratio}&line=0`;
   const response = await fetch(endpoint, {
     signal: options.signal,
-    headers: { "user-agent": userAgent, referer: "https://www.douyin.com/" },
+    headers: { "user-agent": userAgent },
   });
   if (!response.ok || !response.body) throw new Error(`抖音直链下载失败（HTTP ${response.status}）`);
   const bytes = new Uint8Array(await response.arrayBuffer());
