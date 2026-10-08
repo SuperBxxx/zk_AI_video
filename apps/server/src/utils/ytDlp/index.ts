@@ -53,7 +53,14 @@ export async function getStatus() {
 export async function ensureTool(signal?: AbortSignal, report?: (line: string) => void) {
   const directory = ytDlpDirectory();
   const current = await getToolStatus(directory, mode());
-  if (current.path && !current.error) return current.path;
+  // ACT: 只要**程序在**就直接用 —— 不看 `error`。
+  // `error` 现在表示"探测时跑不起来"（多为新落盘的 exe 正被杀软扫描这类环境抖动），
+  // 不再是"没装"。若在这里因 error 触发重装，一个环境抖动就会变成
+  // "重下 17 MB → 再探测 → 再重装"的循环。装没装看 path，能不能跑由使用者去暴露。
+  if (current.path) {
+    if (current.error) report?.(`yt-dlp 已安装，但探测时报错（仍将继续使用）：${current.error}`);
+    return current.path;
+  }
   await mkdir(directory, { recursive: true });
   report?.("未检测到 yt-dlp，正在下载并校验…");
 

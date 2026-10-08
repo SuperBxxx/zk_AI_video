@@ -58,6 +58,11 @@ export async function getToolStatus(directory: string, mode: YtDlpMode = "auto")
   try {
     return { path, origin, version: await readVersion(path), error: null };
   } catch (error) {
+    // ACT: 程序在、但跑不起来时**仍然返回 path**。
+    // 为什么：安装的门槛是 sha256（字节正确），"能不能跑"受当时环境影响
+    // （新落盘的 exe 被扫描时 PyInstaller 解包会失败）。若这里返回 path:null，
+    // 调用方会以为"没装"而反复重装 —— 一个环境抖动就会变成重装循环。
+    // 所以把 path 交出去，让真正去取流的人拿到那条运行错误。
     return { path, origin, version: null, error: error instanceof Error ? error.message : String(error) };
   }
 }
@@ -116,12 +121,32 @@ export async function installYtDlp(
     }), createWriteStream(staged, { flags: "wx", signal }), { signal });
 
     report({ phase: "verifying", received, total });
+    // sha256 一致就证明**文件是对的**（字节级），这是安装的门槛。
     if (hash.digest("hex") !== build.sha256) throw new Error("yt-dlp 文件校验失败，请换源重试");
     if (process.platform !== "win32") await chmod(staged, 0o755);
-    // ACT: 校验通过后再核验它能运行；PyInstaller 单文件在某些目录下解包会失败，
-    // 所以这里必须真的执行一次，而不是只看文件在不在。
-    const actual = await readVersion(staged, signal);
-    if (actual !== version) throw new Error(`yt-dlp 版本不符（期望 ${version}，实际 ${actual}）`);
+
+    // ACT: 版本核验**不再是硬性门槛**，降级为"尽力而为"。
+    //
+    // 原先这里 `readVersion` 一失败就抛错 → 整次安装失败 → 换源重试。
+    // 实测教训：sha256 完全正确、字节与官方一致的文件，也可能因为**当时的环境状态**
+    // （典型是新落盘的 exe 正被杀软扫描，PyInstaller 解包拿不到句柄）跑不起来，
+    // 报 `Could not create temporary directory!`。为这种事把正确的文件丢掉、
+    // 再花几分钟换源重下，是拿环境问题惩罚下载结果。
+    //
+    // 所以：能跑就记下版本；跑不起来只**记一条提示**，照常安装。
+    // 真正跑不动时，第一次取流会如实报出运行错误 —— 那才是它该暴露的地方。
+    let actual: string | null = null;
+    try {
+      actual = await readVersion(staged, signal);
+    } catch (error) {
+      signal.throwIfAborted();
+      console.warn("yt-dlp 版本核验失败（不影响安装，文件校验已通过）：", error instanceof Error ? error.message : error);
+    }
+    if (actual && actual !== version) {
+      // ACT: 版本不符是**另一回事** —— 说明这个镜像给的不是我们要的那一版，
+      // 不能当成环境抖动放过去（否则等于放弃固定版本这条约束）。
+      throw new Error(`yt-dlp 版本不符（期望 ${version}，实际 ${actual}），请换源重试`);
+    }
 
     report({ phase: "installing", received: 0 });
     const target = join(destination, executableName);
