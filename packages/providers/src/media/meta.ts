@@ -59,14 +59,16 @@ async function pollVideo(context: ProviderContext, baseUrl: string, apiKey: stri
 
 export default {
   id: "meta",
-  label: "秘塔版MiniMax H3",
+  label: "秘塔版 MiniMax H3 / Seedance",
   version,
   // ACT: 去掉上游 readme 里的价格宣传话术与渠道码（原链接为
   // https://metaso.cn/minimax-h3/?s=toon，?s= 是上游作者的推广参数，
   // 与 APIMart 那处返利链接同性质）。只保留官方平台地址。
-  readme: `## 秘塔版 MiniMax H3
+  readme: `## 秘塔版 MiniMax H3 / Seedance
 
-提供 MiniMax H3 视频生成服务，支持原生 2K 与音画同步，API 兼容 OpenAI 协议，无需自行部署 GPU。
+提供 MiniMax H3 与 Seedance 2.0 视频生成服务，支持原生 2K 与音画同步，API 兼容 OpenAI 协议，无需自行部署 GPU。
+
+可用模型：\`MiniMax-H3\`、\`seedance-2.0\`、\`seedance-2.0-mini\`
 
 前往平台获取密钥：<https://metaso.cn/minimax-h3/>`,
   rules,
@@ -78,6 +80,28 @@ export default {
       mode: ["text", "startFrameOptional", ["imageReference:9", "videoReference:3", "audioReference:3"]],
       audio: "optional",
       durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["768P", "2K"] }],
+    },
+    // ACT: 秘塔这个通道现在也代理 Seedance，接口形状与 H3 **完全一致**
+    // （同一路径 `POST /v2/video_generation`、同一个 `content` 数组、同样的
+    // `duration`/`resolution`/`ratio` 字段，只有 `model` 不同），所以直接复用同一个
+    // `generateVideo`，只是多两个模型条目。
+    //
+    // 能力声明照搬 `apiMart.ts` 里同 id 的条目，保证两个供应商对同一个模型的说法一致。
+    {
+      id: "seedance-2.0",
+      label: "Seedance-2.0 (支持真人)",
+      type: "video",
+      mode: ["text", "startFrameOptional", ["imageReference:9", "videoReference:3", "audioReference:3"]],
+      audio: "optional",
+      durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["480p", "720p", "1080p"] }],
+    },
+    {
+      id: "seedance-2.0-mini",
+      label: "Seedance 2.0 mini (支持真人)",
+      type: "video",
+      mode: ["text", "startFrameOptional", ["imageReference:9", "videoReference:3", "audioReference:3"]],
+      audio: "optional",
+      durationResolutionMap: [{ duration: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolution: ["480p", "720p"] }],
     },
   ] satisfies ProviderModel[],
   async generateVideo(request: VideoRequest): Promise<MediaAsset[]> {
