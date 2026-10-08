@@ -28,6 +28,15 @@ const version = "2.1.0";
 // 请求 POST {baseUrl}/services/aigc/multimodal-generation/generation
 // 响应 output.audio.url 指向完整音频文件（有效期 24 小时），宿主会下载到工作区。
 const generatePath = "/services/aigc/multimodal-generation/generation";
+// ACT: Qwen-Audio-TTS / CosyVoice **走另一个端点** —— 官方明确"端点不可混用"。
+// 文档：https://help.aliyun.com/zh/model-studio/non-realtime-tts-user-guide
+//   Qwen-Audio-TTS / CosyVoice → /services/audio/tts/SpeechSynthesizer
+//   Qwen-TTS（含 vc / vd / flash）→ /services/aigc/multimodal-generation/generation
+// 实测（2026-10-09，真 Key）：qwen-audio-3.0-tts-plus 打到 multimodal 端点报
+// `InvalidParameter: url error`，换到 SpeechSynthesizer 即 HTTP 200 返回音频 URL；
+// 而 qwen3-tts-vc / vd / flash 反过来 —— SpeechSynthesizer 报 url error、multimodal 可用。
+// 这就是"voice=Cherry 报 url error"的真正原因：**不是音色问题，是端点用错了**。
+const speechSynthPath = "/services/audio/tts/SpeechSynthesizer";
 // 音色创建（声音复刻 / 声音设计）端点，与合成分开。
 const voicePath = "/services/audio/tts/customization";
 // 声音复刻（voice cloning）与声音设计（voice design）是两个不同的目标模型，
@@ -70,14 +79,16 @@ export default {
   rules,
   models: [
     {
+      // ACT: 这个模型的音色**与 Qwen-TTS 系列不通用** —— 它走 SpeechSynthesizer 端点，
+      // 只认 Qwen-Audio-TTS / CosyVoice 的音色表（如 longanhuan_v3.6）。
+      // 原先这里列的是 Cherry/Serena/Ethan/Chelsie（Qwen-TTS 的音色），配上错端点
+      // 一律 `InvalidParameter: url error`。实测 2026-10-09：换到正确端点后
+      // longanhuan_v3.6 → HTTP 200；而 Cherry/Ethan 在该端点报 `Engine error [411]`。
       id: "qwen-audio-3.0-tts-plus",
       label: "Qwen-Audio-TTS-Plus",
       type: "audio",
       voices: [
-        { title: "Cherry（芊悦·女声）", voice: "Cherry" },
-        { title: "Serena（苏瑶·女声）", voice: "Serena" },
-        { title: "Ethan（晨煦·男声）", voice: "Ethan" },
-        { title: "Chelsie（千雪·女声）", voice: "Chelsie" },
+        { title: "龙安欢 v3.6（女声）", voice: "longanhuan_v3.6" },
       ],
     },
     {
@@ -95,29 +106,20 @@ export default {
       // ACT: 声音复刻用的模型 —— 面板里**必须能选到它**，否则复刻完没有模型能用那个音色。
       // 它既是 `qwen-voice-enrollment` 登记时的目标模型，也是复刻音色**唯一**被授权的合成模型
       // （用 qwen3-tts-flash 合成复刻音色会报 Invalid voice specified，实测见 createVoice 的注释）。
-      // 内置音色（Cherry 等）仍走上面的 qwen3-tts-flash。
+      // 内置音色（Cherry 等）只走上面的 qwen3-tts-flash —— 实测该模型不接受内置音色（Cherry 会 400）。
       id: "qwen3-tts-vc-2026-01-22",
       label: "Qwen3-TTS-VC（声音复刻）",
       type: "audio",
-      voices: [
-        { title: "Cherry（芊悦·女声）", voice: "Cherry" },
-        { title: "Serena（苏瑶·女声）", voice: "Serena" },
-        { title: "Ethan（晨煦·男声）", voice: "Ethan" },
-        { title: "Chelsie（千雪·女声）", voice: "Chelsie" },
-      ],
+      voices: [],
     },
     {
       // ACT: 声音设计用的模型 —— 与 qwen3-tts-vc 同理，**面板里必须能选到它**，
       // 否则设计完没有模型能用那个音色（设计音色只被 qwen3-tts-vd-* 授权合成）。
+      // 同上，实测它也不接受内置音色，只能用设计出来的音色。
       id: "qwen3-tts-vd-2026-01-26",
       label: "Qwen3-TTS-VD（声音设计）",
       type: "audio",
-      voices: [
-        { title: "Cherry（芊悦·女声）", voice: "Cherry" },
-        { title: "Serena（苏瑶·女声）", voice: "Serena" },
-        { title: "Ethan（晨煦·男声）", voice: "Ethan" },
-        { title: "Chelsie（千雪·女声）", voice: "Chelsie" },
-      ],
+      voices: [],
     },
   ] satisfies ProviderModel[],
   async generateAudio(request: AudioRequest): Promise<MediaAsset[]> {
@@ -134,7 +136,11 @@ export default {
     // ACT: 不暴露 language_type 给上层（请求结构里没有对应字段），交给服务端自动识别，
     // 多语种混排时也不至于猜错语种。
     const signal = AbortSignal.any([AbortSignal.timeout(5 * 60_000), ...(this.signal ? [this.signal] : [])]);
-    const response = await this.tool.fetch(`${baseUrl}${generatePath}`, {
+    // ACT: 按模型系列选端点 —— 两套端点不可混用（见文件顶部 speechSynthPath 的实测记录）。
+    const path = request.model.startsWith("qwen-audio") || request.model.startsWith("cosyvoice")
+      ? speechSynthPath
+      : generatePath;
+    const response = await this.tool.fetch(`${baseUrl}${path}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: request.model, input }),
