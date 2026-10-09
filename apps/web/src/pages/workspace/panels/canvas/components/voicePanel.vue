@@ -3,7 +3,21 @@
     <el-alert v-if="!audioModels.length" class="voiceHint" type="info" :closable="false" showIcon title="还没有可用的语音模型，请先在「设置 → 语音模型」添加供应商并填写 API Key。" />
 
     <template v-else>
+      <!-- 两个并列流程，各占一个分页 —— 见 script 里 activeMode 的说明。 -->
+      <el-radio-group v-model="activeMode" class="modeTabs" size="small" aria-label="音色创建方式">
+        <el-radio-button value="clone">声音复刻</el-radio-button>
+        <el-radio-button value="design">声音设计</el-radio-button>
+      </el-radio-group>
+
       <el-form class="voiceForm" labelPosition="top" @submit.prevent>
+        <el-form-item label="保存位置">
+          <el-select v-model="activeFolder" class="voiceField" filterable allowCreate defaultFirstOption
+            placeholder="素材库里的文件夹" aria-label="音色保存位置" @change="onFolderChange">
+            <el-option v-for="name in folderOptions" :key="name" :label="`素材库 / ${name}`" :value="name" />
+          </el-select>
+          <el-text class="voiceNote" size="small" type="info">音色会存成该文件夹下的 json 素材；不存在时会自动新建。</el-text>
+        </el-form-item>
+
         <el-form-item label="语音模型">
           <el-select v-model="selectedModel" class="voiceField" placeholder="选择用于创建音色的模型">
             <el-option v-for="item in audioModels" :key="item.value" :label="item.label" :value="item.value" />
@@ -17,21 +31,25 @@
           <el-text class="voiceNote" size="small" type="info">最多 16 个字符；中文也可以用，提交时会自动转成字母、数字、下划线。</el-text>
         </el-form-item>
 
-        <p class="voiceFieldLabel">声音复刻（需要样本）</p>
-        <div class="sampleRow">
-          <el-button :icon="IconUpload" :loading="reading" @click="sampleInput?.click()">上传样本</el-button>
-          <el-button v-if="!recording" :icon="IconMicrophone" :disabled="reading" @click="startRecording">录制样本</el-button>
-          <el-button v-else type="danger" :icon="IconPlayerStop" @click="stopRecording">停止（{{ recordSeconds }}s / 30s）</el-button>
-          <input ref="sampleInput" class="sampleInput" type="file" accept="audio/*" aria-label="选择音频样本" @change="pickSample" />
-        </div>
-        <el-text v-if="sample" class="voiceNote" size="small" type="success">已选样本：{{ sample.name }}（{{ sampleSizeLabel }}）</el-text>
-        <el-alert v-else-if="recording" class="voiceHint" type="warning" :closable="false" showIcon title="正在录音，最长 30 秒，到时会自动停止。" />
-        <el-alert v-if="recordError" class="voiceHint" type="error" :closable="false" showIcon :title="recordError" />
-        <el-button class="voiceAction" type="primary" :loading="creatingClone" :disabled="!canClone" @click="createVoice(false)">开始复刻</el-button>
+        <!-- 两个流程各自的"素材"输入：复刻要样本，设计要文字描述。 -->
+        <template v-if="activeMode === 'clone'">
+          <div class="sampleRow">
+            <el-button :icon="IconUpload" :loading="reading" @click="sampleInput?.click()">上传样本</el-button>
+            <el-button v-if="!recording" :icon="IconMicrophone" :disabled="reading" @click="startRecording">录制样本</el-button>
+            <el-button v-else type="danger" :icon="IconPlayerStop" @click="stopRecording">停止（{{ recordSeconds }}s / 30s）</el-button>
+            <input ref="sampleInput" class="sampleInput" type="file" accept="audio/*" aria-label="选择音频样本" @change="pickSample" />
+          </div>
+          <el-text v-if="sample" class="voiceNote" size="small" type="success">已选样本：{{ sample.name }}（{{ sampleSizeLabel }}）</el-text>
+          <el-alert v-else-if="recording" class="voiceHint" type="warning" :closable="false" showIcon title="正在录音，最长 30 秒，到时会自动停止。" />
+          <el-alert v-if="recordError" class="voiceHint" type="error" :closable="false" showIcon :title="recordError" />
+          <el-button class="voiceAction" type="primary" :loading="creatingClone" :disabled="!canClone" @click="createVoice(false)">开始复刻</el-button>
+        </template>
 
-        <p class="voiceFieldLabel">声音设计（用文字描述）</p>
-        <el-input v-model="description" class="voiceField" type="textarea" :rows="2" maxlength="200" showWordLimit placeholder="例如：温暖的低音女声，语速偏慢" />
-        <el-button class="voiceAction" type="primary" :loading="creatingDesign" :disabled="!canDesign" @click="createVoice(true)">生成音色</el-button>
+        <template v-else>
+          <el-input v-model="description" class="voiceField" type="textarea" :rows="3" maxlength="200" showWordLimit
+            placeholder="例如：沉稳的中年男性，语速缓慢，音色低沉有磁性，适合朗读新闻或纪录片解说" />
+          <el-button class="voiceAction" type="primary" :loading="creatingDesign" :disabled="!canDesign" @click="createVoice(true)">生成音色</el-button>
+        </template>
       </el-form>
 
       <el-alert v-if="createError" class="voiceHint" type="error" :closable="false" showIcon :title="createError" />
@@ -48,7 +66,7 @@
       <el-text v-else class="voiceNote" size="small" type="info">打开一个项目后可以在此试听音色。</el-text>
 
       <p class="voiceFieldLabel">已保存的音色</p>
-      <el-text v-if="!voices.length" class="voiceNote" size="small" type="info">素材库「{{ voiceFolder }}」里还没有音色。</el-text>
+      <el-text v-if="!voices.length" class="voiceNote" size="small" type="info">素材库「{{ activeFolder }}」里还没有音色。</el-text>
       <div v-for="item in voices" :key="item.path" class="voiceItem" :class="{ playing: playingPath === item.path }">
         <div class="voiceItemMain">
           <el-text tag="strong" class="voiceItemName">{{ item.name }}</el-text>
@@ -68,11 +86,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import axios from "axios";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { IconMicrophone, IconPencil, IconPlayerPlay, IconPlayerStop, IconTrash, IconUpload } from "@tabler/icons-vue";
 import { needsWavConversion, toWavBlob } from "@/lib/audioWav";
+import { settings } from "@/stores/settings";
 
 type MediaProviderModel = { id: string; label: string; type: string };
 type MediaProvider = { fileName: string; id: string; label: string; models: MediaProviderModel[]; loadError?: string };
@@ -89,6 +108,47 @@ const emit = defineEmits<{ saved: [] }>();
 
 /** 用户在列表上点播放、又没填试听文字时用的样本句。 */
 const defaultPreviewText = "你好，这是一段试听音频。";
+
+/**
+ * 面板分两个流程：声音复刻（要样本）与声音设计（用文字描述）。
+ *
+ * ACT: 两者是**并列的独立流程**，不是同一条流水线的两步 —— 各自有模型、名称、保存位置，
+ * 各自列出该位置下的音色。原先平铺在一个长表单里，320px 宽的侧栏要滚过另一半，
+ * 而且"已保存的音色"混着两种来源、看不出属于哪个流程。
+ */
+type VoiceMode = "clone" | "design";
+const activeMode = ref<VoiceMode>("clone");
+
+/**
+ * 保存位置：素材库里的文件夹名，复刻与设计各记一份。
+ *
+ * ACT: 存在设置里而不是组件内 —— 它是用户的组织习惯（复刻丢一个文件夹、设计丢另一个），
+ * 每次打开面板都该还是上次选的那个。`settings.voiceFolders` 由 settings store 的 watch 自动保存。
+ */
+const folderOptions = ref<string[]>([]);
+const defaultFolder = computed(() => props.voiceFolder || "声音");
+
+/** 设置里存的每个流程的保存位置（缺省回落到默认文件夹）。 */
+function savedFolder(mode: VoiceMode) {
+  const value = settings.value.voiceFolders;
+  const record = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  const name = record[mode];
+  return typeof name === "string" && name.trim() ? name.trim() : defaultFolder.value;
+}
+
+/** 当前分页的保存位置。切换分页会跟着切到那一页记的文件夹，并重新读该文件夹下的音色。 */
+const activeFolder = computed({
+  get: () => savedFolder(activeMode.value),
+  set: (name: string) => {
+    const next = name.trim();
+    if (!next) return;
+    const value = settings.value.voiceFolders;
+    const record = value && typeof value === "object" && !Array.isArray(value) ? { ...value as Record<string, unknown> } : {};
+    record[activeMode.value] = next;
+    // 直接写 store：settings 的 watch 会持久化，不必再显式调保存接口。
+    settings.value.voiceFolders = record;
+  },
+});
 
 // 单一样本上限：录音 30 秒的 16 位单声道 WAV 约 2.6 MB，这里宽松留到 20 MB。
 const maxSampleBytes = 20 * 1024 * 1024;
@@ -157,13 +217,36 @@ function modelLabel(modelId: string) {
 
 onMounted(() => {
   void loadProviders();
+  void loadFolderOptions();
   void loadVoices();
 });
+
+// 切分页或换保存位置都要重读该文件夹下的音色 —— 两个流程各自列自己的。
+watch([activeMode, activeFolder], () => { void loadVoices(); });
+
 onBeforeUnmount(() => {
   timer !== undefined && window.clearInterval(timer);
   recorder?.state === "recording" && recorder.stop();
   recorder?.stream.getTracks().forEach(track => track.stop());
 });
+
+/** 保存位置的下拉项：素材库顶层的文件夹 + 默认的那个（可能还没建）。 */
+async function loadFolderOptions() {
+  try {
+    const { data } = await axios.get<{ data: { entries: { name: string; type: string }[] } }>("/api/assets/list");
+    const directories = (data.data.entries ?? []).filter(entry => entry.type === "directory").map(entry => entry.name);
+    folderOptions.value = [...new Set([defaultFolder.value, ...directories])].sort((a, b) => a.localeCompare(b, "zh-CN"));
+  } catch {
+    folderOptions.value = [defaultFolder.value];
+  }
+}
+
+/** 用户换了保存位置：音色列表跟着切（watch 已负责重读），并把新文件夹补进下拉项。 */
+function onFolderChange(name: string) {
+  if (name && !folderOptions.value.includes(name)) {
+    folderOptions.value = [...folderOptions.value, name].sort((a, b) => a.localeCompare(b, "zh-CN"));
+  }
+}
 
 function showError(error: unknown) {
   const message = axios.isAxiosError(error) ? error.response?.data?.message || error.message : error instanceof Error ? error.message : "操作失败";
@@ -184,7 +267,7 @@ async function loadProviders() {
 async function loadVoices() {
   try {
     const { data } = await axios.get<{ data: { entries: { name: string; path: string; type: string; children?: unknown[] }[] } }>("/api/assets/list");
-    const folder = data.data.entries.find(entry => entry.type === "directory" && entry.name === props.voiceFolder);
+    const folder = data.data.entries.find(entry => entry.type === "directory" && entry.name === activeFolder.value);
     const files = (folder?.children ?? []) as { name: string; path: string; type: string }[];
     const loaded: VoiceAsset[] = [];
     for (const file of files.filter(entry => entry.type === "file" && entry.name.toLowerCase().endsWith(".json"))) {
@@ -346,11 +429,13 @@ async function createVoice(byDesign: boolean) {
 /** 保存音色，返回**实际写入的路径**（同名冲突时会带时间戳另存，调用方需要知道是哪个）。 */
 async function saveVoice(voice: string, name: string, providerId: string, model: string, source: "clone" | "design") {
   const safeName = name.replace(/[\\/:*?"<>|]/g, "_");
-  const path = `${props.voiceFolder}/${safeName}.json`;
+  // ACT: 存进**当前分页选的保存位置**（复刻与设计各记一份），不再是写死的「声音」。
+  const folder = activeFolder.value;
+  const path = `${folder}/${safeName}.json`;
   const content = JSON.stringify({ name, voice, providerId, model, source, createdAt: new Date().toISOString() }, null, 2);
   const put = (target: string) => axios.put("/api/assets/save", new Blob([content], { type: "application/json" }), { params: { path: target }, headers: { "Content-Type": "application/octet-stream" } });
-  // assets/save 不会创建父目录，声音文件夹不存在时先建（已存在会报错，忽略即可）。
-  await axios.post("/api/assets/mkdir", { path: props.voiceFolder }).catch(() => undefined);
+  // assets/save 不会创建父目录，所选文件夹不存在时先建（已存在会报错，忽略即可）。
+  await axios.post("/api/assets/mkdir", { path: folder }).catch(() => undefined);
   let written = path;
   try {
     await put(path);
@@ -358,7 +443,7 @@ async function saveVoice(voice: string, name: string, providerId: string, model:
     // 同名音色已存在时（服务端 exclusive 不覆盖）改用带时间戳的名称。
     if (!axios.isAxiosError(error)) throw error;
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    written = `${props.voiceFolder}/${safeName}-${stamp}.json`;
+    written = `${folder}/${safeName}-${stamp}.json`;
     await put(written);
   }
   await loadVoices();
@@ -425,8 +510,11 @@ async function renameVoice(item: VoiceAsset) {
     if (!name || name === item.name) return;
     busyPath.value = item.path;
     const safeName = name.replace(/[\\/:*?"<>|]/g, "_");
+    // ACT: 目标路径**沿用该音色自己的文件夹**，不用 activeFolder ——
+    // 否则在 A 文件夹里改名会把音色搬到当前分页选的 B 文件夹。
     // 只改文件名，不改 JSON 里的内容结构（voice / model 等身份信息必须保持）。
-    const target = `${props.voiceFolder}/${safeName}.json`;
+    const folder = item.path.slice(0, item.path.lastIndexOf("/"));
+    const target = `${folder}/${safeName}.json`;
     if (target !== item.path) await axios.post("/api/assets/rename", { path: item.path, target });
     const content = JSON.stringify({ ...item.json, name }, null, 2);
     await axios.put("/api/assets/save", new Blob([content], { type: "application/json" }),
@@ -470,6 +558,15 @@ async function removeVoice(item: VoiceAsset) {
   padding: 2px;
 
   .voiceHint { margin-bottom: 4px; }
+
+  // 两个流程的分页：整宽两等分，与素材库顶部的分页同形。
+  .modeTabs {
+    display: flex;
+    margin-bottom: 10px;
+
+    :deep(.el-radio-button) { flex: 1 1 0; }
+    :deep(.el-radio-button__inner) { width: 100%; }
+  }
 
   .voiceForm {
     :deep(.el-form-item) { margin-bottom: 8px; }
