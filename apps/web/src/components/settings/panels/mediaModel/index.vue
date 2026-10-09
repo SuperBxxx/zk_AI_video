@@ -1,8 +1,8 @@
 <template>
   <div v-if="loaded" class="providerList">
-    <!-- 偏好模型：媒体模型与语音模型两个页面共用此实现（语音页传 kind="audio"），
-         因此放在这里一处即可覆盖两个页面。 -->
-    <preferredModels :scope="kind === 'audio' ? 'audio' : 'video'" :available="preferredChoices" />
+    <!-- 偏好模型：媒体 / 语音 / 图片三个页面共用此实现，各自传 scope。
+         见 script 里 kind → scope 的映射。 -->
+    <preferredModels :scope="preferenceScope" :available="preferredChoices" />
     <div class="itemList">
       <el-card v-for="item in visibleProviders" :key="item.fileName" class="providerItem" shadow="never">
         <div class="providerHeader">
@@ -30,7 +30,7 @@
       </el-card>
     </div>
     <el-text v-if="!visibleProviders.length" class="emptyHint" size="small" type="info">
-      {{ kind === "audio" ? "还没有可用的语音供应商。点下方「添加供应商」选择阿里云百炼或 APIMart，填入 API Key 后即可合成配音。" : "还没有可用的媒体供应商。点下方「添加供应商」选择厂商，填入 API Key 后即可生成图片与视频。" }}
+      {{ emptyHint }}
     </el-text>
     <div class="providerActions">
       <el-button class="addButton" :icon="IconPlus" @click="openAdd('builtin')">添加供应商</el-button>
@@ -51,7 +51,21 @@ import { settings, saveSettings } from "@/stores/settings";
 import { invalidateNodeModels } from "@toonflow/nodes-scaffold/nodeAi";
 import preferredModels from "../preferredModels.vue";
 
-const { visible = true, kind = "media" } = defineProps<{ visible?: boolean; kind?: "media" | "audio" }>();
+// ACT: 三处模型面板（媒体 / 语音 / 图片）共用这一份实现，只是 kind 不同 ——
+// 与 voiceModel 复用本文件的既有做法一致，不再维护第二套逻辑。
+type ModelKind = "media" | "audio" | "image";
+const { visible = true, kind = "media" } = defineProps<{ visible?: boolean; kind?: ModelKind }>();
+/** 该页面关心的模型类型：媒体页要图片+视频，语音页要音频，图片页只要图片。 */
+const wantedTypes = computed<string[]>(() =>
+  kind === "audio" ? ["audio"] : kind === "image" ? ["image"] : ["image", "video"]);
+/** 偏好模型的 scope：图片页单独一个 scope，其余与 kind 同名。 */
+const preferenceScope = computed<"text" | "video" | "audio" | "image">(() =>
+  kind === "audio" ? "audio" : kind === "image" ? "image" : "video");
+const emptyHint = computed(() => kind === "audio"
+  ? "还没有可用的语音供应商。点下方「添加供应商」选择阿里云百炼或 APIMart，填入 API Key 后即可合成配音。"
+  : kind === "image"
+    ? "还没有可用的图片供应商。点下方「添加供应商」选择厂商，填入 API Key 后即可生成图片。"
+    : "还没有可用的媒体供应商。点下方「添加供应商」选择厂商，填入 API Key 后即可生成图片与视频。");
 // ACT: 偏好模型的选择项直接复用 /api/ai/media/models（与视频生成节点同一数据源），
 // 只按当前页面的 kind 过滤：媒体页给图片/视频，语音页给音频。
 // 这样"可选项"与"节点真正能用的模型"必然一致，不会出现选了却用不上的项。
@@ -67,11 +81,8 @@ const sortedProviders = computed(() => [...providers.value]);
 // 同一供应商（如 APIMart、百炼）同时具备两类能力时会在两个面板都出现，
 // 因为供应商文件本身是共享的、配置也是同一份，这里的筛选只影响展示，
 // 编辑模型时仍会看到该供应商的全部模型。
-const visibleProviders = computed(() => {
-  const wantAudio = kind === "audio";
-  return sortedProviders.value.filter(item =>
-    item.models.some(model => wantAudio ? model.type === "audio" : model.type === "image" || model.type === "video"));
-});
+const visibleProviders = computed(() =>
+  sortedProviders.value.filter(item => item.models.some(model => wantedTypes.value.includes(model.type))));
 const loaded = ref(false);
 const providerDialogVisible = ref(false);
 const editorVisible = ref(false);
@@ -109,13 +120,12 @@ async function loadProviders() {
   }
 }
 
-/** 偏好模型的可选项：与视频生成节点同一数据源，只按本页面的 kind 过滤类型。 */
+/** 偏好模型的可选项：与生成节点同一数据源，只按本页面的 kind 过滤类型。 */
 async function loadPreferredChoices() {
   try {
     const { data } = await axios.get<{ data: { providerId: string; providerLabel: string; modelId: string; label: string; type: string }[] }>("/api/ai/media/models");
-    const wantAudio = kind === "audio";
     preferredChoices.value = (data.data ?? [])
-      .filter(item => (wantAudio ? item.type === "audio" : item.type === "image" || item.type === "video"))
+      .filter(item => wantedTypes.value.includes(item.type))
       .map(item => ({ providerId: item.providerId, providerLabel: item.providerLabel, modelId: item.modelId, modelLabel: item.label }));
   } catch { /* 取不到就只显示已保存的偏好项，不影响供应商列表 */ }
 }

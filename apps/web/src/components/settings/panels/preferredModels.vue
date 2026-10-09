@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-card class="preferredPanel" shadow="never">
     <div class="preferredHeader">
       <el-text tag="strong">优先选择模型</el-text>
@@ -36,7 +36,7 @@ import { ElMessage } from "element-plus";
 import { IconArrowDown, IconArrowUp, IconPlus, IconTrash } from "@tabler/icons-vue";
 import { customProviders, saveSettings, settings } from "@/stores/settings";
 
-type Scope = "text" | "video" | "audio";
+type Scope = "text" | "video" | "audio" | "image";
 type Choice = { providerId: string; providerLabel: string; modelId: string; modelLabel: string };
 
 const { scope, available } = defineProps<{

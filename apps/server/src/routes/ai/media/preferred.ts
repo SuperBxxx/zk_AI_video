@@ -1,4 +1,4 @@
-import { Router } from "express";
+﻿import { Router } from "express";
 import { z } from "zod";
 import { validateFields } from "@/lib/middleware";
 import { success } from "@/lib/responseFormat";
@@ -17,9 +17,9 @@ const router = Router();
  * 全部失效返回 null，由调用方退回原本的默认选择。
  */
 export default router.get("/", validateFields({
-  scope: z.enum(["text", "video", "audio"]),
+  scope: z.enum(["text", "video", "audio", "image"]),
 }, "query"), async (req, res) => {
-  const scope = (req.query as unknown as { scope: "text" | "video" | "audio" }).scope;
+  const scope = (req.query as unknown as { scope: "text" | "video" | "audio" | "image" }).scope;
   const settings = u.conf.get("settings", {}) as { preferredModels?: { scope?: string; providerId?: string; modelId?: string }[] };
   const preferred = Array.isArray(settings.preferredModels) ? settings.preferredModels : [];
   const wanted = preferred.filter(item => item?.scope === scope
@@ -37,7 +37,7 @@ export default router.get("/", validateFields({
         modelId: String(model.id ?? ""), modelLabel: String(model.label ?? model.id ?? ""),
       })))
     : (await u.mediaGeneration.listMediaModels())
-      .filter(model => (scope === "audio" ? model.type === "audio" : model.type === "video" || model.type === "image"))
+      .filter(model => scope === "audio" ? model.type === "audio" : scope === "image" ? model.type === "image" : model.type === "video" || model.type === "image")
       .map(model => ({
         providerId: model.providerId, providerLabel: model.providerLabel,
         modelId: model.modelId, modelLabel: model.label,

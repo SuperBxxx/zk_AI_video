@@ -1,4 +1,4 @@
-import { onScopeDispose } from "vue";
+﻿import { onScopeDispose } from "vue";
 import { runAgentLoop, type AgentTool, type AgentToolResult } from "@earendil-works/pi-agent-core";
 import { createAssistantMessageEventStream, type AssistantMessage, type Context, type Message, type Model } from "@earendil-works/pi-ai";
 import { EventSourceParserStream } from "eventsource-parser/stream";
@@ -169,7 +169,7 @@ export function useNodeAi() {
    * ACT: 由服务端解析 —— 插件构建里不含 web 的 Pinia store，读不到设置；
    * 偏好存在服务端 settings.json 里，让节点只问这一个接口即可。
    */
-  async function getPreferredModel(scope: "text" | "video" | "audio", signal?: AbortSignal) {
+  async function getPreferredModel(scope: "text" | "video" | "audio" | "image", signal?: AbortSignal) {
     try {
       const response = await fetch(`/api/ai/media/preferred?scope=${scope}`, { signal: requestSignal(signal) });
       if (!response.ok) return undefined;
