@@ -12,7 +12,9 @@
 
         <el-form-item label="音色名称">
           <el-input v-model="voiceName" class="voiceField" maxlength="16" showWordLimit placeholder="例如 我的声音" />
-          <el-text class="voiceNote" size="small" type="info">名称只能用字母、数字、下划线，最多 16 位，其余字符会被替换为下划线。</el-text>
+          <!-- ACT: 说清"会被自动替换"而不是"只能用"—— 原先写「名称只能用字母、数字、下划线」
+               会让人以为中文不能用，而 provider 实际是把非法字符替换成下划线（`我的声音` → `____`）。 -->
+          <el-text class="voiceNote" size="small" type="info">最多 16 个字符；中文也可以用，提交时会自动转成字母、数字、下划线。</el-text>
         </el-form-item>
 
         <p class="voiceFieldLabel">声音复刻（需要样本）</p>
@@ -37,6 +39,9 @@
       <template v-if="directory">
         <p class="voiceFieldLabel">试听（可选）</p>
         <el-input v-model="previewText" class="voiceField" type="textarea" :rows="2" maxlength="500" showWordLimit placeholder="输入一小段文字，用上面创建的音色读一遍" />
+        <!-- ACT: 按钮按**可用性**禁用，并把依据写在旁边 —— 原先只校验文字非空，
+             选了 vc/vd 又还没建音色时按钮可点，点下去才报一句写给"创建"场景的错。 -->
+        <el-text v-if="!previewVoiceReady" class="voiceNote" size="small" type="warning">{{ previewBlockedReason }}</el-text>
         <el-button class="voiceAction" :loading="synthesizing" :disabled="!previewReady" @click="preview">合成试听</el-button>
         <audio v-if="previewUrl" class="voiceAudio" :src="previewUrl" controls preload="metadata" aria-label="试听结果" />
       </template>
@@ -44,12 +49,19 @@
 
       <p class="voiceFieldLabel">已保存的音色</p>
       <el-text v-if="!voices.length" class="voiceNote" size="small" type="info">素材库「{{ voiceFolder }}」里还没有音色。</el-text>
-      <div v-for="item in voices" :key="item.path" class="voiceItem">
+      <div v-for="item in voices" :key="item.path" class="voiceItem" :class="{ playing: playingPath === item.path }">
         <div class="voiceItemMain">
           <el-text tag="strong" class="voiceItemName">{{ item.name }}</el-text>
-          <el-text class="voiceNote" size="small" type="info">{{ item.source === "design" ? "声音设计" : "声音复刻" }} · {{ item.model }}</el-text>
+          <!-- ACT: 显示**模型友好名**而不是原始 ID（`qwen3-tts-vc-2026-01-22` 对用户没有意义）。 -->
+          <el-text class="voiceNote" size="small" type="info">{{ item.source === "design" ? "声音设计" : "声音复刻" }} · {{ modelLabel(item.model) }}</el-text>
         </div>
-        <el-button text :icon="IconPlayerPlay" :aria-label="'用 ' + item.name + ' 试听'" title="用这个音色试听" @click="previewVoice(item)" />
+        <el-button text :icon="IconPlayerPlay" :loading="playingPath === item.path" :aria-label="'用 ' + item.name + ' 试听'" title="用这个音色试听" @click="previewVoice(item)" />
+        <el-button text :icon="IconPencil" :disabled="busyPath === item.path" :aria-label="'重命名 ' + item.name" title="重命名" @click="renameVoice(item)" />
+        <el-popconfirm :title="`确定删除“${item.name}”？`" confirmButtonText="删除" cancelButtonText="取消" @confirm="removeVoice(item)">
+          <template #reference>
+            <el-button text type="danger" :icon="IconTrash" :disabled="busyPath === item.path" :aria-label="'删除 ' + item.name" title="删除" />
+          </template>
+        </el-popconfirm>
       </div>
     </template>
   </div>
@@ -58,17 +70,25 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import axios from "axios";
-import { ElMessage } from "element-plus";
-import { IconMicrophone, IconPlayerPlay, IconPlayerStop, IconUpload } from "@tabler/icons-vue";
+import { ElMessage, ElMessageBox } from "element-plus";
+import { IconMicrophone, IconPencil, IconPlayerPlay, IconPlayerStop, IconTrash, IconUpload } from "@tabler/icons-vue";
 import { needsWavConversion, toWavBlob } from "@/lib/audioWav";
 
 type MediaProviderModel = { id: string; label: string; type: string };
 type MediaProvider = { fileName: string; id: string; label: string; models: MediaProviderModel[]; loadError?: string };
 // 音色以 json 素材存在素材库的声音文件夹里，字段即 D3 约定的内容。
-type VoiceAsset = { name: string; path: string; voice: string; providerId: string; model: string; source: "clone" | "design" };
+type VoiceAsset = {
+  name: string; path: string; voice: string; providerId: string; model: string;
+  source: "clone" | "design";
+  /** 原始 JSON —— 重命名时要在保留其它字段的前提下改写 name。 */
+  json: Record<string, unknown>;
+};
 
 const props = defineProps<{ voiceFolder: string; directory?: string }>();
 const emit = defineEmits<{ saved: [] }>();
+
+/** 用户在列表上点播放、又没填试听文字时用的样本句。 */
+const defaultPreviewText = "你好，这是一段试听音频。";
 
 // 单一样本上限：录音 30 秒的 16 位单声道 WAV 约 2.6 MB，这里宽松留到 20 MB。
 const maxSampleBytes = 20 * 1024 * 1024;
@@ -103,7 +123,37 @@ const selected = computed(() => audioModels.value.find(item => item.value === se
 const sampleSizeLabel = computed(() => sample.value ? `${(sample.value.blob.size / 1024 / 1024).toFixed(2)} MB` : "");
 const canClone = computed(() => !!selected.value && !!voiceName.value.trim() && !!sample.value && !reading.value && !recording.value);
 const canDesign = computed(() => !!selected.value && !!voiceName.value.trim() && !!description.value.trim());
-const previewReady = computed(() => !!selected.value && !!previewText.value.trim());
+
+/** 与当前模型匹配的已保存音色（合成试听与"创建后自动试听"都用它）。 */
+const matchedVoice = computed(() =>
+  [...voices.value].reverse().find(item => item.providerId === selected.value?.providerId && item.model === selected.value?.modelId));
+/**
+ * 合成试听到底能不能用。
+ *
+ * ACT: 实测只有 `qwen3-tts-flash` 接受内置音色，vc / vd / qwen-audio 都是"专属音色"模型
+ * （用 Cherry 一律 400）。所以必须"有匹配的音色"或"模型支持内置音色"才能合成 ——
+ * 把这个判断前置到按钮的禁用态，用户不必点一下才知道不行。
+ */
+const previewVoiceReady = computed(() => !!matchedVoice.value || selected.value?.modelId === "qwen3-tts-flash");
+const previewBlockedReason = computed(() => {
+  if (!selected.value) return "请先选择语音模型。";
+  if (previewVoiceReady.value) return "";
+  return "这个模型只认它自己创建的音色：请先复刻或设计一个音色，再用该音色的播放按钮试听。";
+});
+const previewReady = computed(() => !!selected.value && !!previewText.value.trim() && previewVoiceReady.value);
+
+/** 正被试听的音色路径（用于按钮 loading）与正在改名/删除的路径。 */
+const playingPath = ref("");
+const busyPath = ref("");
+
+/** 模型友好名：优先用供应商给出的 label，查不到才退回原始 id。 */
+function modelLabel(modelId: string) {
+  for (const provider of providers.value) {
+    const hit = provider.models.find(model => model.id === modelId);
+    if (hit) return hit.label;
+  }
+  return modelId;
+}
 
 onMounted(() => {
   void loadProviders();
@@ -157,6 +207,7 @@ async function loadVoices() {
           providerId: typeof content.providerId === "string" ? content.providerId : "",
           model,
           source: content.source === "design" ? "design" : "clone",
+          json: content,
         });
       } catch {
         // 单个文件读不出来不影响其余，跳过即可。
@@ -277,8 +328,13 @@ async function createVoice(byDesign: boolean) {
     // ACT: 存**供应商回传的实际合成模型**，不用 target.modelId ——
     // 百炼的复刻与设计是两个不同模型（vc / vd），而登记时内部只用其中一个，
     // 存错模型会导致回放 400（实测）。供应商没回传时才回退到用户选中的那个。
-    await saveVoice(data.data.voice, name, target.providerId, data.data.targetModel?.trim() || target.modelId, byDesign ? "design" : "clone");
+    const savedPath = await saveVoice(data.data.voice, name, target.providerId, data.data.targetModel?.trim() || target.modelId, byDesign ? "design" : "clone");
     ElMessage.success(byDesign ? "音色已生成并保存" : "音色复刻完成并保存");
+    // ACT: 创建成功后**就地试听** —— 补上唯一缺失的反馈闭环。
+    // 原先只有列表多一行，用户得自己发现那个 ▶；这里直接读出刚存的音色并合成一次。
+    // 试听失败不影响创建结果（音色已经在素材库里了）。
+    const created = voices.value.find(item => item.path === savedPath);
+    if (created && props.directory) await previewVoice(created);
   } catch (error) {
     showError(error);
   } finally {
@@ -287,6 +343,7 @@ async function createVoice(byDesign: boolean) {
   }
 }
 
+/** 保存音色，返回**实际写入的路径**（同名冲突时会带时间戳另存，调用方需要知道是哪个）。 */
 async function saveVoice(voice: string, name: string, providerId: string, model: string, source: "clone" | "design") {
   const safeName = name.replace(/[\\/:*?"<>|]/g, "_");
   const path = `${props.voiceFolder}/${safeName}.json`;
@@ -294,16 +351,19 @@ async function saveVoice(voice: string, name: string, providerId: string, model:
   const put = (target: string) => axios.put("/api/assets/save", new Blob([content], { type: "application/json" }), { params: { path: target }, headers: { "Content-Type": "application/octet-stream" } });
   // assets/save 不会创建父目录，声音文件夹不存在时先建（已存在会报错，忽略即可）。
   await axios.post("/api/assets/mkdir", { path: props.voiceFolder }).catch(() => undefined);
+  let written = path;
   try {
     await put(path);
   } catch (error) {
     // 同名音色已存在时（服务端 exclusive 不覆盖）改用带时间戳的名称。
     if (!axios.isAxiosError(error)) throw error;
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-    await put(`${props.voiceFolder}/${safeName}-${stamp}.json`);
+    written = `${props.voiceFolder}/${safeName}-${stamp}.json`;
+    await put(written);
   }
   await loadVoices();
   emit("saved");
+  return written;
 }
 
 async function synthesize(text: string, voice: string, providerId: string, model: string) {
@@ -326,21 +386,8 @@ async function preview() {
   synthesizing.value = true;
   createError.value = "";
   try {
-    // ACT: 原先这里传 voice: ""，被服务端 schema（voice 最小长度 1）拒成「参数错误」，
-    // 所以"合成试听"从来没能用过。现在按语义挑一个**真的能用**的音色：
-    //
-    //   · 优先用与当前模型匹配的已保存音色 —— 这正是用户刚复刻/设计出来想听的那个；
-    //     必须匹配模型，因为复刻音色只能被 vc 模型合成、设计音色只能被 vd 模型合成。
-    //   · 没有匹配的，只有 qwen3-tts-flash 能用内置音色 Cherry
-    //     （实测：qwen3-tts-vc / qwen3-tts-vd / qwen-audio-3.0-tts-plus 用 Cherry 都 400 ——
-    //      它们是"专属音色"模型，只认自己创建的 voice）。
-    //   · 两者都不满足时**明确说明**，而不是发一个注定失败的请求。
-    const matched = [...voices.value].reverse().find(item => item.providerId === target.providerId && item.model === target.modelId);
-    const voice = matched?.voice ?? (target.modelId === "qwen3-tts-flash" ? "Cherry" : "");
-    if (!voice) {
-      createError.value = "这个模型只支持它自己创建的音色：请先用「声音复刻」或「声音设计」创建一个音色，再用播放按钮试听。";
-      return;
-    }
+    // ACT: 音色由 `previewVoiceReady` 保证可用（按钮在此之前是禁用的），这里只负责取用。
+    const voice = matchedVoice.value?.voice ?? "Cherry";
     previewUrl.value = await synthesize(previewText.value.trim(), voice, target.providerId, target.modelId);
   } catch (error) {
     showError(error);
@@ -350,14 +397,62 @@ async function preview() {
 }
 
 async function previewVoice(item: VoiceAsset) {
-  synthesizing.value = true;
+  playingPath.value = item.path;
   createError.value = "";
   try {
-    previewUrl.value = await synthesize(previewText.value.trim(), item.voice, item.providerId, item.model);
+    // ACT: 试听文字**可选** —— 用户在列表上点播放时通常只想确认音色，不该被迫先写字。
+    // 空的时候用一句固定样本，保证点下去一定有声音（原先只校验文字非空，
+    // 空文字会合成出一段没有内容的音频）。
+    const text = previewText.value.trim() || defaultPreviewText;
+    previewUrl.value = await synthesize(text, item.voice, item.providerId, item.model);
   } catch (error) {
     showError(error);
   } finally {
-    synthesizing.value = false;
+    playingPath.value = "";
+  }
+}
+
+async function renameVoice(item: VoiceAsset) {
+  try {
+    const { value } = await ElMessageBox.prompt("新的音色名称", `重命名「${item.name}」`, {
+      inputValue: item.name,
+      inputPattern: /\S/,
+      inputErrorMessage: "名称不能为空",
+      confirmButtonText: "保存",
+      cancelButtonText: "取消",
+    });
+    const name = String(value ?? "").trim();
+    if (!name || name === item.name) return;
+    busyPath.value = item.path;
+    const safeName = name.replace(/[\\/:*?"<>|]/g, "_");
+    // 只改文件名，不改 JSON 里的内容结构（voice / model 等身份信息必须保持）。
+    const target = `${props.voiceFolder}/${safeName}.json`;
+    if (target !== item.path) await axios.post("/api/assets/rename", { path: item.path, target });
+    const content = JSON.stringify({ ...item.json, name }, null, 2);
+    await axios.put("/api/assets/save", new Blob([content], { type: "application/json" }),
+      { params: { path: target }, headers: { "Content-Type": "application/octet-stream" } });
+    await loadVoices();
+    emit("saved");
+  } catch (error) {
+    // 用户取消 prompt 不是错误。
+    if (error === "cancel" || error === "close") return;
+    showError(error);
+  } finally {
+    busyPath.value = "";
+  }
+}
+
+async function removeVoice(item: VoiceAsset) {
+  busyPath.value = item.path;
+  createError.value = "";
+  try {
+    await axios.delete("/api/assets/remove", { data: { path: item.path } });
+    await loadVoices();
+    emit("saved");
+  } catch (error) {
+    showError(error);
+  } finally {
+    busyPath.value = "";
   }
 }
 </script>
@@ -413,6 +508,12 @@ async function previewVoice(item: VoiceAsset) {
     border-bottom: 1px solid var(--el-border-color-lighter);
 
     &:last-child { border-bottom: none; }
+
+    // 正在试听的那一行给个底色，用户能对上"哪一行在响"。
+    &.playing {
+      background: var(--el-fill-color-light);
+      border-radius: var(--ui-radius-small);
+    }
 
     .voiceItemMain {
       display: flex;
