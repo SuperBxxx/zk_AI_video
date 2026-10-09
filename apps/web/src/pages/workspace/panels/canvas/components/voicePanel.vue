@@ -308,9 +308,13 @@ async function saveVoice(voice: string, name: string, providerId: string, model:
 
 async function synthesize(text: string, voice: string, providerId: string, model: string) {
   // 合成需要工作目录：生成结果要落在工作区里再读回来播放。
+  // ACT: **必须带 `x-toonflow-workspace: 1`** —— 服务端的 resolveWorkspace 用它判定
+  // "这是本机客户端发来的请求"，不带就只能落在服务器工作区内，工作目录在别处时会失败。
+  // 踩过：这里原先没带这个头，于是点「试听」报「服务器部署只能使用服务器工作区」——
+  // 而素材库能正常读文件（assetLibrary 的请求带了头），所以症状看着很怪。
   const { data } = await axios.post<{ data: { path: string }[] }>("/api/ai/media/generate", {
     directory: props.directory, mediaType: "audio", providerId, modelId: model, prompt: text, voice,
-  });
+  }, { headers: { "x-toonflow-workspace": "1" } });
   const path = data.data[0]?.path;
   if (!path) throw new Error("未返回音频");
   return URL.createObjectURL(await assetBlob(path));
