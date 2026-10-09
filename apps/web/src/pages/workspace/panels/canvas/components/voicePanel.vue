@@ -92,6 +92,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { IconMicrophone, IconPencil, IconPlayerPlay, IconPlayerStop, IconTrash, IconUpload } from "@tabler/icons-vue";
 import { needsWavConversion, toWavBlob } from "@/lib/audioWav";
 import { settings } from "@/stores/settings";
+import { useWorkspaceStore } from "@/stores/workspace";
 
 type MediaProviderModel = { id: string; label: string; type: string };
 type MediaProvider = { fileName: string; id: string; label: string; models: MediaProviderModel[]; loadError?: string };
@@ -109,6 +110,16 @@ const emit = defineEmits<{ saved: [] }>();
 /** 用户在列表上点播放、又没填试听文字时用的样本句。 */
 const defaultPreviewText = "你好，这是一段试听音频。";
 
+const workspaceStore = useWorkspaceStore();
+/**
+ * 合成时要用的工作目录。
+ *
+ * ACT: 优先取 store 里的当前项目目录，props 只作回退 —— 这是修「点试听报参数错误」的关键。
+ * 踩过：`synthesize` 只用了 `props.directory`，而这一层传下来是 `undefined`，
+ * 于是请求被服务端 `validateFields` 拒成「参数错误」（`字段 directory 无效输入：期望 string，
+ * 实际接收 undefined`）—— **与音色、模型、voice 都无关**，报了这么多轮才靠日志定位到。
+ */
+const synthesizeDirectory = computed(() => props.directory?.trim() || workspaceStore.project?.directory?.trim() || "");
 /**
  * 面板分两个流程：声音复刻（要样本）与声音设计（用文字描述）。
  *
@@ -453,12 +464,14 @@ async function saveVoice(voice: string, name: string, providerId: string, model:
 
 async function synthesize(text: string, voice: string, providerId: string, model: string) {
   // 合成需要工作目录：生成结果要落在工作区里再读回来播放。
+  const directory = synthesizeDirectory.value;
+  if (!directory) throw new Error("还没有打开项目，无法确定合成结果放在哪里。请先打开一个项目。");
   // ACT: **必须带 `x-toonflow-workspace: 1`** —— 服务端的 resolveWorkspace 用它判定
   // "这是本机客户端发来的请求"，不带就只能落在服务器工作区内，工作目录在别处时会失败。
   // 踩过：这里原先没带这个头，于是点「试听」报「服务器部署只能使用服务器工作区」——
   // 而素材库能正常读文件（assetLibrary 的请求带了头），所以症状看着很怪。
   const { data } = await axios.post<{ data: { path: string }[] }>("/api/ai/media/generate", {
-    directory: props.directory, mediaType: "audio", providerId, modelId: model, prompt: text, voice,
+    directory, mediaType: "audio", providerId, modelId: model, prompt: text, voice,
   }, { headers: { "x-toonflow-workspace": "1" } });
   const path = data.data[0]?.path;
   if (!path) throw new Error("未返回音频");
