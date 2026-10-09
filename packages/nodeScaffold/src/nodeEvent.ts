@@ -93,6 +93,22 @@ export function useNodeEvent(nodeId = useNodeId(), canvas = useVueFlow()) {
   return { on, emit };
 }
 
+/**
+ * 从节点的 outputs 里取出视频 URL。
+ *
+ * ACT: 持久化的形状是 `{ video: { dataType: "VIDEO", value: { url, mimeType } } }`
+ * （见 videoNode 写入处），但也容忍 `{ video: { url } }` 与直接给字符串 ——
+ * 画布文件是用户数据，形状判断写宽一点，免得换个写法就匹配不上、去重失效。
+ */
+function videoUrlOf(outputs: unknown) {
+  const video = (outputs as { video?: unknown } | undefined)?.video;
+  if (typeof video === "string") return video;
+  if (!video || typeof video !== "object") return undefined;
+  const record = video as { url?: unknown; value?: { url?: unknown } };
+  const stored = record.value?.url ?? record.url;
+  return typeof stored === "string" ? stored : undefined;
+}
+
 // 后台任务（视频生成等）产出结果后：把它放成画布上的一个节点，并通知 agent。
 //
 // 为什么放在这里：节点包不引用 apps/web，只能靠注入拿宿主能力；
@@ -110,6 +126,20 @@ export function useCanvasOutput() {
     return !!flow.findNode(nodeId)?.data?.outputs?.video;
   }
 
+  /**
+   * 画布上是否已经有节点引用了这个成片。
+   *
+   * ACT: 去重必须**跨加载**有效。踩过：`videoGenerationNode` 用组件内的 `placedVideoUrl` 去重，
+   * 而 `output:*` 的监听是 `{ immediate: true }` —— 打开一个已有成片的项目时，
+   * 恢复出来的 URL 一定通过校验，于是**每次打开都会再放一个重复的视频节点、并再通知一次 agent**
+   * （就是那句"画布上的视频「…」已经完成，请查看它的输出…"）。
+   *
+   * 这里以"画布数据里是否已存在同一 URL"为准，与组件生命周期无关，所以重新打开项目不会重复。
+   */
+  function alreadyPlaced(url: string) {
+    return flow.getNodes.value.some(node => videoUrlOf(node.data?.outputs) === url);
+  }
+
   // ACT: 优先复用半径内的空素材节点，而不是无脑新建。
   // 为什么限定半径：多镜头工作流里同画布可能有多个空的 videoNode，
   // 取全局第一个会把 A 段的产出挂到 B 段的节点上；取最近的一般正是它对应的那个。
@@ -124,6 +154,8 @@ export function useCanvasOutput() {
   }
 
   return async function placeOutput(output: { url: string; mimeType: string }, label: string) {
+    // 画布上已有同一成片：既不再放节点，也不再通知 agent。
+    if (alreadyPlaced(output.url)) return undefined;
     const node = id ? flow.findNode(id) : undefined;
     // 放在源节点右侧，尽量不与已有节点重叠。
     const position = { x: node ? node.position.x + 420 : 0, y: node ? node.position.y : 0 };
