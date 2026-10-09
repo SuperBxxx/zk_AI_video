@@ -400,11 +400,6 @@ function blobToDataUrl(blob: Blob) {
   });
 }
 
-async function assetBlob(path: string) {
-  const { data } = await axios.get<Blob>("/api/assets/read", { params: { path }, responseType: "blob" });
-  return data;
-}
-
 async function createVoice(byDesign: boolean) {
   const target = selected.value;
   if (!target) return showError(new Error("请先选择语音模型"));
@@ -475,7 +470,21 @@ async function synthesize(text: string, voice: string, providerId: string, model
   }, { headers: { "x-toonflow-workspace": "1" } });
   const path = data.data[0]?.path;
   if (!path) throw new Error("未返回音频");
-  return URL.createObjectURL(await assetBlob(path));
+  // ACT: 生成结果返回的是**工作区相对路径**（`assets/generated/audio….wav`），
+  // 而 `/api/assets/read` 的根是**素材库目录**（`<data>/assets`）—— 两者根不同，用后者读会 404。
+  // 踩过：桌面版点试听报 `Request failed with status code 404`，就是这里读错了根。
+  // 工作区读接口本来就是为工作区相对路径设计的，带上目录即可。
+  return URL.createObjectURL(await workspaceBlob(directory, path));
+}
+
+/** 按**工作区相对路径**读文件（与素材库读取区分：素材库的根是 `<data>/assets`）。 */
+async function workspaceBlob(directory: string, path: string) {
+  const { data } = await axios.get<Blob>("/api/workspaces/files/read", {
+    params: { directory, path },
+    responseType: "blob",
+    headers: { "x-toonflow-workspace": "1" },
+  });
+  return data;
 }
 
 async function preview() {
