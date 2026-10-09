@@ -51,3 +51,23 @@ export const audioGenerationSchema = z.strictObject({
   format: z.string().trim().min(1).max(64).optional(),
   sampleRate: z.number().int().positive().optional(),
 });
+
+/**
+ * Agent 侧 schema：在图片/视频生成上**强制**一个"已向用户确认"的字段。
+ *
+ * ACT: 为什么加在工具层而不是服务端 —— 生成是"消耗算力"的操作，很贵，
+ * 而节点生成是用户自己点的按钮（本身即确认），**只有 Agent 会静默地决定去生成**。
+ * 所以门槛加在 Agent 的工具入参上：缺这个字段 zod 直接拒，
+ * Agent 会看到"必填缺失"，被引导去用 askUser 把方案（模型/画幅/时长/提示词/次数）
+ * 给用户确认后再调用。内部调用与节点走的是原始 schema，不受影响。
+ *
+ * ACT: 它是一道**流程门槛**，不是防伪造 —— Agent 理论上可以自己填 true。
+ * 真正的强制确认（服务端签发令牌）代价大得多，当前判断不值得。
+ */
+const confirmedField = {
+  userConfirmed: z.literal(true).describe(
+    "必填：仅当已把模型、画幅/分辨率、时长、提示词与生成次数向用户说明并取得明确同意后才传 true。未经确认的生成会被拒绝。",
+  ),
+};
+export const agentImageGenerationSchema = z.strictObject({ ...imageGenerationSchema.shape, ...confirmedField });
+export const agentVideoGenerationSchema = z.strictObject({ ...videoGenerationSchema.shape, ...confirmedField });
