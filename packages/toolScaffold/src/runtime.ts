@@ -116,6 +116,14 @@ export interface MediaModel {
    * 没有这个字段就是「未提供」—— 不要替平台推算或编造。
    */
   price?: { amount: number; per: "second" | "video" | "count"; currency?: string; note?: string };
+  /**
+   * 用户是否把该模型设为了这个类型的首选（「设置 → 模型 → 优先选择模型」）。
+   *
+   * ACT: 由服务端在 `listMediaModels` 里标注 —— Agent 靠这个列表挑生成用的模型，
+   * 不标它就看不到用户偏好，只能照提示词里的通用建议挑（"优先 gpt-image 系列"），
+   * 于是设置里的偏好形同不存在。**用户明确指定模型时仍然优先于本字段。**
+   */
+  preferred?: boolean;
 }
 
 export interface MediaReference {

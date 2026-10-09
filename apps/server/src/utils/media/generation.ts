@@ -48,7 +48,22 @@ function priceOption(value: unknown): { amount: number; per: "second" | "video" 
 
 export async function listMediaModels(): Promise<MediaModel[]> {
   const installedProviders = await listMediaProviders();
-  return installedProviders.flatMap(provider => provider.models.flatMap(model => {
+  // ACT: 标出用户偏好，并把偏好项排在前面。
+  //
+  // 为什么必须标：Agent 生成图片/视频时靠 listMediaModels 挑模型（工具说明写着
+  // "providerId 和 modelId 必须来自 listMediaModels"），而它此前**完全看不到**用户设的偏好
+  // —— 于是照提示词里"优先 gpt-image 系列"去挑，用户设的偏好形同不存在。
+  // 排前面是给"按列表顺序取"的消费方（节点默认值、界面下拉）也留一条一致的暗示。
+  const settings = conf.get("settings", {}) as { preferredModels?: { scope?: string; providerId?: string; modelId?: string }[] };
+  const preferred = Array.isArray(settings.preferredModels) ? settings.preferredModels : [];
+  // scope 与模型 type 的对应：文本模型不在这里（listMediaModels 只列 image/video/audio）。
+  const preferredKeys = new Set(preferred
+    .filter(item => item && typeof item.providerId === "string" && typeof item.modelId === "string")
+    .map(item => `${item.scope}::${item.providerId}::${item.modelId}`));
+  const isPreferred = (type: string, providerId: string, modelId: string) =>
+    preferredKeys.has(`${type}::${providerId}::${modelId}`);
+
+  const models = installedProviders.flatMap(provider => provider.models.flatMap(model => {
     if (model.type !== "image" && model.type !== "video" && model.type !== "audio") return [];
     const builtIn = (mediaProviders as readonly Provider[]).find(item => item.id === provider.id)?.models.find(item => item.id === model.id);
     const price = priceOption(model.price);
@@ -61,8 +76,11 @@ export async function listMediaModels(): Promise<MediaModel[]> {
         imageSizes: imageOptions(Array.isArray(model.imageSizes) ? model.imageSizes : builtIn?.imageSizes, /^[^\u0000-\u001f\u007f]+$/),
         imageRatios: imageOptions(Array.isArray(model.imageRatios) ? model.imageRatios : builtIn?.imageRatios, /^[1-9]\d{0,3}:[1-9]\d{0,3}$/),
       } : {}),
+      ...(isPreferred(model.type, provider.id, model.id) ? { preferred: true } : {}),
     } as MediaModel];
   }));
+  // 稳定排序：偏好项在前，其余保持原有顺序。
+  return [...models.filter(model => model.preferred), ...models.filter(model => !model.preferred)];
 }
 
 function detectMimeType(bytes: Uint8Array, fallback: string) {
