@@ -1,16 +1,16 @@
 {
   "name": "zhukai-video",
   "description": "住凯AI视频 —— AI 短剧漫剧与短视频创作工具。基于 Toonflow（MIT，Copyright (c) 2026 HBAI-Ltd）改造。",
-  "author": "HBAI-Ltd <ltlctools@outlook.com>",
+  "author": "SuperBxxx",
   "license": "MIT",
-  "homepage": "https://github.com/HBAI-Ltd/Toonflow-app#readme",
+  "//": "本仓库是 HBAI-Ltd/Toonflow-app（MIT）的改造版：上游版权与许可声明见 LICENSE 与 i18n 的「关于」文案，不在此处移除。",
+  "homepage": "https://github.com/SuperBxxx/zk_AI_video#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/HBAI-Ltd/Toonflow-app.git"
+    "url": "git+https://github.com/SuperBxxx/zk_AI_video.git"
   },
   "bugs": {
-    "url": "https://github.com/HBAI-Ltd/Toonflow-app/issues",
-    "email": "ltlctools@outlook.com"
+    "url": "https://github.com/SuperBxxx/zk_AI_video/issues"
   },
   "type": "module",
   "packageManager": "bun@1.3.14",

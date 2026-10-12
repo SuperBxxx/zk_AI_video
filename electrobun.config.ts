@@ -39,10 +39,16 @@ export default {
   },
   release: {
     // ACT: 上游把这里默认指回 HBAI-Ltd/Toonflow-app。对住凯AI视频是错的——用户点更新会装成上游版本。
-    // 发布前必须用 UPDATE_BASE_URL 指向自己的发布地址；未设置时用占位域名，宁可让更新失败也不要装错。
-    // 例：UPDATE_BASE_URL=https://dl.example.com/zhukai
+    // 现在默认为本项目的仓库；发布到别处时用 UPDATE_BASE_URL 覆盖。
+    //
+    // ACT: 注意更新通道**不是**建了仓库就能用 —— 客户端会去取
+    // `<baseUrl>/stable-win-x64-update.json`，那个清单与配套产物（tar.zst、增量 patch）
+    // 必须由 `bun run release:desktop <版本号> --initial` 生成，并作为 **GitHub Release**
+    // 上传（`/releases/latest/download/` 只服务最新 Release 的资产，普通文件提交不生效）。
+    // 仓库里没有 Release 时，检查更新会 404 —— 这是预期行为，不是缺陷。
+    // GitHub Actions 构建时 GITHUB_REPOSITORY 会被自动设置，从而指向实际运行构建的仓库。
     baseUrl: process.env.UPDATE_BASE_URL
-      ?? `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${process.env.GITHUB_REPOSITORY || "zhukai-video/zhukai-video"}/releases/latest/download`,
+      ?? `${process.env.GITHUB_SERVER_URL || "https://github.com"}/${process.env.GITHUB_REPOSITORY || "SuperBxxx/zk_AI_video"}/releases/latest/download`,
     // ACT: 常规构建不访问更新服务器；release:desktop 显式开启增量构建。
     generatePatch: process.env.generateUpdatePatch === "1",
   },
