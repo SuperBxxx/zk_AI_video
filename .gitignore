@@ -34,3 +34,6 @@ Thumbs.db
 /.tmp-install/
 /.tmp-verify/
 /_artifact-server.mjs
+
+# 内部策略文档：只保留在本地，不进公开仓库
+品牌化改造计划.md
